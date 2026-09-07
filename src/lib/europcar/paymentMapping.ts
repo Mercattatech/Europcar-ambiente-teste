@@ -131,21 +131,31 @@ export function buildCreateVoucherXml(
 ): string {
   const isETO = voucherData.type === 'ETO';
 
-  // ETO: <meanOfPayment typeCode="VCH" voucherType="ETO" businessAccount="73675595" ...>
-  // EXO: <meanOfPayment typeCode="VCH" voucherType="EXO" IATANumber="02170722" ...>
-  const typeSpecificAttrs = isETO
-    ? `businessAccount="${escapeXml(voucherData.businessAccount || '')}"`
-    : `IATANumber="${escapeXml(voucherData.iataNumber || '02170722')}"`;
-  const duration = voucherDurationDays(pickupDate, returnDate);
+  if (isETO) {
+    const duration = voucherDurationDays(pickupDate, returnDate);
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<message>
+  <serviceRequest serviceCode="createVoucher">
+    <serviceParameters>
+      <reservation resNumber="${escapeXml(resNumber)}">
+        <meanOfPayment typeCode="VCH" voucherType="ETO" businessAccount="${escapeXml(voucherData.businessAccount || '')}" voucherAmount="${escapeXml(voucherAmount)}" voucherCurrency="${escapeXml(voucherCurrency)}" voucherCarCategory="${escapeXml(carCategory || '')}" voucherRentalDuration="${escapeXml(duration)}"/>
+      </reservation>
+    </serviceParameters>
+  </serviceRequest>
+</message>`;
+  }
 
+  // EXO (Voucher de Agência): estrutura exata homologada por Antonio (Europcar)
+  const iata = voucherData.iataNumber || '02170722';
   return `<?xml version="1.0" encoding="UTF-8"?>
 <message>
   <serviceRequest serviceCode="createVoucher">
     <serviceParameters>
       <reservation resNumber="${escapeXml(resNumber)}">
-        <meanOfPayment typeCode="VCH" voucherType="${escapeXml(voucherData.type)}" ${typeSpecificAttrs} voucherAmount="${escapeXml(voucherAmount)}" voucherCurrency="${escapeXml(voucherCurrency)}" voucherCarCategory="${escapeXml(carCategory || '')}" voucherRentalDuration="${escapeXml(duration)}"/>
+        <meanOfPayment typeCode="VCH" voucherType="EXO" IATANumber="${escapeXml(iata)}" voucherAmount="${escapeXml(voucherAmount)}" voucherCurrency="${escapeXml(voucherCurrency)}"/>
       </reservation>
     </serviceParameters>
   </serviceRequest>
 </message>`;
 }
+
