@@ -9,7 +9,7 @@ const DEFAULTS: Array<string | { name: string; code: string }> = [
   { name: 'AIR EUROPA SUMA', code: 'UXP' }, // loyaltyID correto fornecido pela Europcar (Antonio)
   'AIR INDIA MAHARAJA CLUB',
   'AIRBERLIN TOPBONUS',
-  'ALL – ACCOR LIVE LIMITLESS',
+  { name: 'ALL – ACCOR LIVE LIMITLESS', code: 'ACL' }, // loyaltyID correto fornecido pela Europcar (Antonio)
   'AMERICAN AIRLINES ADVANTAGE PROGR.',
   'ASIA MILES',
   'BAHN.BONUS',
