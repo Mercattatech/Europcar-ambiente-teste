@@ -846,7 +846,7 @@ function VehiclesContent() {
             const rawIns  = quote.insuranceList.insurance;
             const insArr  = Array.isArray(rawIns) ? rawIns : [rawIns];
 
-            const parsedInsurances = insArr.map((ins: any) => {
+            const parsedInsurances: any[] = insArr.map((ins: any) => {
               const a = ins.$ || ins;
               const code = (a.code || '').toUpperCase();
               const descr = translateDescr(code, a.descr || '');
@@ -862,6 +862,7 @@ function VehiclesContent() {
                 excessWithPOM:                 parseFloat(a.excessWithPOM      || '0'),
                 bkExcessWithPOM:               parseFloat(a.bkExcessWithPOM    || '0'),
                 prepaid:                       a.prepaid                       || '',
+                paidBy:                        undefined as string | undefined,
               };
             }).filter((ins: any) => ins.code);
 
@@ -975,10 +976,11 @@ function VehiclesContent() {
                       excessWithPOM:                 0,
                       bkExcessWithPOM:               0,
                       prepaid:                       '',
-                      paidBy,
+                      paidBy: 'counter' as any,  // Airport surcharge = SEMPRE balcão
                     });
                   } else {
                     // POA customer: this call is already NP — value is authoritative.
+                    // chrgTy 00024 = SEMPRE pago no balcão, independente do paidBy do XRS.
                     parsedInsurances.push({
                       code:                          auxK && auxK !== '8' && auxK !== '' ? auxK : 'AIRPORTFEE',
                       descr:                         AIRPORT_LABEL,
@@ -991,7 +993,7 @@ function VehiclesContent() {
                       excessWithPOM:                 0,
                       bkExcessWithPOM:               0,
                       prepaid:                       '',
-                      paidBy,
+                      paidBy: 'counter' as any,  // Airport surcharge = SEMPRE balcão
                     });
                   }
                   return;
@@ -1111,6 +1113,40 @@ function VehiclesContent() {
               amountToPayOnArrival: quoteAttrs.amountToPayOnArrival || '0',
               amountToPayOnArrivalInBookingCurrency: quoteAttrs.amountToPayOnArrivalInBookingCurrency || '0',
             });
+          }
+        }
+
+        // ── Fallback: sobretaxa de aeroporto do NP quando PP não retornou chargeList ──
+        // Quando getQuote PP não retorna quote (comum para ETO CIDs), a sobretaxa
+        // de aeroporto do NP call (npAirportEntry) precisa ser injetada manualmente.
+        // chrgTy 00024 = SEMPRE pago no balcão, nunca somar no ticket Cielo.
+        if (npAirportEntry && npAirportEntry.priceBRL > 0) {
+          const currentInsurances = quoteInsurances.length > 0 ? [...quoteInsurances] : [];
+          const hasAirport = currentInsurances.some((i: any) =>
+            ['APF','APT','AIRPORTFEE','APS','ASF','APF2','APTF','STF'].includes((i.code || '').toUpperCase()) ||
+            i.code === 'AIRPORTFEE' ||
+            (i.descr || '').toLowerCase().includes('airport') ||
+            (i.descr || '').toLowerCase().includes('aeroporto')
+          );
+          if (!hasAirport) {
+            const npVatMult = npAirportEntry.vatPct > 0 ? 1 + npAirportEntry.vatPct / 100 : 1;
+            const airportEntry = {
+              code:                          'AIRPORTFEE',
+              descr:                         'Sobretaxa de aeroporto/estação ferroviária',
+              type:                          'M',
+              includedInTotal:               'Y',
+              price:                         npAirportEntry.price    * npVatMult,
+              priceInBookingCurrency:        npAirportEntry.priceBRL * npVatMult,
+              rentalPriceAI:                 0,
+              rentalPriceInBookingCurrencyAI: 0,
+              excessWithPOM:                 0,
+              bkExcessWithPOM:               0,
+              prepaid:                       '',
+              paidBy:                        'counter' as const,  // SEMPRE balcão
+            };
+            currentInsurances.push(airportEntry);
+            setQuoteInsurances(currentInsurances);
+            console.log(`[Step3] ✈️ Airport surcharge injetada via NP fallback: EUR ${npAirportEntry.price.toFixed(2)} / BRL ${npAirportEntry.priceBRL.toFixed(2)} (VAT ${npAirportEntry.vatPct}%) → paidBy=counter`);
           }
         }
 

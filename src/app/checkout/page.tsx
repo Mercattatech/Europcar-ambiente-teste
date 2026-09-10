@@ -548,9 +548,16 @@ export default function CheckoutPage() {
 
   // Cobranças a pagar no balcão — definidas pelo XRS via campo paidBy
   // paidBy='business' → conta corporativa (BA) → pago no balcão, NÃO cobrar online
+  // paidBy='counter'  → chrgTy 00024 (airport surcharge) → SEMPRE balcão
   // paidBy='driver'   → motorista → cobrar online via Cielo
-  // Fallback: se paidBy não existe, verificar se há cobranças de aeroporto sem paidBy
-  const counterCharges = (booking?.quoteInsurances || []).filter((i: any) => i.paidBy === 'business');
+  const AIRPORT_CODES = ['APF','APT','AIRPORTFEE','APS','ASF','APF2','APTF','STF'];
+  const counterCharges = (booking?.quoteInsurances || []).filter((i: any) => {
+    // paidBy='counter' ou 'business' = balcão
+    if (i.paidBy === 'counter' || i.paidBy === 'business') return true;
+    // Airport surcharge codes sem paidBy = balcão (fallback por código)
+    if (!i.paidBy && AIRPORT_CODES.includes((i.code || '').toUpperCase())) return true;
+    return false;
+  });
   const hasXRSPayerData = (booking?.quoteInsurances || []).some((i: any) => i.paidBy && i.paidBy !== 'unknown');
   const airportSurchargeBRL = counterCharges.reduce((sum: number, ins: any) => {
     const val = ins.rentalPriceInBookingCurrencyAI > 0
@@ -1497,7 +1504,7 @@ export default function CheckoutPage() {
               return (
                 <div className="mx-5 mb-3 flex flex-col gap-1 bg-orange-50 border border-orange-200 rounded-lg p-3">
                   <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">✈ Valores a pagar no balcão</span>
+                    <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">✈ Cobranças pagas no balcão</span>
                   </div>
                   {balcaoFees.map((ins: any, idx: number) => {
                     const val = ins.rentalPriceInBookingCurrencyAI > 0
