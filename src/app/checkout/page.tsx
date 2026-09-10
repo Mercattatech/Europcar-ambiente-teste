@@ -55,6 +55,7 @@ export default function CheckoutPage() {
   const [ccNumber, setCcNumber] = useState("");
   const [ccValidity, setCcValidity] = useState("");
   const [ccCvv, setCcCvv] = useState("");
+  const [ccInstallments, setCcInstallments] = useState(1);
 
   const [threeDsReady, setThreeDsReady] = useState(false); // script MPI carregado
   const [threeDsAccessToken, setThreeDsAccessToken] = useState(""); // token Braspag MPI
@@ -585,6 +586,7 @@ export default function CheckoutPage() {
           paymentData: {
             method: paymentMethod,
             amountInCents,
+            installments: paymentMethod === "CREDIT" ? ccInstallments : 1,
             // Reaproveita o mesmo MerchantOrderId autenticado no 3DS — evita
             // inconsistência entre a autenticação e a cobrança na Cielo.
             merchantOrderId: paymentMethod === "CREDIT" ? ccOrderNumber : undefined,
@@ -1203,7 +1205,7 @@ export default function CheckoutPage() {
                       <input type="hidden" className="bpmpi_currency" value="BRL" readOnly />
                       <input type="hidden" className="bpmpi_totalamount" value={amountInCents} readOnly />
                       <input type="hidden" className="bpmpi_paymentmethod" value="Credit" readOnly />
-                      <input type="hidden" className="bpmpi_installments" value="1" readOnly />
+                      <input type="hidden" className="bpmpi_installments" value={ccInstallments} readOnly />
 
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Nome no Cartão</label>
@@ -1260,6 +1262,26 @@ export default function CheckoutPage() {
                             autoComplete="cc-csc"
                           />
                         </div>
+                      </div>
+
+                      {/* Parcelas */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Parcelas</label>
+                        <select
+                          id="cc-installments"
+                          value={ccInstallments}
+                          onChange={e => setCcInstallments(Number(e.target.value))}
+                          className="w-full border rounded p-3 outline-none focus:border-[#008d36] bg-white text-gray-900"
+                        >
+                          {[1, 2, 3, 4, 5, 6].map(n => {
+                            const parcela = baseAmountBRL / n;
+                            return (
+                              <option key={n} value={n}>
+                                {n}x de R$ {parcela.toFixed(2).replace('.', ',')} sem juros
+                              </option>
+                            );
+                          })}
+                        </select>
                       </div>
                       {threeDsProcessing ? (
                         <p className="text-xs text-blue-600 flex items-center gap-2 font-bold">
@@ -1705,6 +1727,14 @@ export default function CheckoutPage() {
                     Inclui aluguel do veículo, proteções incluídas, taxas e impostos.
                     {airportSurchargeBRL > 0 && ' A sobretaxa de aeroporto foi subtraída deste valor (paga no balcão).'}
                   </p>
+                  {paymentMethod === 'CREDIT' && ccInstallments > 1 && (
+                    <div className="mt-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-center">
+                      <span className="text-sm font-black text-[#008d36]">
+                        {ccInstallments}x de R$ {(baseAmountBRL / ccInstallments).toFixed(2).replace('.', ',')}
+                      </span>
+                      <span className="text-xs text-green-700 ml-1">sem juros</span>
+                    </div>
+                  )}
 
                   {/* ── BLOCO 2: PAGAMENTO NO BALCÃO ── */}
                   {(() => {

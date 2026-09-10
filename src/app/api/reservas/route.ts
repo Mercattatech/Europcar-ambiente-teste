@@ -204,7 +204,7 @@ export async function POST(request: Request) {
          const cieloPaymentNode: any = {
              "Type": "CreditCard",
              "Amount": paymentData.amountInCents,
-             "Installments": 1,
+             "Installments": Math.min(Math.max(paymentData.installments || 1, 1), 6),
              "Capture": true,
              "SoftDescriptor": "EUROPCAR",
              "CreditCard": {
