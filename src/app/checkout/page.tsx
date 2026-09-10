@@ -1103,7 +1103,7 @@ export default function CheckoutPage() {
               </div>
               <div className="mt-4">
                 <label className="block text-xs font-bold text-gray-700 mb-1">Número do Voo <span className="text-gray-400 font-normal">(Opcional)</span></label>
-                <input value={flightNumber} onChange={e => setFlightNumber(e.target.value.toUpperCase())} className="w-full border rounded p-3 outline-none focus:border-[#008d36]" placeholder="Ex: LA3212" />
+                <input value={flightNumber} onChange={e => setFlightNumber(e.target.value.toUpperCase())} maxLength={8} className="w-full border rounded p-3 outline-none focus:border-[#008d36]" placeholder="Ex: LA3212" />
               </div>
             </div>
 
