@@ -546,21 +546,18 @@ export default function CheckoutPage() {
   // payerSplit é mantido apenas para auditoria/GW.
   const payerSplit = booking?.payerSplit ?? null;
 
-  // Sobretaxa de aeroporto — detectada por nome no chargeList XRS (quoteInsurances)
-  const airportSurchargeBRL = (() => {
-    const fees = (booking?.quoteInsurances || []).filter((i: any) => {
-      const d = (i.descr || '').toLowerCase();
-      return d.includes('aeroporto') || d.includes('airport') ||
-        d.includes('ferroviária') || d.includes('railway') ||
-        d === 'sobretaxa de aeroporto/estação ferroviária';
-    });
-    return fees.reduce((sum: number, ins: any) => {
-      const val = ins.rentalPriceInBookingCurrencyAI > 0
-        ? ins.rentalPriceInBookingCurrencyAI
-        : (ins.priceInBookingCurrency > 0 ? ins.priceInBookingCurrency : ins.price);
-      return sum + (parseFloat(val) || 0);
-    }, 0);
-  })();
+  // Cobranças a pagar no balcão — definidas pelo XRS via campo paidBy
+  // paidBy='business' → conta corporativa (BA) → pago no balcão, NÃO cobrar online
+  // paidBy='driver'   → motorista → cobrar online via Cielo
+  // Fallback: se paidBy não existe, verificar se há cobranças de aeroporto sem paidBy
+  const counterCharges = (booking?.quoteInsurances || []).filter((i: any) => i.paidBy === 'business');
+  const hasXRSPayerData = (booking?.quoteInsurances || []).some((i: any) => i.paidBy && i.paidBy !== 'unknown');
+  const airportSurchargeBRL = counterCharges.reduce((sum: number, ins: any) => {
+    const val = ins.rentalPriceInBookingCurrencyAI > 0
+      ? ins.rentalPriceInBookingCurrencyAI
+      : (ins.priceInBookingCurrency > 0 ? ins.priceInBookingCurrency : ins.price);
+    return sum + (parseFloat(val) || 0);
+  }, 0);
 
   // Valor a cobrar online = total XRS − sobretaxa aeroporto (paga no balcão)
   const baseAmountBRL = Math.max(0, (totalBRL > 0 ? totalBRL : totalRateXRS) - airportSurchargeBRL);
@@ -1467,22 +1464,42 @@ export default function CheckoutPage() {
               )}
             </div>
 
-            {/* ═══════════════ SOBRETAXA AEROPORTO ═══════════════ */}
-            {/* Sobretaxa de aeroporto/estação ferroviária — box destacado com valor (escondido quando BALCAO) */}
+            {/* ═══════════════ COBRANÇAS PAGAS NO BALCÃO (via XRS paidBy) ═══════════════ */}
             {paymentMethod !== 'BALCAO' && (() => {
-              const airportFees = booking?.quoteInsurances?.filter((i: any) => {
-                const d = (i.descr || '').toLowerCase();
-                return d.includes('aeroporto') || d.includes('airport') ||
-                  d.includes('ferroviária') || d.includes('railway') ||
-                  d === 'sobretaxa de aeroporto/estação ferroviária';
-              }) || [];
-              if (airportFees.length === 0) return null;
+              // Cobranças que o XRS atribui à BA (business account) = pago no balcão
+              const balcaoFees = counterCharges;
+              
+              // Se não há dados de paidBy do XRS E a estação pode ter sobretaxa, exibir aviso genérico
+              if (!hasXRSPayerData) {
+                // Verificar se alguma cobrança parece ser de aeroporto (apenas para exibir aviso)
+                const mayHaveAirportFee = (booking?.quoteInsurances || []).some((i: any) => {
+                  const d = (i.descr || '').toLowerCase();
+                  return d.includes('aeroporto') || d.includes('airport') ||
+                    d.includes('ferroviária') || d.includes('railway');
+                });
+                if (mayHaveAirportFee) {
+                  return (
+                    <div className="mx-5 mb-3 flex flex-col gap-1 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">ⓘ Aviso sobre sobretaxa</span>
+                      </div>
+                      <p className="text-[10px] text-amber-700 leading-tight mt-1">
+                        Esta estação pode cobrar uma sobretaxa de aeroporto/estação ferroviária.
+                        Consulte diretamente com a Europcar no balcão de retirada para confirmar o valor.
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              }
+
+              if (balcaoFees.length === 0) return null;
               return (
                 <div className="mx-5 mb-3 flex flex-col gap-1 bg-orange-50 border border-orange-200 rounded-lg p-3">
                   <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">✈ Sobretaxa de aeroporto/estação ferroviária</span>
+                    <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">✈ Valores a pagar no balcão</span>
                   </div>
-                  {airportFees.map((ins: any, idx: number) => {
+                  {balcaoFees.map((ins: any, idx: number) => {
                     const val = ins.rentalPriceInBookingCurrencyAI > 0
                       ? ins.rentalPriceInBookingCurrencyAI
                       : (ins.priceInBookingCurrency > 0 ? ins.priceInBookingCurrency : ins.price);
@@ -1499,7 +1516,7 @@ export default function CheckoutPage() {
                     );
                   })}
                   <p className="text-[9px] text-orange-600 mt-1 leading-tight border-t border-orange-200 pt-1">
-                    ⓘ Este valor é cobrado diretamente pela Europcar no balcão de retirada.
+                    ⓘ Estes valores são definidos pela Europcar e cobrados no balcão de retirada.
                   </p>
                 </div>
               );
@@ -1650,10 +1667,10 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Sobretaxa no total (apenas quando NÃO é BALCAO) */}
+              {/* Valores pagos no balcão (apenas quando NÃO é BALCAO) */}
               {airportSurchargeBRL > 0 && paymentMethod !== 'BALCAO' && (
                 <div className="flex justify-between items-center text-xs text-orange-600 mt-2 pt-2 border-t border-gray-100">
-                  <span>✈ Sobretaxa de aeroporto (pago no balcão)</span>
+                  <span>✈ Valores pagos no balcão</span>
                   <span className="font-bold">{totalBRL > 0 ? bookingCurrency : currency} {airportSurchargeBRL.toFixed(2).replace('.', ',')}</span>
                 </div>
               )}

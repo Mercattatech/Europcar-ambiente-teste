@@ -930,6 +930,13 @@ function VehiclesContent() {
                 const price      = parseFloat(a.price || '0');
                 const priceBK    = parseFloat(a.priceInBookingCurrency || '0');
 
+                // ── paidBy: quem paga esta cobrança (fonte XRS) ──────────────
+                const payerNode = c.payer?.$ || c.payer || {};
+                const paidBy: 'driver' | 'business' | 'unknown' =
+                  'dvrName' in payerNode ? 'driver'
+                  : 'ba' in payerNode ? 'business'
+                  : 'unknown';
+
                 // Skip pure rental/mileage infrastructure lines
                 if (skipChrgTy.has(chrgTy)) return;
                 // Skip equipment items (already shown in extras section)
@@ -968,6 +975,7 @@ function VehiclesContent() {
                       excessWithPOM:                 0,
                       bkExcessWithPOM:               0,
                       prepaid:                       '',
+                      paidBy,
                     });
                   } else {
                     // POA customer: this call is already NP — value is authoritative.
@@ -983,6 +991,7 @@ function VehiclesContent() {
                       excessWithPOM:                 0,
                       bkExcessWithPOM:               0,
                       prepaid:                       '',
+                      paidBy,
                     });
                   }
                   return;
@@ -1009,6 +1018,7 @@ function VehiclesContent() {
                       excessWithPOM: 0,
                       bkExcessWithPOM: 0,
                       prepaid: '',
+                      paidBy,
                     });
                   }
                   return;
@@ -1030,6 +1040,7 @@ function VehiclesContent() {
                   excessWithPOM: 0,
                   bkExcessWithPOM: 0,
                   prepaid: '',
+                  paidBy,
                 });
               });
             }
