@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
@@ -1564,10 +1564,12 @@ function VehiclesContent() {
                                 <svg className="w-[16px] h-[16px] text-[#008d36]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                                 {car.mileageType === "Livre" ? "Quilometragem ilimitada" : car.mileageLimit ? `${car.mileageLimit} ${car.mileageUnit || "km"} incluído` : "Quilometragem incluída"}
                               </div>
+                              {!isBrazil && (
                               <div className="text-[#008d36] flex items-center gap-2 text-sm font-bold">
                                 <svg className="w-[16px] h-[16px] text-[#008d36]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                                 Proteção básica incluída
                               </div>
+                              )}
                             </div>
                           </div>
 
@@ -1713,6 +1715,7 @@ function VehiclesContent() {
                                 )}
                               </div>
 
+                              {!isBrazil && (
                               <div className="border-[2px] border-gray-100 bg-white rounded-xl p-5 flex flex-col justify-start">
                                 <span className="text-[10px] font-black text-[#e4002b] uppercase tracking-wider mb-1">INCLUÍDO</span>
                                 <h4 className="text-[17px] font-black text-gray-900 mb-2">Proteção básica</h4>
@@ -1747,6 +1750,7 @@ function VehiclesContent() {
                                   Você poderá fazer upgrade da proteção depois de selecionar este veículo
                                 </div>
                               </div>
+                              )}
                             </div>
 
                           </div>
