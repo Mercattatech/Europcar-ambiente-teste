@@ -115,6 +115,8 @@ export default function WhatsappPage() {
     RESERVA_SUCESSO: { ...DEFAULT_TRIGGER },
     RESERVA_BALCAO: { ...DEFAULT_TRIGGER },
     CANCELAMENTO: { ...DEFAULT_TRIGGER },
+    PIX_LEMBRETE: { ...DEFAULT_TRIGGER },
+    PIX_AGRADECIMENTO: { ...DEFAULT_TRIGGER },
   });
   const [activeTriggerId, setActiveTriggerId] = useState("RESERVA_SUCESSO");
 
@@ -136,7 +138,7 @@ export default function WhatsappPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [tkn, bUrl, nums, intv, trRs, trBc, trCanc] = await Promise.all([
+      const [tkn, bUrl, nums, intv, trRs, trBc, trCanc, trPixL, trPixA] = await Promise.all([
         waGet("TOKEN"),
         waGet("BASE_URL"),
         waGet("NUMBERS"),
@@ -144,6 +146,8 @@ export default function WhatsappPage() {
         waGet("TRIGGER_RESERVA_SUCESSO"),
         waGet("TRIGGER_RESERVA_BALCAO"),
         waGet("TRIGGER_CANCELAMENTO"),
+        waGet("TRIGGER_PIX_LEMBRETE"),
+        waGet("TRIGGER_PIX_AGRADECIMENTO"),
       ]);
 
       if (tkn) setToken(tkn);
@@ -165,6 +169,8 @@ export default function WhatsappPage() {
         RESERVA_SUCESSO: parseTrigger(trRs, "RESERVA_SUCESSO"),
         RESERVA_BALCAO: parseTrigger(trBc, "RESERVA_BALCAO"),
         CANCELAMENTO: parseTrigger(trCanc, "CANCELAMENTO"),
+        PIX_LEMBRETE: parseTrigger(trPixL, "PIX_LEMBRETE"),
+        PIX_AGRADECIMENTO: parseTrigger(trPixA, "PIX_AGRADECIMENTO"),
       });
     } catch (e) {
       console.error(e);
@@ -188,6 +194,8 @@ export default function WhatsappPage() {
         waSet("TRIGGER_RESERVA_SUCESSO", JSON.stringify(triggerConfigs.RESERVA_SUCESSO)),
         waSet("TRIGGER_RESERVA_BALCAO", JSON.stringify(triggerConfigs.RESERVA_BALCAO)),
         waSet("TRIGGER_CANCELAMENTO", JSON.stringify(triggerConfigs.CANCELAMENTO)),
+        waSet("TRIGGER_PIX_LEMBRETE", JSON.stringify(triggerConfigs.PIX_LEMBRETE)),
+        waSet("TRIGGER_PIX_AGRADECIMENTO", JSON.stringify(triggerConfigs.PIX_AGRADECIMENTO)),
       ]);
       setMsg({ text: "✅ Configurações salvas com sucesso!", ok: true });
       setTimeout(() => setMsg(null), 4000);
