@@ -24,7 +24,8 @@ export async function GET(request: Request) {
          return NextResponse.json({ status: 'PAID', resNumber: reservaLocal.resNumber });
      }
 
-     if (reservaLocal.status === 'PENDING_PIX') {
+      // Check PIX status for both PENDING_PIX and ON_REQUEST (PIX + on-request)
+      if (reservaLocal.status === 'PENDING_PIX' || reservaLocal.status === 'ON_REQUEST') {
          // Consulta API da Cielo para ver se pagou
          const cieloConfig = await prisma.cieloConfig.findFirst();
          if (!cieloConfig) return NextResponse.json({ error: 'chaves da cielo falha' }, { status: 500 });

@@ -583,7 +583,7 @@ export async function POST(request: Request) {
               resNumber: resNumber,
               merchantOrderId,
               amountInCents: paymentData.amountInCents || 0,
-              status: isOnRequest ? 'ON_REQUEST' : (paymentData.method === 'PIX' ? 'PENDING_PIX' : (paymentData.method === 'BALCAO' ? 'CONFIRMED_NON_PREPAID' : 'CONFIRMED_PREPAID')),
+              status: paymentData.method === 'PIX' ? 'PENDING_PIX' : (isOnRequest ? 'ON_REQUEST' : (paymentData.method === 'BALCAO' ? 'CONFIRMED_NON_PREPAID' : 'CONFIRMED_PREPAID')),
               customerData: JSON.stringify({
                 ...safeCustomerData,      // sem creditCard, cvv, cardNumber
                 booking: bookingData,

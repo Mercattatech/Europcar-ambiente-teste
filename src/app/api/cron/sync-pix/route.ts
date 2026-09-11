@@ -16,7 +16,7 @@ export async function GET() {
 
       const pendingReservations = await prisma.localReservation.findMany({
          where: { 
-            status: 'PENDING_PIX',
+            status: { in: ['PENDING_PIX', 'ON_REQUEST'] },
             createdAt: { gte: yesterday }
          }
       });
