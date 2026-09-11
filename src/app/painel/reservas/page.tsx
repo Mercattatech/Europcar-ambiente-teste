@@ -630,7 +630,16 @@ export default function PainelReservas() {
                                            <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Valores e Pagamento</p>
                                            <p className="text-gray-300"><strong>Total EUR:</strong> {parsed?.booking?.car?.totalRateEstimate ? `€ ${parseFloat(parsed.booking.car.totalRateEstimate).toFixed(2)}` : "—"}</p>
                                            <p className="text-gray-300"><strong>Total BRL:</strong> {res.amountInCents ? `R$ ${(res.amountInCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : parsed?.booking?.car?.totalRateInBookingCurrency ? `R$ ${parseFloat(parsed.booking.car.totalRateInBookingCurrency).toFixed(2)}` : "—"}</p>
-                                           <p className="text-gray-300"><strong>Câmbio:</strong> {parsed?.booking?.car?.exchangeRate ? `1 EUR = ${parseFloat(parsed.booking.car.exchangeRate).toFixed(4)} BRL` : "—"}</p>
+                                           <p className="text-gray-300"><strong>Câmbio:</strong> {(() => {
+                                              const totalEUR = parseFloat(parsed?.booking?.car?.totalRateEstimate || '0');
+                                              const totalBRLraw = res.amountInCents ? res.amountInCents / 100 : parseFloat(parsed?.booking?.car?.totalRateInBookingCurrency || '0');
+                                              const xrsRate = parseFloat(parsed?.booking?.car?.exchangeRate || '0');
+                                              if (totalEUR > 0 && totalBRLraw > 0) {
+                                                const effectiveRate = totalBRLraw / totalEUR;
+                                                return `1 EUR = ${effectiveRate.toFixed(4)} BRL${xrsRate > 0 && Math.abs(effectiveRate - xrsRate) > 0.01 ? ` (XRS: ${xrsRate.toFixed(4)})` : ''}`;
+                                              }
+                                              return xrsRate > 0 ? `1 EUR = ${xrsRate.toFixed(4)} BRL (XRS)` : '—';
+                                           })()}</p>
                                            <div className="border-t border-gray-700/50 my-2"></div>
                                            <p className="text-gray-300"><strong>Método:</strong> <span className={`text-xs font-bold px-2 py-0.5 rounded ${res.status === 'CONFIRMED_PREPAID' ? 'bg-green-500/20 text-green-400' : res.status === 'PENDING_PIX' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-300'}`}>{STATUS_LABELS[res.status] || res.status}</span></p>
                                            {parsed?.contractID && <p className="text-gray-300 mt-1"><strong>ContractID:</strong> <span className="font-mono text-xs text-orange-400">{parsed.contractID}</span></p>}

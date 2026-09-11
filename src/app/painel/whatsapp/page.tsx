@@ -49,6 +49,22 @@ const TRIGGERS = [
     defaultBody:
       "🚫 *Cancelamento de Reserva - Europcar Brasil*\n\nOlá, {{NOME}}.\n\nInformamos que a reserva *{{NUMERO_RESERVA}}* foi cancelada.\n\nSe precisar de ajuda ou quiser fazer uma nova reserva, acesse nosso site ou entre em contato.\n_Europcar Brasil_",
   },
+  {
+    id: "PIX_LEMBRETE",
+    label: "⏰ Lembrete PIX",
+    description: "Disparado automaticamente quando o PIX não é pago em ~5 minutos. Enviado até 5 vezes.",
+    color: "yellow",
+    defaultBody:
+      "💰 *Lembrete de Pagamento - Europcar Brasil*\n\nOlá, {{NOME}}! 👋\n\nNotamos que o PIX da sua reserva ainda está pendente.\n\n💵 *Valor:* {{VALOR_TOTAL}}\n\nSe houve algum problema, você pode gerar um novo PIX clicando no link abaixo:\n🔗 {{LINK_RETRY_PIX}}\n\nSe precisar de ajuda, estamos à disposição!\n_Europcar Brasil_",
+  },
+  {
+    id: "PIX_AGRADECIMENTO",
+    label: "🎉 PIX Confirmado",
+    description: "Disparado quando o pagamento PIX é confirmado. Mensagem de agradecimento.",
+    color: "emerald",
+    defaultBody:
+      "✅ *Pagamento Confirmado - Europcar Brasil*\n\nObrigado, {{NOME}}! 🎉\n\nSeu pagamento PIX de *{{VALOR_TOTAL}}* foi confirmado com sucesso!\n\n📋 *Nº da Reserva:* {{NUMERO_RESERVA}}\n🚘 *Veículo:* {{CARRO}}\n\nSua reserva está garantida. Boas viagens! 🚗\n_Europcar Brasil_",
+  },
 ];
 
 const VARIABLES = [
@@ -63,6 +79,7 @@ const VARIABLES = [
   { key: "{{LOCAL_DEVOLUCAO}}", label: "Local de devolução", color: "text-purple-400" },
   { key: "{{VALOR_TOTAL}}", label: "Valor total", color: "text-orange-400" },
   { key: "{{FORMA_PAGAMENTO}}", label: "Forma de pagamento", color: "text-orange-400" },
+  { key: "{{LINK_RETRY_PIX}}", label: "Link para novo PIX", color: "text-red-400" },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

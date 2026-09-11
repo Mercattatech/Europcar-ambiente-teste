@@ -6,6 +6,7 @@ export default function Footer() {
   const year = new Date().getFullYear();
   const [termsAvailable, setTermsAvailable] = useState<{reserva: boolean, pais: boolean, paisUrl: string, brasil: boolean}>({reserva: false, pais: false, paisUrl: '', brasil: false});
   const [openSection, setOpenSection] = useState<string | null>(null);
+  const [privacyUrl, setPrivacyUrl] = useState('https://www.europcar.com/privacy-policy');
 
   useEffect(() => {
     fetch('/api/admin/terms')
@@ -21,6 +22,12 @@ export default function Footer() {
           });
         }
       })
+      .catch(() => {});
+
+    // Load privacy policy URL from admin panel
+    fetch('/api/admin/config?key=PRIVACY_POLICY_URL')
+      .then(r => r.json())
+      .then(d => { if (d.value) setPrivacyUrl(d.value); })
       .catch(() => {});
   }, []);
 
@@ -69,7 +76,7 @@ export default function Footer() {
                 <li><a href="https://www.europcar.com/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Informação Legal</a></li>
                 <li><a href="https://www.europcar.com/damage-management-policy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Política de Gerenciamento de Danos</a></li>
                 <li><a href="https://www.europcar.com/deposit-policy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Política de Depósito</a></li>
-                <li><a href="https://www.europcar.com/privacy-policy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Segurança e Política de Privacidade</a></li>
+                <li><a href={privacyUrl} target={privacyUrl.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Segurança e Política de Privacidade</a></li>
                 <li><a href="https://www.europcar.com/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Termos e Condições</a></li>
               </ul>
             </FooterAccordion>

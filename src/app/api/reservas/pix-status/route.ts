@@ -113,6 +113,28 @@ export async function GET(request: Request) {
                        });
                     }
                  } catch(e){}
+
+                 // WhatsApp: PIX_AGRADECIMENTO
+                 try {
+                    if (parsedData?.telefone) {
+                       const booking = parsedData.booking || {};
+                       const totalBRLwa = `R$ ${(cieloJson.Payment.Amount / 100).toFixed(2).replace('.', ',')}`;
+                       import('@/lib/whatsapp/whatsappService').then(({ sendWhatsappTrigger }) => {
+                          sendWhatsappTrigger('PIX_AGRADECIMENTO', {
+                             NOME: parsedData.nome || '',
+                             SOBRENOME: parsedData.sobrenome || '',
+                             NUMERO_RESERVA: resNumber,
+                             VALOR_TOTAL: totalBRLwa,
+                             CARRO: booking.car?.carCategoryName || booking.car?.name || '',
+                             DATA_RETIRADA: booking.pickupDate || '',
+                             DATA_DEVOLUCAO: booking.returnDate || '',
+                             LOCAL_RETIRADA: booking.pickupStation || '',
+                             LOCAL_DEVOLUCAO: booking.returnStation || booking.pickupStation || '',
+                          }, parsedData.telefone);
+                       }).catch(err => console.error('[pix-status] WhatsApp agradecimento falhou:', err));
+                    }
+                 } catch(e){}
+
                  return NextResponse.json({ status: 'PAID', resNumber });
              } else {
                  return NextResponse.json({ status: 'PENDING' });

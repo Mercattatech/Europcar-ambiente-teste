@@ -194,6 +194,9 @@ function VehiclesContent() {
   // ETO protection skip state
   const [protectionsSkipped, setProtectionsSkipped] = useState(false);
 
+  // International Banner from /painel
+  const [intlBanner, setIntlBanner] = useState<{ enabled: boolean; title: string; line1: string; line2: string; line3: string; bgColor: string } | null>(null);
+
   // Filters
   const [transmission, setTransmission] = useState("Ambos");
   const [vehicleType, setVehicleType] = useState("Todos");
@@ -549,6 +552,18 @@ function VehiclesContent() {
   }, [pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, effectiveContractID]);
 
   useEffect(() => { fetchCars(); }, [fetchCars]);
+
+  // Load international banner config from /painel
+  useEffect(() => {
+    fetch('/api/admin/config?key=BANNER_INTERNACIONAL')
+      .then(r => r.json())
+      .then(d => {
+        if (d.value) {
+          try { setIntlBanner(JSON.parse(d.value)); } catch {}
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Load ETO margin from admin panel
   useEffect(() => {
@@ -1467,6 +1482,18 @@ function VehiclesContent() {
                   <p className="font-bold text-red-700 text-lg mb-1">Não foi possível carregar os veículos</p>
                   <p className="text-red-600 text-sm mb-4">{error}</p>
                   <button onClick={fetchCars} className="bg-[#008d36] text-white px-6 py-2 rounded font-bold text-sm hover:bg-[#007530]">Tentar novamente</button>
+                </div>
+              )}
+
+              {/* International Banner - only for non-Brazil searches */}
+              {!loading && !error && intlBanner?.enabled && !(stationCountry === 'BR' || !stationCountry || pickupStation.toUpperCase().startsWith('BR')) && (
+                <div style={{ background: `linear-gradient(135deg, ${intlBanner.bgColor || '#008d36'}, ${intlBanner.bgColor || '#008d36'}dd)` }} className="rounded-xl p-5 text-center shadow-lg mb-2">
+                  <p className="text-white font-black text-lg tracking-wide">{intlBanner.title}</p>
+                  <div className="flex flex-wrap justify-center gap-3 mt-3">
+                    {intlBanner.line1 && <span className="bg-white/20 backdrop-blur text-white text-sm font-bold px-4 py-1.5 rounded-full">{intlBanner.line1}</span>}
+                    {intlBanner.line2 && <span className="bg-white/20 backdrop-blur text-white text-sm font-bold px-4 py-1.5 rounded-full">{intlBanner.line2}</span>}
+                    {intlBanner.line3 && <span className="bg-white/20 backdrop-blur text-white text-sm font-bold px-4 py-1.5 rounded-full">{intlBanner.line3}</span>}
+                  </div>
                 </div>
               )}
 
