@@ -453,6 +453,9 @@ export default function CheckoutPage() {
                       sessionStorage.removeItem("europcar_journey_session");
                     }
                   } catch { }
+                  // Redirect to thank you page
+                  clearInterval(timer);
+                  window.location.href = `/obrigado?res=${encodeURIComponent(d.resNumber)}&method=PIX`;
                 }
               })
               .catch(() => { });
@@ -625,6 +628,10 @@ export default function CheckoutPage() {
               sessionStorage.removeItem("europcar_journey_session");
             }
           } catch { }
+          // Redirect to thank you page after a brief delay (let on-request UI show first)
+          setTimeout(() => {
+            window.location.href = `/obrigado?res=${encodeURIComponent(json.resNumber)}&method=${paymentMethod === 'BALCAO' ? 'BALCAO' : 'CREDIT'}&amount=${amountInCents}`;
+          }, 2000);
         } else {
           setResNumber(json.resNumber);
           if (json.accountCreated) setAccountCreated(true);
@@ -640,6 +647,8 @@ export default function CheckoutPage() {
               sessionStorage.removeItem("europcar_journey_session");
             }
           } catch { }
+          // Redirect to thank you page
+          window.location.href = `/obrigado?res=${encodeURIComponent(json.resNumber)}&method=${paymentMethod === 'BALCAO' ? 'BALCAO' : 'CREDIT'}&amount=${amountInCents}`;
         }
       } else {
         alert("Erro ao finalizar reserva: " + (json.error || "Desconhecido"));

@@ -58,6 +58,9 @@ export default function PixRetryPage() {
           setPaid(true);
           setResNumber(data.resNumber || "");
           clearInterval(interval);
+          // Redirect to thank you page
+          const amt = pixData?.amount || 0;
+          window.location.href = `/obrigado?res=${encodeURIComponent(data.resNumber || '')}&method=PIX&amount=${amt}`;
         }
       } catch {}
       setCheckingStatus(false);
