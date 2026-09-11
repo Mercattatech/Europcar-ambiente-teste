@@ -145,12 +145,17 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <div className="border-t border-gray-800">
-          <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-2">
-            <p className="text-[10px] md:text-xs text-gray-600 text-center md:text-left">
-              © {year} Europcar Brasil — Grupo Mercatta. Todos os direitos reservados.
-            </p>
-            <p className="text-[10px] text-gray-700 text-center">
-              Europcar™ é marca registrada do Europcar Groupe S.A.
+          <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col items-center gap-2">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-2 w-full">
+              <p className="text-[10px] md:text-xs text-gray-600 text-center md:text-left">
+                © {year} Europcar Brasil — Grupo Mercatta. Todos os direitos reservados.
+              </p>
+              <p className="text-[10px] text-gray-700 text-center">
+                Europcar™ é marca registrada do Europcar Groupe S.A.
+              </p>
+            </div>
+            <p className="text-[10px] text-gray-500 text-center border-t border-gray-800 pt-2 w-full">
+              * O cancelamento gratuito é válido exclusivamente para reservas pagas antecipadamente via cartão de crédito ou PIX. Reservas com pagamento no balcão estão sujeitas às políticas de cancelamento da estação.
             </p>
           </div>
         </div>

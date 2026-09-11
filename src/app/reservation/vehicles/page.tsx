@@ -1679,7 +1679,10 @@ function VehiclesContent() {
                                       {discountPct}% MAIS BARATO
                                     </span>
                                   )}
-                                  <span className="text-[10px] text-[#008d36] font-bold uppercase tracking-wider mb-2">PAGAR AGORA</span>
+                                  <div className="flex items-center gap-1.5 mb-2">
+                                    <span className="text-[10px] text-[#008d36] font-bold uppercase tracking-wider">PAGAR AGORA</span>
+                                    <span className="bg-blue-100 text-blue-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap">✓ Cancelamento Grátis</span>
+                                  </div>
                                   <div className="flex flex-col items-end mb-1">
                                     <div className="text-2xl font-black text-[#008d36] leading-none whitespace-nowrap">
                                       {dailyBRL_ETO > 0 ? `R$ ${fmtPrice(dailyBRL_ETO)}` : `${currency} ${fmtPrice(dailyETO)}`} <span className="text-xl font-normal text-[#008d36]">/ dia</span>
