@@ -84,13 +84,31 @@ export async function GET(request: Request) {
                  // Trigger Email PIX Sucesso
                  try {
                     if (parsedData?.email) {
+                       const fmtDate = (d: string) => d && d.length >= 8 ? `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}` : d || '';
+                       const fmtTime = (d: string) => { if (!d) return ''; const t = d.indexOf('T'); return t >= 0 && d.length >= t+5 ? `${d.slice(t+1,t+3)}:${d.slice(t+3,t+5)}` : ''; };
+                       const booking = parsedData.booking || {};
+                       const totalBRL = (cieloJson.Payment.Amount / 100).toFixed(2).replace('.', ',');
+
                        import('@/lib/emailService').then(({ sendTransactionalEmail }) => {
                           sendTransactionalEmail(parsedData.email, 'RESERVA_SUCESSO', {
                              NOME: parsedData.nome || '',
+                             SOBRENOME: parsedData.sobrenome || '',
+                             EMAIL: parsedData.email || '',
+                             TELEFONE: parsedData.telefone || '',
+                             CPF: parsedData.cpf || '',
                              NUMERO_RESERVA: resNumber,
-                             VALOR: String(cieloJson.Payment.Amount / 100) || '',
-                             DATA_RETIRADA: parsedData.booking?.pickupDate || '',
-                             CARRO: parsedData.booking?.car?.carCategoryName || parsedData.booking?.car?.name || ''
+                             VALOR_TOTAL: `R$ ${totalBRL}`,
+                             FORMA_PAGAMENTO: 'PIX',
+                             CARRO: booking.car?.carCategoryName || booking.car?.name || '',
+                             CATEGORIA_CARRO: booking.car?.acrissCode || booking.carCategory || '',
+                             DATA_RETIRADA: fmtDate(booking.pickupDate || ''),
+                             HORARIO_RETIRADA: fmtTime(booking.pickupDate || '') || booking.pickupTime || '',
+                             LOCAL_RETIRADA: booking.pickupStation || '',
+                             DATA_DEVOLUCAO: fmtDate(booking.returnDate || ''),
+                             HORARIO_DEVOLUCAO: fmtTime(booking.returnDate || '') || booking.returnTime || '',
+                             LOCAL_DEVOLUCAO: booking.returnStation || booking.pickupStation || '',
+                             LISTA_PROTECOES: '',
+                             LISTA_EXTRAS: '',
                           }).catch(console.error);
                        });
                     }

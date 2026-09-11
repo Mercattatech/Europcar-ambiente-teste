@@ -624,21 +624,76 @@ export async function POST(request: Request) {
               return { code, name: qi?.name || code, qty, priceBRL: qi?.priceBRL || 0 };
             });
 
-          sendBookingConfirmation({
-            toEmail: customerData.email,
-            customerName: `${customerData.nome} ${customerData.sobrenome}`,
-            resNumber: finalResNumber,
-            carName: bookingData.car?.carCategoryName || bookingData.car?.name || '',
-            pickupStation: bookingData.pickupStation || '',
-            returnStation: bookingData.returnStation || bookingData.pickupStation || '',
-            pickupDate: bookingData.pickupDate || '',
-            returnDate: bookingData.returnDate || '',
-            paymentMethod: paymentData.method,
-            totalBRL: (paymentData.amountInCents || 0) / 100,
-            isOnRequest,
-            xrsEquipment: Array.isArray(xrsEquipment) ? xrsEquipment : [],
-            extras: extrasArr,
-          });
+          // Formata datas XRS (YYYYMMDD → DD/MM/YYYY)
+          const fmtDate = (d: string) => d && d.length >= 8 ? `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}` : d || '';
+          // Extrai horário se presente (YYYYMMDDTHHMM → HH:MM ou HHMM → HH:MM)
+          const fmtTime = (d: string) => {
+            if (!d) return '';
+            const tIdx = d.indexOf('T');
+            if (tIdx >= 0) { const t = d.slice(tIdx+1); return t.length >= 4 ? `${t.slice(0,2)}:${t.slice(2,4)}` : t; }
+            return '';
+          };
+
+          // Monta listas HTML de proteções e extras para o template
+          const listaProtecoes = extrasArr.length > 0
+            ? extrasArr.map(ex => `• ${ex.name || ex.code} ×${ex.qty}${ex.priceBRL > 0 ? ` — R$ ${ex.priceBRL.toFixed(2).replace('.', ',')}` : ''}`).join('<br/>')
+            : 'Nenhuma proteção adicional selecionada';
+
+          const equipArr: any[] = Array.isArray(xrsEquipment) ? xrsEquipment : [];
+          const listaExtras = equipArr.length > 0
+            ? equipArr.map(eq => `• ${eq.icon || '📦'} ${eq.name || eq.code} ×${eq.qty || 1}${eq.priceBRL ? ` — R$ ${parseFloat(eq.priceBRL).toFixed(2).replace('.', ',')} /dia` : ''}`).join('<br/>')
+            : 'Nenhum acessório selecionado';
+
+          const fmtPagamento: Record<string, string> = { BALCAO: 'Pagamento no Balcão', PIX: 'PIX', CREDIT: 'Cartão de Crédito', VOUCHER: 'Voucher ETO (Faturado)' };
+          const pickupDateRaw = bookingData.pickupDate || '';
+          const returnDateRaw = bookingData.returnDate || '';
+
+          // Monta dicionário completo de variáveis para o template do painel
+          const emailVars: Record<string, string> = {
+            NOME: customerData.nome || '',
+            SOBRENOME: customerData.sobrenome || '',
+            EMAIL: customerData.email || '',
+            TELEFONE: customerData.telefone || '',
+            CPF: customerData.cpf || '',
+            NUMERO_RESERVA: finalResNumber,
+            VALOR_TOTAL: `R$ ${((paymentData.amountInCents || 0) / 100).toFixed(2).replace('.', ',')}`,
+            FORMA_PAGAMENTO: fmtPagamento[paymentData.method] || paymentData.method || '',
+            CARRO: bookingData.car?.carCategoryName || bookingData.car?.name || '',
+            CATEGORIA_CARRO: bookingData.car?.acrissCode || bookingData.carCategory || '',
+            DATA_RETIRADA: fmtDate(pickupDateRaw),
+            HORARIO_RETIRADA: fmtTime(pickupDateRaw) || bookingData.pickupTime || '',
+            LOCAL_RETIRADA: bookingData.pickupStation || '',
+            DATA_DEVOLUCAO: fmtDate(returnDateRaw),
+            HORARIO_DEVOLUCAO: fmtTime(returnDateRaw) || bookingData.returnTime || '',
+            LOCAL_DEVOLUCAO: bookingData.returnStation || bookingData.pickupStation || '',
+            LISTA_PROTECOES: listaProtecoes,
+            LISTA_EXTRAS: listaExtras,
+          };
+
+          // Tenta enviar usando o template do painel (RESERVA_SUCESSO)
+          const trigger = paymentData.method === 'BALCAO' ? 'RESERVA_SUCESSO' : 'RESERVA_SUCESSO';
+          const { sendTransactionalEmail } = await import('@/lib/emailService');
+          const tplResult = await sendTransactionalEmail(customerData.email, trigger, emailVars);
+
+          if (!tplResult.success && tplResult.error === 'Template não encontrado') {
+            // Fallback: nenhum template cadastrado no painel → usa template hardcoded
+            console.warn('[reservas] Template do painel não encontrado para RESERVA_SUCESSO — usando fallback hardcoded.');
+            sendBookingConfirmation({
+              toEmail: customerData.email,
+              customerName: `${customerData.nome} ${customerData.sobrenome}`,
+              resNumber: finalResNumber,
+              carName: bookingData.car?.carCategoryName || bookingData.car?.name || '',
+              pickupStation: bookingData.pickupStation || '',
+              returnStation: bookingData.returnStation || bookingData.pickupStation || '',
+              pickupDate: bookingData.pickupDate || '',
+              returnDate: bookingData.returnDate || '',
+              paymentMethod: paymentData.method,
+              totalBRL: (paymentData.amountInCents || 0) / 100,
+              isOnRequest,
+              xrsEquipment: Array.isArray(xrsEquipment) ? xrsEquipment : [],
+              extras: extrasArr,
+            });
+          }
         } catch (emailErr) {
           console.error('[reservas] Error sending booking confirmation:', emailErr);
         }
