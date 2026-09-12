@@ -428,43 +428,61 @@ export default function CheckoutPage() {
     }
   }, [status, session]);
 
+  // State to show last pix-status response for debugging
+  const [pixDebug, setPixDebug] = useState<string>("");
+
+  // Timer countdown (visual only)
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (merchantOrderId && !resNumber && paymentMethod === "PIX") {
       timer = setInterval(() => {
         setTimeLeft(prev => {
-          const t = prev - 1;
-          if (t <= 0) clearInterval(timer);
-          if (t % 5 === 0 && t > 0) {
-            fetch(`/api/reservas/pix-status?orderId=${merchantOrderId}`)
-              .then(r => r.json())
-              .then(d => {
-                if (d.status === "PAID" && d.resNumber) {
-                  setResNumber(d.resNumber);
-                  // Journey tracking — Step 5: PIX payment confirmed
-                  try {
-                    const sessionId = sessionStorage.getItem("europcar_journey_session");
-                    if (sessionId) {
-                      fetch("/api/journey/track", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ sessionId, step: 5, resNumber: d.resNumber, paymentMethod: "PIX", status: "COMPLETED" }),
-                      }).catch(() => { });
-                      sessionStorage.removeItem("europcar_journey_session");
-                    }
-                  } catch { }
-                  // Redirect to thank you page
-                  clearInterval(timer);
-                  window.location.href = `/obrigado?res=${encodeURIComponent(d.resNumber)}&method=PIX`;
-                }
-              })
-              .catch(() => { });
-          }
-          return t;
+          if (prev <= 1) { clearInterval(timer); return 0; }
+          return prev - 1;
         });
       }, 1000);
     }
     return () => clearInterval(timer);
+  }, [merchantOrderId, resNumber, paymentMethod]);
+
+  // PIX status polling — separate from timer to avoid React state updater issues
+  useEffect(() => {
+    let pollTimer: NodeJS.Timeout;
+    if (merchantOrderId && !resNumber && paymentMethod === "PIX") {
+      const checkPixStatus = async () => {
+        try {
+          const res = await fetch(`/api/reservas/pix-status?orderId=${merchantOrderId}`);
+          const d = await res.json();
+          setPixDebug(`[${new Date().toLocaleTimeString()}] HTTP ${res.status} → ${JSON.stringify(d)}`);
+          
+          if (d.status === "PAID" && d.resNumber) {
+            setResNumber(d.resNumber);
+            clearInterval(pollTimer);
+            // Journey tracking — Step 5: PIX payment confirmed
+            try {
+              const sessionId = sessionStorage.getItem("europcar_journey_session");
+              if (sessionId) {
+                fetch("/api/journey/track", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ sessionId, step: 5, resNumber: d.resNumber, paymentMethod: "PIX", status: "COMPLETED" }),
+                }).catch(() => { });
+                sessionStorage.removeItem("europcar_journey_session");
+              }
+            } catch { }
+            // Redirect to thank you page
+            window.location.href = `/obrigado?res=${encodeURIComponent(d.resNumber)}&method=PIX`;
+          }
+        } catch (err: any) {
+          setPixDebug(`[${new Date().toLocaleTimeString()}] ERRO: ${err.message}`);
+        }
+      };
+
+      // First check immediately, then every 5 seconds
+      checkPixStatus();
+      pollTimer = setInterval(checkPixStatus, 5000);
+    }
+    return () => clearInterval(pollTimer);
   }, [merchantOrderId, resNumber, paymentMethod]);
 
   // Allow rendering even when session is still loading — guests don't need a session
@@ -937,6 +955,13 @@ export default function CheckoutPage() {
                   <p className="text-amber-800 text-xs text-center font-medium">
                     ⚠️ <strong>Não feche esta página!</strong> Após o pagamento, você será redirecionado automaticamente para a confirmação da sua reserva.
                   </p>
+                </div>
+              )}
+
+              {/* Debug — último resultado do polling (visível para diagnóstico) */}
+              {pixDebug && (
+                <div className="w-full bg-gray-100 rounded-lg p-2 mb-3 border border-gray-200">
+                  <p className="text-[10px] font-mono text-gray-500 break-all leading-tight">{pixDebug}</p>
                 </div>
               )}
 
