@@ -83,7 +83,7 @@ export default function CheckoutPage() {
   const [resNumber, setResNumber] = useState<string | null>(null);
   const [accountCreated, setAccountCreated] = useState(false);
   const [merchantOrderId, setMerchantOrderId] = useState<string | null>(null);
-  const [timeLeft, setTimeLeft] = useState(180);
+  const [timeLeft, setTimeLeft] = useState(900); // 15 minutos para polling PIX
 
   const [imgSrcIdx, setImgSrcIdx] = useState(0);
   const [extrasDetails, setExtrasDetails] = useState<any[]>([]);
