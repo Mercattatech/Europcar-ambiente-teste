@@ -56,11 +56,15 @@ export async function GET(request: Request) {
         return NextResponse.json({ status: 'PENDING', error: 'paymentId ausente' });
      }
 
-     console.log(`[pix-status] Consultando Cielo paymentId=${paymentId} | sandbox=${cieloConfig.isSandbox}`);
+     // CRITICAL: mesma coerção estrita usada na criação do PIX (reservas/route.ts)
+     const isSandbox = cieloConfig.isSandbox === true;
+     console.log(`[pix-status] Consultando Cielo paymentId=${paymentId} | sandbox=${isSandbox} (raw: ${cieloConfig.isSandbox}, type: ${typeof cieloConfig.isSandbox})`);
 
-     const CIELO_QUERY_URL = cieloConfig.isSandbox 
+     const CIELO_QUERY_URL = isSandbox 
         ? `https://apiquerysandbox.cieloecommerce.cielo.com.br/1/sales/${paymentId}`
         : `https://apiquery.cieloecommerce.cielo.com.br/1/sales/${paymentId}`;
+
+     console.log(`[pix-status] URL: ${CIELO_QUERY_URL}`);
 
      const resCielo = await fetch(CIELO_QUERY_URL, {
          headers: {
@@ -93,8 +97,8 @@ export async function GET(request: Request) {
      if (!isPaid) {
         // Status 12 = Pending, 0 = Not Finished, 3 = Denied
         const statusNames: Record<number, string> = { 0: 'NotFinished', 1: 'Authorized', 2: 'Paid', 3: 'Denied', 10: 'Voided', 11: 'Refunded', 12: 'Pending', 13: 'Aborted' };
-        console.log(`[pix-status] PIX ainda não pago. Status: ${cieloPaymentStatus} (${statusNames[cieloPaymentStatus] || 'Unknown'})`);
-        return NextResponse.json({ status: 'PENDING', cieloStatus: cieloPaymentStatus, cieloStatusName: statusNames[cieloPaymentStatus] || 'Unknown' });
+        console.log(`[pix-status] PIX ainda não pago. Status: ${cieloPaymentStatus} (${statusNames[cieloPaymentStatus] || 'Unknown'}) | sandbox=${isSandbox}`);
+        return NextResponse.json({ status: 'PENDING', cieloStatus: cieloPaymentStatus, cieloStatusName: statusNames[cieloPaymentStatus] || 'Unknown', sandbox: isSandbox });
      }
 
      // ══════════════════════════════════════════════════════════════
