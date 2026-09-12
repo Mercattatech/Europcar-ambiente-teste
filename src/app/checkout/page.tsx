@@ -853,14 +853,14 @@ export default function CheckoutPage() {
         <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl overflow-hidden border-t-8 border-[#1b75bb]">
           <div className="flex flex-col md:flex-row">
 
-            {/* Left — QR Code */}
+            {/* Left — QR Code + Processing Status */}
             <div className="flex-1 flex flex-col items-center justify-center p-10 border-b md:border-b-0 md:border-r border-gray-100">
               <h1 className="text-2xl font-black text-gray-900 mb-1">Pague via PIX</h1>
-              <p className="text-xs text-gray-500 mb-6 text-center">
-                Pedido <strong className="text-gray-700">{merchantOrderId}</strong>.<br />Escaneie o QR Code para confirmar.
+              <p className="text-xs text-gray-500 mb-4 text-center">
+                Pedido <strong className="text-gray-700">{merchantOrderId}</strong>.<br />Escaneie o QR Code ou copie o código abaixo.
               </p>
 
-              <div className="bg-gray-50 rounded-lg p-4 mb-5">
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
                 {timeLeft > 0 ? (
                   <>
                     {pixQrCode ? (
@@ -881,24 +881,70 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              {/* Countdown */}
+              {/* Copy Pix Code */}
+              {pixQrCode && timeLeft > 0 && (
+                <button
+                  onClick={() => { navigator.clipboard.writeText(pixQrCode); }}
+                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 rounded-lg text-xs transition-colors mb-4 flex items-center justify-center gap-2"
+                >
+                  📋 Copiar código PIX
+                </button>
+              )}
+
+              {/* Processing Status Bar */}
               {timeLeft > 0 && (
-                <div className="flex items-center gap-2 text-[#1b75bb] mb-6">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-xl font-black tabular-nums">
-                    {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
-                  </span>
-                  <span className="text-xs text-gray-400">para expirar</span>
+                <div className="w-full bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                  {/* Pulsing indicator */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="relative">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full animate-ping absolute" />
+                      <div className="w-3 h-3 bg-blue-500 rounded-full relative" />
+                    </div>
+                    <span className="text-blue-800 font-bold text-sm">Aguardando confirmação do pagamento...</span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="w-full bg-blue-200/50 rounded-full h-2 mb-2 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-400 via-blue-500 to-blue-400 rounded-full transition-all duration-1000"
+                      style={{
+                        width: `${Math.max(2, ((900 - timeLeft) / 900) * 100)}%`,
+                        backgroundSize: '200% 100%',
+                        animation: 'shimmer 2s ease-in-out infinite',
+                      }}
+                    />
+                  </div>
+                  <style>{`@keyframes shimmer { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }`}</style>
+
+                  {/* Timer */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-600 text-xs font-medium">Verificando a cada 5 segundos</span>
+                    <div className="flex items-center gap-1 text-blue-700">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-sm font-black tabular-nums">
+                        {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Warning - do not close */}
+              {timeLeft > 0 && (
+                <div className="w-full bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                  <p className="text-amber-800 text-xs text-center font-medium">
+                    ⚠️ <strong>Não feche esta página!</strong> Após o pagamento, você será redirecionado automaticamente para a confirmação da sua reserva.
+                  </p>
                 </div>
               )}
 
               <button
                 onClick={() => window.location.href = "/"}
-                className="w-full bg-[#ffcc00] hover:bg-[#e6b800] text-gray-900 font-bold py-3 rounded text-sm transition-colors"
+                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 rounded-lg text-sm transition-colors"
               >
-                Já paguei / Voltar
+                ← Voltar ao início
               </button>
             </div>
 
