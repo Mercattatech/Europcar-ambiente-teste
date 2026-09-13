@@ -52,7 +52,8 @@ export async function GET() {
                headers: {
                   "MerchantId": String(cieloConfig.merchantId || '').trim(),
                   "MerchantKey": String(cieloConfig.merchantKey || '').trim(),
-               }
+               },
+               cache: 'no-store',
             });
 
             if (!resCielo.ok) {

@@ -70,7 +70,8 @@ export async function GET(request: Request) {
          headers: {
             "MerchantId": cieloConfig.merchantId,
             "MerchantKey": cieloConfig.merchantKey
-         }
+         },
+         cache: 'no-store',  // CRITICAL: sem isso Next.js cacheia a primeira resposta (Status 12) para sempre
      });
 
      if (!resCielo.ok) {
