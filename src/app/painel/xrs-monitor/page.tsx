@@ -79,10 +79,11 @@ export default function XrsMonitorPage() {
         alert("Configurações salvas com sucesso!");
         loadConfig();
       } else {
-        alert("Erro ao salvar.");
+        const errData = await res.json().catch(() => ({}));
+        alert("Erro ao salvar: " + (errData.error || `HTTP ${res.status}`));
       }
-    } catch {
-      alert("Erro ao salvar.");
+    } catch (err: any) {
+      alert("Erro ao salvar: " + (err.message || "desconhecido"));
     } finally {
       setSaving(false);
     }
