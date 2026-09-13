@@ -317,3 +317,22 @@ model AIConversationLog {
   @@index([approved])
   @@index([sessionStart])
 }
+
+// XRS API Monitor — health check + WhatsApp alerts
+model XrsMonitorConfig {
+  id                        String    @id @default(cuid())
+  enabled                   Boolean   @default(false)
+  intervalMinutes           Int       @default(7)
+  messagingIntervalSeconds  Int       @default(10)
+  whatsappNumbers           String    @default("[]") @db.Text   // JSON array of phone numbers
+  testStation               String    @default("LIST01")
+  errorMessageTemplate      String    @default("⚠️ ALERTA: A API XRS (Europcar) está FORA DO AR desde {DATA} às {HORA}. Erro: {ERRO}") @db.Text
+  recoveryMessageTemplate   String    @default("✅ API XRS NORMALIZADA em {DATA} às {HORA}. O sistema voltou a operar normalmente.") @db.Text
+  lastStatus                String    @default("UNKNOWN") // OK, ERROR, UNKNOWN
+  lastCheckAt               DateTime?
+  lastErrorAt               DateTime?
+  lastRecoveryAt            DateTime?
+  lastErrorMessage          String?   @db.Text
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+}

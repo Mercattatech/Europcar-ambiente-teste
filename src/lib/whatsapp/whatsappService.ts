@@ -159,3 +159,19 @@ export async function sendWhatsappTrigger(
     }
   }
 }
+
+/**
+ * Envia uma mensagem de texto WhatsApp diretamente para um número.
+ * Usado pelo monitor XRS e outros alertas que não dependem de triggers configurados.
+ */
+export async function sendWhatsappDirect(phone: string, message: string): Promise<void> {
+  const token = await getWaConfig('TOKEN');
+  if (!token) {
+    throw new Error('WA_TOKEN não configurado.');
+  }
+
+  const client = new GmLeadClient({ token });
+  const cleanPhone = phone.replace(/\D/g, '');
+  await client.sendText({ number: cleanPhone, body: message });
+  console.log(`[whatsapp] Mensagem direta enviada para ${cleanPhone}`);
+}

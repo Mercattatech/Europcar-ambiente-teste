@@ -31,6 +31,7 @@ const sidebarLinks = [
    { href: "/painel/tags", label: "Tags & Rastreamento", icon: "📈" },
    { href: "/painel/manutencao", label: "Modo Manutenção", icon: "🚧" },
    { href: "/painel/logs-xrs", label: "XRS Debugger", icon: "🔍" },
+   { href: "/painel/xrs-monitor", label: "Monitor XRS", icon: "🛰️" },
    { href: "/painel/logs", label: "Logs Cielo", icon: "📄" },
 ];
 
