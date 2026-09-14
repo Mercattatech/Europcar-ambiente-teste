@@ -11,9 +11,15 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 
-# Instala todas as dependências (incluindo devDependências para o build)
-# NOTA: 'npm ci' já executa 'prisma generate' via postinstall — sem duplicação.
-RUN npm ci
+# Configura npm para ser resiliente a quedas de rede temporárias (ECONNRESET)
+# --fetch-retries: tenta até 5x antes de desistir
+# --fetch-retry-mintimeout / --fetch-retry-maxtimeout: aguarda mais entre tentativas
+# --fetch-timeout: tempo máximo por requisição individual (5 min)
+RUN npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-timeout 300000 && \
+    npm ci
 
 # =============================================================================
 # Stage 2 — Build
@@ -95,4 +101,3 @@ ENV PORT=3000 \
 # Roda migrate deploy ao iniciar (|| true = não falha se já aplicado ou se houver erro)
 # Usa caminho direto ao binário — evita tentativa de download do npx
 CMD ["sh", "-c", "node node_modules/.bin/prisma migrate deploy 2>&1 || true && node server.js"]
-
