@@ -179,6 +179,24 @@ export default function CheckoutPage() {
     // resolvesse, o script podia começar a rodar com o token AINDA vazio (a busca do token
     // depende de uma chamada externa à Braspag, mais lenta), causando 401 imediato ao
     // carregar a página, antes mesmo do formulário ser preenchido.
+    const log3dsClientError = (event: string, details: any) => {
+      const fullCustomerName = `${nome || ''} ${sobrenome || ''}`.trim();
+      fetch('/api/cielo/log-error', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event,
+          details,
+          cardBin: ccNumber ? ccNumber.replace(/\D/g, '').slice(0, 6) : undefined,
+          customerName: fullCustomerName || undefined,
+          customerEmail: email || undefined,
+          customerPhone: telefone || undefined,
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+          orderId: ccOrderNumber,
+        }),
+      }).catch(() => {});
+    };
+
     (async () => {
       try {
         const [tokenRes, configRes] = await Promise.all([
@@ -188,11 +206,14 @@ export default function CheckoutPage() {
 
         // Proteção contra 502/503: .json() quebra se o servidor retornar "Bad Gateway"
         if (!tokenRes.ok) {
-          console.warn(`[3DS] get3dsToken retornou HTTP ${tokenRes.status} — 3DS indisponível no momento.`);
+          const msg = `get3dsToken retornou HTTP ${tokenRes.status}`;
+          console.warn(`[3DS] ${msg} — 3DS indisponível no momento.`);
+          log3dsClientError('GET_TOKEN_HTTP_ERROR', { status: tokenRes.status });
           return;
         }
         if (!configRes.ok) {
           console.warn(`[3DS] config/cielo retornou HTTP ${configRes.status} — 3DS indisponível no momento.`);
+          log3dsClientError('GET_CONFIG_HTTP_ERROR', { status: configRes.status });
           return;
         }
 
@@ -202,19 +223,14 @@ export default function CheckoutPage() {
 
         if (tokenData.accessToken) {
           setThreeDsAccessToken(tokenData.accessToken);
-          // Grava direto no DOM — garante que o valor já está lá quando o script
-          // carregar, sem depender do próximo ciclo de render do React.
           if (accessTokenInputRef.current) accessTokenInputRef.current.value = tokenData.accessToken;
         } else {
           console.warn('[3DS] Sem access token:', tokenData.error);
+          log3dsClientError('NO_ACCESS_TOKEN', tokenData);
         }
 
         const isSandboxEnv = configData.isSandbox !== false;
 
-        // window.bpmpi_config() precisa existir antes do <script> executar — é lida pelo
-        // próprio script no carregamento. Os callbacks disparam a submissão real via ref
-        // (sempre aponta para a versão mais atual de submitReservation, com o estado
-        // corrente do formulário — o config em si só é montado uma vez).
         (window as any).bpmpi_config = function () {
           return {
             onReady: function () {
@@ -232,31 +248,27 @@ export default function CheckoutPage() {
             onFailure: function (e: any) {
               setThreeDsProcessing(false);
               console.warn('[3DS] Autenticação falhou — prosseguindo sem Liability Shift:', e);
+              log3dsClientError('ON_FAILURE', e);
               submitReservationRef.current(undefined);
             },
             onUnenrolled: function (e: any) {
               setThreeDsProcessing(false);
               console.warn('[3DS] Cartão não elegível para 3DS — prosseguindo sem Liability Shift:', e);
+              log3dsClientError('ON_UNENROLLED', e);
               submitReservationRef.current(undefined);
             },
             onDisabled: function () {
               setThreeDsProcessing(false);
               console.warn('[3DS] Autenticação desabilitada (bpmpi_auth=false) — prosseguindo sem 3DS.');
+              log3dsClientError('ON_DISABLED', {});
               submitReservationRef.current(undefined);
             },
-            // onError/onUnsupportedBrand: o script pode disparar isso na checagem interna
-            // de carregamento, antes do usuário sequer clicar em "Finalizar" — só mostra o
-            // alerta bloqueante quando o erro acontece DURANTE uma tentativa real (usuário
-            // já clicou e threeDsProcessingRef está true); fora disso, só loga no console.
             onError: function (e: any) {
               const wasUserInitiated = threeDsProcessingRef.current;
               setThreeDsProcessing(false);
               console.error('[3DS] Erro sistêmico na autenticação:', e);
+              log3dsClientError('ON_ERROR', { error: e, wasUserInitiated });
               if (wasUserInitiated) {
-                // Em vez de travar o cliente (especialmente em mobile onde 3DS
-                // frequentemente falha), prosseguir sem Liability Shift — a
-                // transação será processada normalmente, apenas sem a proteção
-                // extra do 3DS para o lojista.
                 console.warn('[3DS] Prosseguindo sem 3DS após erro sistêmico (mobile/Amex/timeout).');
                 submitReservationRef.current(undefined);
               }
@@ -265,6 +277,7 @@ export default function CheckoutPage() {
               const wasUserInitiated = threeDsProcessingRef.current;
               setThreeDsProcessing(false);
               console.error('[3DS] Bandeira não suportada pelo 3DS:', e);
+              log3dsClientError('ON_UNSUPPORTED_BRAND', e);
               if (wasUserInitiated) {
                 alert('A bandeira deste cartão não é suportada pela autenticação 3DS.\n\n' + (e?.ReturnMessage || ''));
                 setLoading(false);
@@ -281,9 +294,14 @@ export default function CheckoutPage() {
           ? 'https://mpisandbox.braspag.com.br/Scripts/BP.Mpi.3ds20.min.js'
           : 'https://mpi.braspag.com.br/Scripts/BP.Mpi.3ds20.min.js';
         script.async = true;
+        script.onerror = function (e) {
+          console.error('[3DS] Falha ao carregar o script Braspag MPI:', e);
+          log3dsClientError('SCRIPT_LOAD_ERROR', 'Falha ao carregar script BP.Mpi.3ds20.min.js via CDN Braspag');
+        };
         document.head.appendChild(script);
       } catch (err: any) {
         console.warn('[3DS] Falha ao preparar autenticação 3DS:', err.message);
+        log3dsClientError('PREPARE_EXCEPTION', err.message);
       }
     })();
 
@@ -687,8 +705,23 @@ export default function CheckoutPage() {
     // acontece dentro dos callbacks do BP.Mpi (onSuccess/onFailure/onUnenrolled/...),
     // chamados via submitReservationRef depois que window.bpmpi_authenticate() resolver.
     if (paymentMethod === "CREDIT") {
+      const fullCustName = `${nome || ''} ${sobrenome || ''}`.trim();
       if (!threeDsReady || typeof (window as any).bpmpi_authenticate !== 'function') {
         alert("O sistema de segurança 3DS ainda está carregando. Aguarde alguns segundos e tente novamente.");
+        fetch('/api/cielo/log-error', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'SUBMIT_3DS_NOT_READY',
+            details: 'Cliente clicou em Pagar mas o script Braspag MPI não estava pronto ou carregado no DOM',
+            cardBin: ccNumber ? ccNumber.replace(/\D/g, '').slice(0, 6) : undefined,
+            customerName: fullCustName || undefined,
+            customerEmail: email || undefined,
+            customerPhone: telefone || undefined,
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+            orderId: ccOrderNumber,
+          }),
+        }).catch(() => {});
         setLoading(false);
         return;
       }
@@ -701,19 +734,61 @@ export default function CheckoutPage() {
         const tokenRes = await fetch('/api/cielo/get3dsToken', { method: 'POST' });
         if (!tokenRes.ok) {
           alert(`Não foi possível iniciar a autenticação 3DS (HTTP ${tokenRes.status}). Tente novamente em instantes.`);
+          fetch('/api/cielo/log-error', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event: 'FRESH_TOKEN_HTTP_ERROR',
+              details: { status: tokenRes.status },
+              cardBin: ccNumber ? ccNumber.replace(/\D/g, '').slice(0, 6) : undefined,
+              customerName: fullCustName || undefined,
+              customerEmail: email || undefined,
+              customerPhone: telefone || undefined,
+              userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+              orderId: ccOrderNumber,
+            }),
+          }).catch(() => {});
           setLoading(false);
           return;
         }
         const tokenData = await tokenRes.json();
         if (!tokenData.accessToken) {
           alert("Não foi possível iniciar a autenticação 3DS: " + (tokenData.error || "token indisponível") + ". Tente novamente.");
+          fetch('/api/cielo/log-error', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event: 'FRESH_TOKEN_NO_ACCESS_TOKEN',
+              details: tokenData,
+              cardBin: ccNumber ? ccNumber.replace(/\D/g, '').slice(0, 6) : undefined,
+              customerName: fullCustName || undefined,
+              customerEmail: email || undefined,
+              customerPhone: telefone || undefined,
+              userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+              orderId: ccOrderNumber,
+            }),
+          }).catch(() => {});
           setLoading(false);
           return;
         }
         setThreeDsAccessToken(tokenData.accessToken);
         if (accessTokenInputRef.current) accessTokenInputRef.current.value = tokenData.accessToken;
-      } catch {
+      } catch (err: any) {
         alert("Falha ao preparar a autenticação 3DS. Verifique sua conexão e tente novamente.");
+        fetch('/api/cielo/log-error', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'FRESH_TOKEN_EXCEPTION',
+            details: err?.message,
+            cardBin: ccNumber ? ccNumber.replace(/\D/g, '').slice(0, 6) : undefined,
+            customerName: fullCustName || undefined,
+            customerEmail: email || undefined,
+            customerPhone: telefone || undefined,
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+            orderId: ccOrderNumber,
+          }),
+        }).catch(() => {});
         setLoading(false);
         return;
       }

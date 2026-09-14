@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { checkAdmin } from '@/lib/checkAdmin';
 export const dynamic = 'force-dynamic';
 
 /**
@@ -7,6 +8,10 @@ export const dynamic = 'force-dynamic';
  * GET /api/admin/pix-debug?orderId=ORD...
  */
 export async function GET(request: Request) {
+  if (!(await checkAdmin())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const orderId = searchParams.get('orderId');
   if (!orderId) return NextResponse.json({ error: 'orderId required' }, { status: 400 });
