@@ -203,6 +203,38 @@ function VehiclesContent() {
   const [minSeats, setMinSeats] = useState(2);
   const [sortBy, setSortBy] = useState("Recomendado");
 
+  // Promo modal for Balcão (Pagar no balcão)
+  const [showBalcaoPromoModal, setShowBalcaoPromoModal] = useState(false);
+  const [pendingPoaSelection, setPendingPoaSelection] = useState<{ car: any; etoCar: any; totalPriceETO: number; totalBRL_ETO: number } | null>(null);
+
+  const handleConfirmEtoFromModal = () => {
+    if (pendingPoaSelection) {
+      const { car, etoCar, totalPriceETO, totalBRL_ETO } = pendingPoaSelection;
+      setSelectedTariffType('ETO');
+      const merged = {
+        ...car,
+        ...etoCar,
+        totalRateEstimate: totalPriceETO.toFixed(2),
+        totalRateEstimateInBookingCurrency: totalBRL_ETO.toFixed(2),
+        optionalInsurances: car.optionalInsurances,
+        imageUrl: car.imageUrl,
+        _etoCID: '56935466'
+      };
+      handleSelectCar(merged);
+    }
+    setShowBalcaoPromoModal(false);
+    setPendingPoaSelection(null);
+  };
+
+  const handleConfirmPoaFromModal = () => {
+    if (pendingPoaSelection) {
+      setSelectedTariffType('POA');
+      handleSelectCar(pendingPoaSelection.car);
+    }
+    setShowBalcaoPromoModal(false);
+    setPendingPoaSelection(null);
+  };
+
   const formatDate = (d: string) => d ? `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : "";
 
   // ---- Fetch vehicles from XRS (POA + ETO in parallel) ----
@@ -2425,6 +2457,45 @@ function VehiclesContent() {
           )}
         </div>
       </div>
+      {/* Promo Alert Modal for International Pay at Counter */}
+      {showBalcaoPromoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 md:p-8 text-center border border-gray-100 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500" />
+            <button
+              onClick={handleConfirmPoaFromModal}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+              <span className="text-3xl">🏷️</span>
+            </div>
+            <h3 className="text-xl font-black text-gray-900 mb-3">
+              Aproveite a Promoção!
+            </h3>
+            <p className="text-gray-600 text-sm leading-relaxed mb-6 font-medium">
+              Aproveite a promoção, pagamento no cartão de crédito ou pix com até <strong className="text-emerald-600 font-black">6% de desconto</strong> e <strong className="text-emerald-600 font-black">cancelamento grátis</strong>.
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={handleConfirmEtoFromModal}
+                className="w-full bg-[#008d36] hover:bg-[#007530] text-white font-black py-3.5 px-6 rounded-xl shadow-lg shadow-green-900/20 transition-all transform hover:-translate-y-0.5 text-sm flex items-center justify-center gap-2"
+              >
+                <span>💳</span> Garantir Desconto (Pagar Online)
+              </button>
+              <button
+                onClick={handleConfirmPoaFromModal}
+                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-xl text-xs transition-colors"
+              >
+                Continuar sem Desconto (Pagar no Balcão)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

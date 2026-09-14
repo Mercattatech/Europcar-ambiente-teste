@@ -102,6 +102,9 @@ export default function CheckoutPage() {
   const [acceptTermsPais, setAcceptTermsPais] = useState(false);
   const [termsAvailable, setTermsAvailable] = useState<{ reserva: boolean, pais: boolean, paisUrl: string, brasil: boolean }>({ reserva: false, pais: false, paisUrl: '', brasil: false });
 
+  // Promo modal for Balcão
+  const [showBalcaoPromoModal, setShowBalcaoPromoModal] = useState(false);
+
 
   useEffect(() => {
     const data = sessionStorage.getItem("europcar_booking");
@@ -1301,7 +1304,15 @@ export default function CheckoutPage() {
               <div className="space-y-4">
                 {/* Balcão — only for POA tariff */}
                 {tariffType !== 'ETO' && (
-                  <label className={`block border-2 rounded-lg p-5 cursor-pointer flex items-center gap-4 transition-colors ${paymentMethod === "BALCAO" ? "border-[#008d36] bg-green-50" : "border-gray-200 hover:border-gray-300"}`}>
+                  <label
+                    onClick={() => {
+                      const isBrazilStation = !booking?.stationCountry || booking.stationCountry === 'BR' || (booking?.pickupStation && booking.pickupStation.toUpperCase().startsWith('BR'));
+                      if (!isBrazilStation) {
+                        setShowBalcaoPromoModal(true);
+                      }
+                    }}
+                    className={`block border-2 rounded-lg p-5 cursor-pointer flex items-center gap-4 transition-colors ${paymentMethod === "BALCAO" ? "border-[#008d36] bg-green-50" : "border-gray-200 hover:border-gray-300"}`}
+                  >
                     <input type="radio" checked={paymentMethod === "BALCAO"} onChange={() => setPaymentMethod("BALCAO")} className="w-5 h-5 accent-[#008d36]" />
                     <div>
                       <span className="font-bold text-gray-900 block">Pagar no balcão da loja</span>
@@ -1988,6 +1999,51 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+      {/* Promo Alert Modal for International Pay at Counter */}
+      {showBalcaoPromoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 md:p-8 text-center border border-gray-100 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500" />
+            <button
+              onClick={() => setShowBalcaoPromoModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+              <span className="text-3xl">🏷️</span>
+            </div>
+            <h3 className="text-xl font-black text-gray-900 mb-3">
+              Aproveite a Promoção!
+            </h3>
+            <p className="text-gray-600 text-sm leading-relaxed mb-6 font-medium">
+              Aproveite a promoção, pagamento no cartão de crédito ou pix com até <strong className="text-emerald-600 font-black">6% de desconto</strong> e <strong className="text-emerald-600 font-black">cancelamento grátis</strong>.
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setShowBalcaoPromoModal(false);
+                  window.location.href = `/reservation/vehicles?pickupStation=${booking?.pickupStation || ''}&returnStation=${booking?.returnStation || ''}&pickupDate=${booking?.pickupDate || ''}&returnDate=${booking?.returnDate || ''}&pickupTime=${booking?.pickupTime || ''}&returnTime=${booking?.returnTime || ''}`;
+                }}
+                className="w-full bg-[#008d36] hover:bg-[#007530] text-white font-black py-3.5 px-6 rounded-xl shadow-lg shadow-green-900/20 transition-all transform hover:-translate-y-0.5 text-sm flex items-center justify-center gap-2"
+              >
+                <span>💳</span> Garantir Desconto (Pagar Online)
+              </button>
+              <button
+                onClick={() => {
+                  setPaymentMethod("BALCAO");
+                  setShowBalcaoPromoModal(false);
+                }}
+                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-xl text-xs transition-colors"
+              >
+                Continuar sem Desconto (Pagar no Balcão)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
