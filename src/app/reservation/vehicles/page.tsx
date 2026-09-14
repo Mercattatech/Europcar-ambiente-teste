@@ -206,6 +206,14 @@ function VehiclesContent() {
   // Promo modal for Balcão (Pagar no balcão)
   const [showBalcaoPromoModal, setShowBalcaoPromoModal] = useState(false);
   const [pendingPoaSelection, setPendingPoaSelection] = useState<{ car: any; etoCar: any; totalPriceETO: number; totalBRL_ETO: number } | null>(null);
+  const [promoPopupConfig, setPromoPopupConfig] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/config/promo-popup")
+      .then(res => res.json())
+      .then(data => setPromoPopupConfig(data))
+      .catch(() => {});
+  }, []);
 
   const handleConfirmEtoFromModal = () => {
     if (pendingPoaSelection) {
@@ -2464,33 +2472,49 @@ function VehiclesContent() {
             <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500" />
             <button
               onClick={handleConfirmPoaFromModal}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors z-10"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
-              <span className="text-3xl">🏷️</span>
-            </div>
+            
+            {promoPopupConfig?.imageUrl ? (
+              <div className="mb-4 rounded-xl overflow-hidden max-h-48 border border-gray-100 shadow-sm">
+                <img src={promoPopupConfig.imageUrl} alt="Promo" className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+                <span className="text-3xl">🏷️</span>
+              </div>
+            )}
+
+            {promoPopupConfig?.badgeText && (
+              <span className="inline-block bg-emerald-100 text-emerald-700 text-[10px] font-black px-2.5 py-0.5 rounded-full mb-2 uppercase tracking-wide">
+                {promoPopupConfig.badgeText}
+              </span>
+            )}
+
             <h3 className="text-xl font-black text-gray-900 mb-3">
-              Aproveite a Promoção!
+              {promoPopupConfig?.title || "Aproveite a Promoção!"}
             </h3>
-            <p className="text-gray-600 text-sm leading-relaxed mb-6 font-medium">
-              Aproveite a promoção, pagamento no cartão de crédito ou pix com até <strong className="text-emerald-600 font-black">6% de desconto</strong> e <strong className="text-emerald-600 font-black">cancelamento grátis</strong>.
+            
+            <p className="text-gray-600 text-sm leading-relaxed mb-6 font-medium whitespace-pre-line">
+              {promoPopupConfig?.message || "Aproveite a promoção, pagamento no cartão de crédito ou pix com até 6% de desconto e cancelamento grátis."}
             </p>
+            
             <div className="space-y-3">
               <button
                 onClick={handleConfirmEtoFromModal}
                 className="w-full bg-[#008d36] hover:bg-[#007530] text-white font-black py-3.5 px-6 rounded-xl shadow-lg shadow-green-900/20 transition-all transform hover:-translate-y-0.5 text-sm flex items-center justify-center gap-2"
               >
-                <span>💳</span> Garantir Desconto (Pagar Online)
+                <span>💳</span> {promoPopupConfig?.primaryBtnText || "Garantir Desconto (Pagar Online)"}
               </button>
               <button
                 onClick={handleConfirmPoaFromModal}
                 className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-xl text-xs transition-colors"
               >
-                Continuar sem Desconto (Pagar no Balcão)
+                {promoPopupConfig?.secondaryBtnText || "Continuar sem Desconto (Pagar no Balcão)"}
               </button>
             </div>
           </div>

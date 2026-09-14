@@ -23,6 +23,17 @@ export default function PainelPromocoes() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
+  // Popup Promo Balcão Config
+  const [popupActive, setPopupActive] = useState(true);
+  const [popupTitle, setPopupTitle] = useState("Aproveite a Promoção!");
+  const [popupMessage, setPopupMessage] = useState("Aproveite a promoção, pagamento no cartão de crédito ou pix com até 6% de desconto e cancelamento grátis.");
+  const [popupPrimaryBtnText, setPopupPrimaryBtnText] = useState("Garantir Desconto (Pagar Online)");
+  const [popupSecondaryBtnText, setPopupSecondaryBtnText] = useState("Continuar sem Desconto (Pagar no Balcão)");
+  const [popupBadgeText, setPopupBadgeText] = useState("PROMOÇÃO EXCLUSIVA");
+  const [popupImageUrl, setPopupImageUrl] = useState("");
+  const [savingPopup, setSavingPopup] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToast({ message: msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -36,7 +47,80 @@ export default function PainelPromocoes() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchPromotions(); }, []);
+  const fetchPopupConfig = async () => {
+    try {
+      const res = await fetch("/api/admin/config/promo-popup");
+      if (res.ok) {
+        const data = await res.json();
+        setPopupActive(data.active !== undefined ? data.active : true);
+        setPopupTitle(data.title || "Aproveite a Promoção!");
+        setPopupMessage(data.message || "");
+        setPopupPrimaryBtnText(data.primaryBtnText || "Garantir Desconto (Pagar Online)");
+        setPopupSecondaryBtnText(data.secondaryBtnText || "Continuar sem Desconto (Pagar no Balcão)");
+        setPopupBadgeText(data.badgeText || "PROMOÇÃO EXCLUSIVA");
+        setPopupImageUrl(data.imageUrl || "");
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  useEffect(() => {
+    fetchPromotions();
+    fetchPopupConfig();
+  }, []);
+
+  const handleSavePopupConfig = async () => {
+    setSavingPopup(true);
+    try {
+      const payload = {
+        active: popupActive,
+        title: popupTitle,
+        message: popupMessage,
+        primaryBtnText: popupPrimaryBtnText,
+        secondaryBtnText: popupSecondaryBtnText,
+        badgeText: popupBadgeText,
+        imageUrl: popupImageUrl
+      };
+      const res = await fetch("/api/admin/config/promo-popup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        showToast("Configuração do Popup salva com sucesso!");
+      } else {
+        showToast("Erro ao salvar popup", "error");
+      }
+    } catch (e) {
+      showToast("Erro de conexão", "error");
+    } finally {
+      setSavingPopup(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/admin/upload-image", {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      if (data.url) {
+        setPopupImageUrl(data.url);
+        showToast("Imagem enviada!");
+      } else {
+        showToast("Erro ao enviar imagem", "error");
+      }
+    } catch (e) {
+      showToast("Erro no envio da imagem", "error");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const resetForm = () => {
     setEditingId(null); setTitle(""); setSubtitle(""); setDescription(""); setDiscountValue("");
@@ -109,6 +193,181 @@ export default function PainelPromocoes() {
       <div className="flex items-start gap-3 bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
         <span className="text-lg">💡</span>
         <p className="text-sm text-blue-300">O <strong>Contract ID</strong> é o código do contrato Europcar (ex: <code className="bg-blue-900/50 px-1.5 py-0.5 rounded text-xs">45944876</code>). Quando preenchido, será injetado automaticamente nas requisições XRS para aplicar o desconto negociado.</p>
+      </div>
+
+      {/* --- Popup Balcão Internacional Editor Section --- */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 md:p-8 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-5">
+          <div>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚡</span>
+              <h2 className="text-xl font-black text-white">Popup Promocional Balcão (Reservas Internacionais)</h2>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Configure o texto, imagens e botões do modal exibido ao escolher "Pagar no Balcão"</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer bg-gray-800 px-4 py-2 rounded-xl border border-gray-700">
+              <input
+                type="checkbox"
+                checked={popupActive}
+                onChange={e => setPopupActive(e.target.checked)}
+                className="w-4 h-4 accent-green-500"
+              />
+              <span className={`text-xs font-bold ${popupActive ? "text-green-400" : "text-gray-400"}`}>
+                {popupActive ? "Popup Ativo" : "Popup Inativo"}
+              </span>
+            </label>
+            <button
+              onClick={handleSavePopupConfig}
+              disabled={savingPopup}
+              className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-xl font-bold text-xs transition-colors shadow-lg disabled:opacity-50 flex items-center gap-2"
+            >
+              {savingPopup ? "Salvando..." : "💾 Salvar Configurações"}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Form Controls */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-300 mb-1">Badge / Tag Superior</label>
+              <input
+                type="text"
+                value={popupBadgeText}
+                onChange={e => setPopupBadgeText(e.target.value)}
+                placeholder="Ex: PROMOÇÃO EXCLUSIVA"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs text-white outline-none focus:border-green-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-300 mb-1">Título Principal do Popup</label>
+              <input
+                type="text"
+                value={popupTitle}
+                onChange={e => setPopupTitle(e.target.value)}
+                placeholder="Ex: Aproveite a Promoção!"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs text-white outline-none focus:border-green-500 font-bold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-300 mb-1">Mensagem / Texto do Popup</label>
+              <textarea
+                rows={3}
+                value={popupMessage}
+                onChange={e => setPopupMessage(e.target.value)}
+                placeholder="Ex: Aproveite a promoção, pagamento no cartão de crédito ou pix com até 6% de desconto e cancelamento grátis."
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs text-white outline-none focus:border-green-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Texto Botão Verde (Com Desconto)</label>
+                <input
+                  type="text"
+                  value={popupPrimaryBtnText}
+                  onChange={e => setPopupPrimaryBtnText(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs text-white outline-none focus:border-green-500 font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-300 mb-1">Texto Botão Secundário (Balcão)</label>
+                <input
+                  type="text"
+                  value={popupSecondaryBtnText}
+                  onChange={e => setPopupSecondaryBtnText(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs text-white outline-none focus:border-green-500"
+                />
+              </div>
+            </div>
+
+            {/* Imagem do Popup */}
+            <div className="border-t border-gray-800 pt-4 space-y-3">
+              <label className="block text-xs font-bold text-gray-300">
+                🖼️ Imagem do Banner do Popup <span className="text-gray-500 font-normal">(Opcional)</span>
+              </label>
+
+              <div className="flex items-center gap-3">
+                <label className="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-4 py-2.5 rounded-lg text-xs font-bold cursor-pointer transition-colors shrink-0">
+                  {uploadingImage ? "Enviando imagem..." : "📁 Subir Imagem do Computador"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={uploadingImage}
+                  />
+                </label>
+                {popupImageUrl && (
+                  <button
+                    onClick={() => setPopupImageUrl("")}
+                    className="text-xs text-red-400 hover:text-red-300 font-bold"
+                  >
+                    🗑️ Remover Imagem
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <input
+                  type="text"
+                  value={popupImageUrl}
+                  onChange={e => setPopupImageUrl(e.target.value)}
+                  placeholder="Ou cole a URL direta da imagem aqui (https://...)"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs text-white outline-none focus:border-green-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Live Preview Panel */}
+          <div className="bg-gray-950 border border-gray-800 rounded-xl p-6 flex flex-col items-center justify-center relative">
+            <span className="absolute top-3 left-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-900 px-2 py-1 rounded">
+              Pré-visualização em Tempo Real
+            </span>
+
+            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center border border-gray-100 relative overflow-hidden mt-6">
+              <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500" />
+              
+              {/* Image preview if exists */}
+              {popupImageUrl ? (
+                <div className="mb-4 rounded-xl overflow-hidden max-h-40 border border-gray-100 shadow-sm">
+                  <img src={popupImageUrl} alt="Banner" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
+                  <span className="text-2xl">🏷️</span>
+                </div>
+              )}
+
+              {popupBadgeText && (
+                <span className="inline-block bg-emerald-100 text-emerald-700 text-[10px] font-black px-2.5 py-0.5 rounded-full mb-2 uppercase tracking-wide">
+                  {popupBadgeText}
+                </span>
+              )}
+
+              <h4 className="text-lg font-black text-gray-900 mb-2">
+                {popupTitle || "Aproveite a Promoção!"}
+              </h4>
+
+              <p className="text-gray-600 text-xs leading-relaxed mb-5 font-medium">
+                {popupMessage || "Mensagem..."}
+              </p>
+
+              <div className="space-y-2">
+                <div className="w-full bg-[#008d36] text-white font-black py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md">
+                  <span>💳</span> {popupPrimaryBtnText || "Garantir Desconto"}
+                </div>
+                <div className="w-full bg-gray-100 text-gray-700 font-bold py-2.5 px-4 rounded-xl text-[11px]">
+                  {popupSecondaryBtnText || "Continuar sem Desconto"}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {loading ? (
