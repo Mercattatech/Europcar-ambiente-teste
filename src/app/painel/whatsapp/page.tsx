@@ -9,6 +9,7 @@ type MsgType = "text" | "template" | "flow";
 interface TriggerConfig {
   type: MsgType;
   enabled: boolean;
+  sendToCustomer?: boolean; // Se false, inativa o envio direto para o cliente
   body: string;         // text mode
   templateName: string; // template mode
   bodyParams: string[]; // template params
@@ -18,6 +19,7 @@ interface TriggerConfig {
 const DEFAULT_TRIGGER: TriggerConfig = {
   type: "text",
   enabled: false,
+  sendToCustomer: true,
   body: "",
   templateName: "",
   bodyParams: [],
@@ -574,6 +576,31 @@ export default function WhatsappPage() {
               </div>
 
               <div className="p-6 space-y-6">
+
+                {/* Opção para Inativar/Ativar envio direto para o cliente */}
+                <div className="p-4 bg-gray-950/80 border border-gray-800 rounded-xl flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-bold text-white flex items-center gap-2">
+                      📱 Enviar mensagem de WhatsApp para o Cliente
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      {activeCfg.sendToCustomer !== false
+                        ? "✅ ATIVO — A mensagem será enviada automaticamente para o número de WhatsApp informado pelo cliente no checkout."
+                        : "⛔ INATIVO — Envio para o cliente desativado! As mensagens deste gatilho serão enviadas APENAS para os números internos da equipe."}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs font-bold text-gray-400">
+                      {activeCfg.sendToCustomer !== false ? "Sim" : "Não"}
+                    </span>
+                    <button
+                      onClick={() => updateTrigger(activeTriggerId, { sendToCustomer: activeCfg.sendToCustomer === false ? true : false })}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${activeCfg.sendToCustomer !== false ? "bg-emerald-600" : "bg-red-700/80"}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${activeCfg.sendToCustomer !== false ? "translate-x-6" : "translate-x-1"}`} />
+                    </button>
+                  </div>
+                </div>
 
                 {/* Tipo de mensagem */}
                 <div>

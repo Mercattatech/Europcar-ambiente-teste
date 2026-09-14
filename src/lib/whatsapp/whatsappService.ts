@@ -38,6 +38,7 @@ interface WaTriggerConfig {
   bodyParams?: string[];   // Parâmetros do template (substituídos em ordem)
   flowId?: string;         // Para type=flow
   enabled: boolean;
+  sendToCustomer?: boolean; // Ativa/Inativa envio para o WhatsApp do cliente
 }
 
 /** Substitui variáveis {{NOME}} em um texto */
@@ -104,9 +105,10 @@ export async function sendWhatsappTrigger(
     } catch {}
   }
 
-  // Lista final: cliente primeiro (se tiver telefone), depois internos
+  // Lista final: cliente primeiro (se tiver telefone e sendToCustomer !== false), depois internos
+  const sendToCustomer = triggerCfg.sendToCustomer !== false;
   const allNumbers: string[] = [];
-  if (clientPhone) {
+  if (clientPhone && sendToCustomer) {
     const cleaned = clientPhone.replace(/\D/g, '');
     if (cleaned.length >= 10) allNumbers.push(cleaned);
   }
