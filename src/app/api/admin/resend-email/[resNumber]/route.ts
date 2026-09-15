@@ -92,7 +92,32 @@ export async function POST(
   const paymentMethod = cd?.paymentMethod || 'CREDIT';
   const pickupDateRaw = booking?.pickupDate || '';
   const returnDateRaw = booking?.returnDate || '';
+  const country       = booking?.country || cd?.country || 'BR';
   const amountBRL     = (reservation.amountInCents || 0) / 100;
+
+  // ── Valor na moeda local da reserva ──────────────────────
+  // O XRS já retorna o valor na moeda do país — não é preciso converter.
+  // Exemplos: reserva na Suíça → CHF 285.50 | na França → EUR 210.00
+  const localAmount   = parseFloat(car?.totalRateEstimate || car?.total || '0');
+  const localCurrency = (car?.bookingCurrencyOfTotalRateEstimate || car?.currency || '').toUpperCase();
+
+  // Formata o valor na moeda local usando Intl.NumberFormat
+  let valorTotal: string;
+  if (localAmount > 0 && localCurrency && localCurrency !== 'BRL') {
+    // Reserva internacional — usa moeda e valor do país
+    try {
+      valorTotal = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: localCurrency,
+        minimumFractionDigits: localCurrency === 'JPY' ? 0 : 2,
+      }).format(localAmount);
+    } catch {
+      valorTotal = `${localCurrency} ${localAmount.toFixed(2)}`;
+    }
+  } else {
+    // Reserva no Brasil ou moeda não identificada — usa BRL
+    valorTotal = `R$ ${amountBRL.toFixed(2).replace('.', ',')}`;
+  }
 
   const emailVars: Record<string, string> = {
     NOME:              cd?.nome        || '',
@@ -101,7 +126,8 @@ export async function POST(
     TELEFONE:          cd?.telefone    || '',
     CPF:               cd?.cpf         || '',
     NUMERO_RESERVA:    finalResNumber,
-    VALOR_TOTAL:       `R$ ${amountBRL.toFixed(2).replace('.', ',')}`,
+    VALOR_TOTAL:       valorTotal,
+    MOEDA:             localCurrency || 'BRL',
     FORMA_PAGAMENTO:   fmtPagamento[paymentMethod] || paymentMethod,
     CARRO:             car?.carCategoryName || car?.carCategorySample || car?.name || '',
     CATEGORIA_CARRO:   car?.carCategoryCode || car?.acrissCode || '',
