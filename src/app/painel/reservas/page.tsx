@@ -376,10 +376,18 @@ export default function PainelReservas() {
                            <p className="text-xs text-gray-500 mt-2">Cobrado em BRL: R$ {emailPreview.amountBRL?.toFixed(2).replace('.', ',')}</p>
                         )}
                      </div>
-                     {/* Aviso se moeda não tem valor exato */}
-                     {emailPreview._debug && !emailPreview._debug.car_totalRateEstimate && emailPreview.localeCurrency !== 'BRL' && (
-                        <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl p-3 text-xs text-yellow-400">
-                           ⚠️ Valor local não encontrado nos dados da reserva. O e-mail mostrará a moeda {emailPreview.localeCurrency} mas com o valor em BRL como referência.
+                     {/* Debug de detecção de moeda */}
+                     {emailPreview._debug && (
+                        <div className="bg-gray-900 border border-gray-700/40 rounded-xl p-3 text-xs space-y-1">
+                           <p className="text-gray-500 font-bold uppercase tracking-wider mb-1">Detecção de Moeda</p>
+                           <p className="text-gray-400">📍 Estação: <span className="text-white font-mono">{emailPreview._debug.pickupStation_raw || '—'}</span> → prefixo <span className="text-yellow-300 font-mono">{emailPreview._debug.pickupStation_prefix || '—'}</span></p>
+                           <p className="text-gray-400">① XRS: <span className={`font-mono ${emailPreview._debug.step1_xrsCurrency ? 'text-green-400' : 'text-red-400'}`}>{emailPreview._debug.step1_xrsCurrency || 'não encontrado'}</span></p>
+                           <p className="text-gray-400">② Estação: <span className={`font-mono ${emailPreview._debug.step2_stationCurrency ? 'text-green-400' : 'text-red-400'}`}>{emailPreview._debug.step2_stationCurrency || 'não mapeado'}</span></p>
+                           <p className="text-gray-400">③ País booking: <span className="text-yellow-300 font-mono">{emailPreview._debug.booking_country || '—'}</span> → <span className="font-mono">{emailPreview._debug.step3_localeCurrency}</span> <span className="text-gray-600">(pode ser nacionalidade do cliente!)</span></p>
+                           <p className="text-white font-bold mt-1">✅ Final: <span className="text-indigo-300 font-mono">{emailPreview._debug.finalCurrency}</span></p>
+                           {!emailPreview._debug.car_totalRateEstimate && (
+                              <p className="text-yellow-500 mt-1">⚠️ Valor na moeda local não disponível nos dados XRS. Será mostrado o BRL como referência.</p>
+                           )}
                         </div>
                      )}
                   </div>

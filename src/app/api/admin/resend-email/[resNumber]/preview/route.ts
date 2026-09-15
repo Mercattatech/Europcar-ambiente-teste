@@ -113,14 +113,24 @@ export async function GET(
     returnDate: booking?.returnDate || '',
     carName: car?.carCategoryName || car?.carCategorySample || '',
     carCategory: car?.carCategoryCode || '',
-    // Debug: campos brutos do car para diagnóstico
+    // Debug: campos brutos para diagnóstico de moeda
     _debug: {
+      // Campos XRS do car
       car_bookingCurrencyOfTotalRateEstimate: car?.bookingCurrencyOfTotalRateEstimate,
       car_currency: car?.currency,
       car_totalRateEstimate: car?.totalRateEstimate,
       car_total: car?.total,
       car_totalRateInBookingCurrency: car?.totalRateInBookingCurrency,
+      // País e estações
       booking_country: booking?.country,
+      cd_country: cd?.country,
+      pickupStation_raw: booking?.pickupStation,
+      pickupStation_prefix: (booking?.pickupStation || '').slice(0, 3).toUpperCase(),
+      // Resolução de moeda (passo a passo)
+      step1_xrsCurrency: rawCurrency || null,
+      step2_stationCurrency: stationCurrency,
+      step3_localeCurrency: localeLookup.currency,
+      finalCurrency: localCurrency,
     },
   });
 }
