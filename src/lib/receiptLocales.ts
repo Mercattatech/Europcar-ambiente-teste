@@ -566,3 +566,134 @@ export function formatTime(timeStr: string): string {
   if (t.length >= 4) return `${t.slice(0, 2)}:${t.slice(2, 4)}`;
   return timeStr;
 }
+
+/**
+ * getCurrencyFromStation
+ *
+ * Determina a moeda a partir do prefixo IATA da estação de retirada.
+ * O código da estação Europcar/XRS usa os primeiros 3 caracteres como código IATA da cidade.
+ *
+ * Exemplos:
+ *   OPOT01 → OPO → Porto, Portugal → EUR
+ *   LIST01 → LIS → Lisboa, Portugal → EUR
+ *   ZRHT01 → ZRH → Zurique, Suíça → CHF
+ *   CDGT01 → CDG → Paris, França → EUR
+ *   GIGT01 → GIG → Rio de Janeiro, Brasil → BRL
+ *
+ * Retorna null se o prefixo não for reconhecido.
+ */
+export function getCurrencyFromStation(stationCode?: string | null): string | null {
+  if (!stationCode || stationCode.length < 3) return null;
+  const prefix = stationCode.slice(0, 3).toUpperCase();
+
+  const stationCurrencyMap: Record<string, string> = {
+    // Brasil → BRL
+    GRU: 'BRL', CGH: 'BRL', GIG: 'BRL', SDU: 'BRL', BSB: 'BRL',
+    CNF: 'BRL', POA: 'BRL', SSA: 'BRL', REC: 'BRL', FOR: 'BRL',
+    CWB: 'BRL', FLN: 'BRL', NAT: 'BRL', MAO: 'BRL', BEL: 'BRL',
+    VCP: 'BRL', CGB: 'BRL', THE: 'BRL', MCZ: 'BRL', JPA: 'BRL',
+    AJU: 'BRL', MGF: 'BRL', LDB: 'BRL', RAO: 'BRL', PVH: 'BRL',
+    // Portugal → EUR
+    LIS: 'EUR', OPO: 'EUR', FAO: 'EUR', PDL: 'EUR', HOR: 'EUR',
+    SMA: 'EUR', TER: 'EUR', FLW: 'EUR', PIX: 'EUR', GRW: 'EUR',
+    // Espanha → EUR
+    MAD: 'EUR', BCN: 'EUR', AGP: 'EUR', ALC: 'EUR', LPA: 'EUR',
+    TFS: 'EUR', PMI: 'EUR', SVQ: 'EUR', VLC: 'EUR', BIO: 'EUR',
+    SCQ: 'EUR', IBZ: 'EUR', MAH: 'EUR', FUE: 'EUR', ACE: 'EUR',
+    GRX: 'EUR', VIT: 'EUR', ZAZ: 'EUR', REU: 'EUR', GRO: 'EUR',
+    // França → EUR
+    CDG: 'EUR', ORY: 'EUR', NCE: 'EUR', LYS: 'EUR', TLS: 'EUR',
+    BOD: 'EUR', NTE: 'EUR', SXB: 'EUR', BES: 'EUR', BIA: 'EUR',
+    // Alemanha → EUR
+    FRA: 'EUR', MUC: 'EUR', TXL: 'EUR', HAM: 'EUR', DUS: 'EUR',
+    CGN: 'EUR', STR: 'EUR', NUE: 'EUR', LEJ: 'EUR', HAJ: 'EUR',
+    BRE: 'EUR', DRS: 'EUR', ERF: 'EUR', PAD: 'EUR', FKB: 'EUR',
+    BER: 'EUR',
+    // Itália → EUR
+    FCO: 'EUR', MXP: 'EUR', LIN: 'EUR', NAP: 'EUR', VCE: 'EUR',
+    BGY: 'EUR', CTA: 'EUR', PMO: 'EUR', PSA: 'EUR', BLQ: 'EUR',
+    FLR: 'EUR', TRN: 'EUR', GOA: 'EUR', VRN: 'EUR', BRI: 'EUR',
+    OLB: 'EUR', CAG: 'EUR',
+    // Suíça → CHF
+    ZRH: 'CHF', GVA: 'CHF', BSL: 'CHF', BRN: 'CHF', LGN: 'CHF',
+    // Reino Unido → GBP
+    LHR: 'GBP', LGW: 'GBP', MAN: 'GBP', EDI: 'GBP', GLA: 'GBP',
+    BHX: 'GBP', LTN: 'GBP', STN: 'GBP', BRS: 'GBP', NCL: 'GBP',
+    LPL: 'GBP', LBA: 'GBP', CWL: 'GBP', ABZ: 'GBP',
+    // Irlanda → EUR
+    DUB: 'EUR', ORK: 'EUR', SNN: 'EUR',
+    // EUA → USD
+    JFK: 'USD', LAX: 'USD', ORD: 'USD', MIA: 'USD', SFO: 'USD',
+    DFW: 'USD', ATL: 'USD', DEN: 'USD', SEA: 'USD', LAS: 'USD',
+    MCO: 'USD', EWR: 'USD', BOS: 'USD', PHX: 'USD', IAH: 'USD',
+    FLL: 'USD', DTW: 'USD', MSP: 'USD', CLT: 'USD', LGA: 'USD',
+    BWI: 'USD', SAN: 'USD', SLC: 'USD', TPA: 'USD', HNL: 'USD',
+    AUS: 'USD', OAK: 'USD', RSW: 'USD', ANC: 'USD',
+    // Canadá → CAD
+    YYZ: 'CAD', YVR: 'CAD', YUL: 'CAD', YYC: 'CAD', YEG: 'CAD',
+    YOW: 'CAD', YHZ: 'CAD', YWG: 'CAD',
+    // Austrália → AUD
+    SYD: 'AUD', MEL: 'AUD', BNE: 'AUD', PER: 'AUD', ADL: 'AUD',
+    CBR: 'AUD', DRW: 'AUD', CNS: 'AUD',
+    // Argentina → ARS
+    EZE: 'ARS', AEP: 'ARS', COR: 'ARS', MDZ: 'ARS', USH: 'ARS',
+    // México → MXN
+    MEX: 'MXN', CUN: 'MXN', GDL: 'MXN', MTY: 'MXN', PVR: 'MXN',
+    // Japão → JPY
+    NRT: 'JPY', HND: 'JPY', KIX: 'JPY', CTS: 'JPY', FUK: 'JPY',
+    OKA: 'JPY', NGO: 'JPY',
+    // Holanda → EUR
+    AMS: 'EUR', EIN: 'EUR', RTM: 'EUR',
+    // Bélgica → EUR
+    BRU: 'EUR', CRL: 'EUR', LGG: 'EUR',
+    // Áustria → EUR
+    VIE: 'EUR', SZG: 'EUR', INN: 'EUR', GRZ: 'EUR', LNZ: 'EUR',
+    // Grécia → EUR
+    ATH: 'EUR', SKG: 'EUR', HER: 'EUR', RHO: 'EUR', CFU: 'EUR',
+    ZTH: 'EUR', KGS: 'EUR',
+    // Noruega → NOK
+    OSL: 'NOK', BGO: 'NOK', TRD: 'NOK', SVG: 'NOK',
+    // Suécia → SEK
+    ARN: 'SEK', GOT: 'SEK', MMX: 'SEK',
+    // Dinamarca → DKK
+    CPH: 'DKK', BLL: 'DKK', AAL: 'DKK',
+    // Finlândia → EUR
+    HEL: 'EUR', TMP: 'EUR', TKU: 'EUR',
+    // Polônia → PLN
+    WAW: 'PLN', KRK: 'PLN', GDN: 'PLN', KTW: 'PLN', POZ: 'PLN', WRO: 'PLN',
+    // República Tcheca → CZK
+    PRG: 'CZK', BRQ: 'CZK',
+    // Hungria → HUF
+    BUD: 'HUF',
+    // Romênia → RON
+    OTP: 'RON', CLJ: 'RON',
+    // Croácia → EUR
+    ZAG: 'EUR', SPU: 'EUR', DBV: 'EUR',
+    // Turquia → TRY
+    IST: 'TRY', SAW: 'TRY', AYT: 'TRY', ESB: 'TRY', ADB: 'TRY',
+    // Emirados → AED
+    DXB: 'AED', AUH: 'AED',
+    // África do Sul → ZAR
+    JNB: 'ZAR', CPT: 'ZAR', DUR: 'ZAR',
+    // Nova Zelândia → NZD
+    AKL: 'NZD', CHC: 'NZD', WLG: 'NZD', ZQN: 'NZD',
+    // Chile → CLP
+    SCL: 'CLP', PMC: 'CLP',
+    // Colômbia → COP
+    BOG: 'COP', MDE: 'COP', CLO: 'COP',
+    // Peru → PEN
+    LIM: 'PEN', CUZ: 'PEN',
+    // China → CNY
+    PEK: 'CNY', PVG: 'CNY', CAN: 'CNY', CTU: 'CNY',
+    // Coreia do Sul → KRW
+    ICN: 'KRW', GMP: 'KRW',
+    // Índia → INR
+    DEL: 'INR', BOM: 'INR', MAA: 'INR', BLR: 'INR', HYD: 'INR',
+    // Israel → ILS
+    TLV: 'ILS',
+    // Marrocos → MAD (Dirham)
+    CMN: 'MAD', RAK: 'MAD', AGA: 'MAD',
+  };
+
+  return stationCurrencyMap[prefix] || null;
+}

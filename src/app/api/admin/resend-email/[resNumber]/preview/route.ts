@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { checkAdmin } from '@/lib/checkAdmin';
-import { getReceiptLocale } from '@/lib/receiptLocales';
+import { getReceiptLocale, getCurrencyFromStation } from '@/lib/receiptLocales';
 export const dynamic = 'force-dynamic';
 
 /**
@@ -48,16 +48,22 @@ export async function GET(
   const localeLookup  = getReceiptLocale(country);
   const amountBRL     = (reservation.amountInCents || 0) / 100;
 
-  // Detecta moeda: usa campo do car, senão usa o locale do país
+  // Detecta moeda: estação > XRS > locale do país
+  //   1. bookingCurrencyOfTotalRateEstimate (XRS)
+  //   2. currency do car
+  //   3. ESTAÇÃO de retirada (prefixo IATA) — resolve o problema do país
+  //      ser a nacionalidade do cliente (ex: BR alugando em Lisboa → EUR)
+  //   4. Locale do país → último recurso
+  const stationCurrency = getCurrencyFromStation(booking?.pickupStation);
   const rawCurrency = (
     car?.bookingCurrencyOfTotalRateEstimate ||
     car?.currency ||
     ''
   ).toUpperCase().trim();
 
-  const localCurrency = rawCurrency && rawCurrency !== 'BRL' && rawCurrency.length === 3
+  const localCurrency = (rawCurrency && rawCurrency.length === 3)
     ? rawCurrency
-    : (country !== 'BR' ? localeLookup.currency : 'BRL');
+    : (stationCurrency || localeLookup.currency);
 
   // Detecta valor: usa totalRateEstimate do car, senão usa amountBRL
   const rawAmount = parseFloat(

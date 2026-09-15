@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { checkAdmin } from '@/lib/checkAdmin';
-import { getReceiptLocale } from '@/lib/receiptLocales';
+import { getReceiptLocale, getCurrencyFromStation } from '@/lib/receiptLocales';
 export const dynamic = 'force-dynamic';
 
 
@@ -97,20 +97,25 @@ export async function POST(
   const country       = booking?.country || cd?.country || 'BR';
   const amountBRL     = (reservation.amountInCents || 0) / 100;
 
-  // ── Moeda local da reserva ───────────────────────────
-  // Prioridade:
-  //   1. bookingCurrencyOfTotalRateEstimate do car (campo XRS)
+  // ── Moeda local da reserva ─────────────────────────────────────────────
+  // Prioridade (da mais confiável para a menos):
+  //   1. bookingCurrencyOfTotalRateEstimate do car (campo XRS direto)
   //   2. currency do car
-  //   3. moeda do país (via receiptLocales) — fallback garantido
-  const localeLookup  = getReceiptLocale(country);
-  const rawCurrency   = (
+  //   3. ESTAÇÃO de retirada (prefixo IATA → moeda)  ← principal fallback
+  //      Resolve o problema de booking.country ser a NACIONALIDADE do cliente
+  //      (ex: cliente BR que aluga em Lisboa → OPO/LIS → EUR, não BRL)
+  //   4. Locale do país → último recurso
+  const localeLookup    = getReceiptLocale(country);
+  const stationCurrency = getCurrencyFromStation(booking?.pickupStation);
+  const rawCurrency     = (
     car?.bookingCurrencyOfTotalRateEstimate ||
     car?.currency ||
     ''
   ).toUpperCase().trim();
   const localCurrency = (rawCurrency && rawCurrency.length === 3)
     ? rawCurrency
-    : localeLookup.currency;  // ex: 'PT' -> 'EUR', 'CH' -> 'CHF'
+    : (stationCurrency || localeLookup.currency);
+    // ex: OPOT01→EUR | ZRHT01→CHF | GRUG01→BRL
 
   // Valor na moeda local
   const rawAmount = parseFloat(
