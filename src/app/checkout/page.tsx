@@ -210,10 +210,11 @@ export default function CheckoutPage() {
 
     (async () => {
       try {
-        const [tokenRes, configRes] = await Promise.all([
-          fetch('/api/cielo/get3dsToken', { method: 'POST' }),
-          fetch('/api/admin/config/cielo'),
-        ]);
+        // NOTA: Não chamamos /api/admin/config/cielo aqui pois essa rota exige
+        // autenticação de admin e retorna 401 para clientes normais, impedindo
+        // o script MPI de carregar. O campo `environment` já vem na resposta
+        // do get3dsToken (sandbox | production) — usamos ele diretamente.
+        const tokenRes = await fetch('/api/cielo/get3dsToken', { method: 'POST' });
 
         // Proteção contra 502/503: .json() quebra se o servidor retornar "Bad Gateway"
         if (!tokenRes.ok) {
@@ -222,14 +223,8 @@ export default function CheckoutPage() {
           log3dsClientError('GET_TOKEN_HTTP_ERROR', { status: tokenRes.status });
           return;
         }
-        if (!configRes.ok) {
-          console.warn(`[3DS] config/cielo retornou HTTP ${configRes.status} — 3DS indisponível no momento.`);
-          log3dsClientError('GET_CONFIG_HTTP_ERROR', { status: configRes.status });
-          return;
-        }
 
         const tokenData = await tokenRes.json();
-        const configData = await configRes.json();
         if (cancelled) return;
 
         if (tokenData.accessToken) {
@@ -240,7 +235,8 @@ export default function CheckoutPage() {
           log3dsClientError('NO_ACCESS_TOKEN', tokenData);
         }
 
-        const isSandboxEnv = configData.isSandbox !== false;
+        // `environment` vem do get3dsToken: 'sandbox' | 'production'
+        const isSandboxEnv = tokenData.environment !== 'production';
 
         (window as any).bpmpi_config = function () {
           return {
