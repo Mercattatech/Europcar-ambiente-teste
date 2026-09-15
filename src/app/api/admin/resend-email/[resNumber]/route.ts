@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { checkAdmin } from '@/lib/checkAdmin';
+import { getReceiptLocale } from '@/lib/receiptLocales';
 export const dynamic = 'force-dynamic';
+
 
 export async function POST(
   _req: Request,
@@ -95,27 +97,47 @@ export async function POST(
   const country       = booking?.country || cd?.country || 'BR';
   const amountBRL     = (reservation.amountInCents || 0) / 100;
 
-  // ── Valor na moeda local da reserva ──────────────────────
-  // O XRS já retorna o valor na moeda do país — não é preciso converter.
-  // Exemplos: reserva na Suíça → CHF 285.50 | na França → EUR 210.00
-  const localAmount   = parseFloat(car?.totalRateEstimate || car?.total || '0');
-  const localCurrency = (car?.bookingCurrencyOfTotalRateEstimate || car?.currency || '').toUpperCase();
+  // ── Moeda local da reserva ───────────────────────────
+  // Prioridade:
+  //   1. bookingCurrencyOfTotalRateEstimate do car (campo XRS)
+  //   2. currency do car
+  //   3. moeda do país (via receiptLocales) — fallback garantido
+  const localeLookup  = getReceiptLocale(country);
+  const rawCurrency   = (
+    car?.bookingCurrencyOfTotalRateEstimate ||
+    car?.currency ||
+    ''
+  ).toUpperCase().trim();
+  const localCurrency = (rawCurrency && rawCurrency.length === 3)
+    ? rawCurrency
+    : localeLookup.currency;  // ex: 'PT' -> 'EUR', 'CH' -> 'CHF'
 
-  // Formata o valor na moeda local usando Intl.NumberFormat
+  // Valor na moeda local
+  const rawAmount = parseFloat(
+    car?.totalRateEstimate ||
+    car?.total ||
+    car?.totalRateInBookingCurrency ||
+    '0'
+  );
+
   let valorTotal: string;
-  if (localAmount > 0 && localCurrency && localCurrency !== 'BRL') {
-    // Reserva internacional — usa moeda e valor do país
+  if (localCurrency !== 'BRL' && rawAmount > 0) {
+    // Reserva internacional com valor local disponivel
     try {
       valorTotal = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: localCurrency,
         minimumFractionDigits: localCurrency === 'JPY' ? 0 : 2,
-      }).format(localAmount);
+      }).format(rawAmount);
     } catch {
-      valorTotal = `${localCurrency} ${localAmount.toFixed(2)}`;
+      valorTotal = `${localCurrency} ${rawAmount.toFixed(2)}`;
     }
+  } else if (localCurrency !== 'BRL') {
+    // País internacional mas sem valor local salvo (pagamento foi em BRL)
+    // Mostra BRL mas indica a moeda do país
+    valorTotal = `${localCurrency} — (R$ ${amountBRL.toFixed(2).replace('.', ',')})`;
   } else {
-    // Reserva no Brasil ou moeda não identificada — usa BRL
+    // Brasil
     valorTotal = `R$ ${amountBRL.toFixed(2).replace('.', ',')}`;
   }
 
@@ -173,10 +195,11 @@ export async function POST(
 
   return NextResponse.json({
     ok: true,
-    sentTo:    toEmail,
-    resNumber: finalResNumber,
-    template:  result.success ? 'RESERVA_SUCESSO' : 'FALLBACK',
-    provider:  'provider' in result ? result.provider : undefined,
-
+    sentTo:         toEmail,
+    resNumber:      finalResNumber,
+    localeCurrency: localCurrency,
+    valorTotal,
+    template:       result.success ? 'RESERVA_SUCESSO' : 'FALLBACK',
+    provider:       'provider' in result ? result.provider : undefined,
   });
 }

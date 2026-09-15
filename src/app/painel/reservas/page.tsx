@@ -74,6 +74,8 @@ export default function PainelReservas() {
    const [adminModifying, setAdminModifying] = useState(false);
    const [adminModifyMsg, setAdminModifyMsg] = useState('');
    const [resendingEmail, setResendingEmail] = useState<string | null>(null);
+   const [emailPreview, setEmailPreview] = useState<any | null>(null);
+   const [loadingPreview, setLoadingPreview] = useState<string | null>(null);
 
    const showToast = (message: string, type: "success" | "error" = "success") => {
       setToast({ message, type });
@@ -86,6 +88,27 @@ export default function PainelReservas() {
       window.open(`/api/receipt/${encodeURIComponent(key)}`, '_blank');
    };
 
+   // Abre preview do e-mail antes de enviar
+   const handleOpenEmailPreview = async (resNumber: string) => {
+      const key = resNumber || '';
+      if (!key) return;
+      setLoadingPreview(key);
+      try {
+         const r = await fetch(`/api/admin/resend-email/${encodeURIComponent(key)}/preview`);
+         const data = await r.json();
+         if (r.ok) {
+            setEmailPreview(data);
+         } else {
+            showToast(`❌ Erro ao carregar preview: ${data.error || ''}`, 'error');
+         }
+      } catch {
+         showToast('❌ Erro de conexão ao carregar preview', 'error');
+      } finally {
+         setLoadingPreview(null);
+      }
+   };
+
+   // Reenvia e-mail (chamado após confirmação no modal de preview)
    const handleResendEmail = async (resNumber: string) => {
       const key = resNumber || '';
       if (!key) return;
@@ -94,7 +117,8 @@ export default function PainelReservas() {
          const r = await fetch(`/api/admin/resend-email/${encodeURIComponent(key)}`, { method: 'POST' });
          const data = await r.json();
          if (r.ok) {
-            showToast(`✅ E-mail reenviado para ${data.sentTo} (${data.lang?.toUpperCase()} / ${data.currency})`, 'success');
+            showToast(`✅ E-mail reenviado para ${data.sentTo} · ${data.localeCurrency || ''}`, 'success');
+            setEmailPreview(null);
          } else {
             showToast(`❌ Erro: ${data.error || 'Falha ao reenviar e-mail'}`, 'error');
          }
@@ -311,6 +335,74 @@ export default function PainelReservas() {
 
    return (
       <div className="space-y-6">
+         {/* ── E-mail Preview Modal ── */}
+         {emailPreview && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+               <div className="bg-gray-900 border border-indigo-800/40 rounded-2xl p-0 max-w-lg w-full shadow-2xl overflow-hidden">
+                  {/* Header */}
+                  <div className="bg-indigo-950 px-6 py-4 flex items-center justify-between border-b border-indigo-800/40">
+                     <div>
+                        <h2 className="text-white font-bold text-base">✉️ Preview do E-mail</h2>
+                        <p className="text-indigo-300 text-xs mt-0.5">Confirme os dados antes de enviar</p>
+                     </div>
+                     <button onClick={() => setEmailPreview(null)} className="text-gray-400 hover:text-white transition-colors">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                     </button>
+                  </div>
+                  {/* Body */}
+                  <div className="px-6 py-5 space-y-4">
+                     {/* Destinatário */}
+                     <div className="bg-gray-800 rounded-xl p-4">
+                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-2">Destinatário</p>
+                        <p className="text-white font-semibold">{emailPreview.customerName}</p>
+                        <p className="text-indigo-300 text-sm">{emailPreview.toEmail}</p>
+                     </div>
+                     {/* Reserva */}
+                     <div className="bg-gray-800 rounded-xl p-4">
+                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-2">Reserva</p>
+                        <p className="text-white font-mono font-bold text-lg">{emailPreview.resNumber}</p>
+                        <p className="text-gray-400 text-sm">{emailPreview.carName} · {emailPreview.carCategory}</p>
+                        <p className="text-gray-400 text-sm mt-1">{emailPreview.pickupStation} → {emailPreview.returnStation}</p>
+                     </div>
+                     {/* Valor - destaque principal */}
+                     <div className="bg-indigo-950 border border-indigo-700/50 rounded-xl p-4">
+                        <p className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider mb-2">Valor no E-mail (moeda local)</p>
+                        <p className="text-2xl font-black text-indigo-200">{emailPreview.valorTotal}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                           <span className="text-xs bg-indigo-900 text-indigo-300 px-2 py-0.5 rounded-full font-mono font-bold">{emailPreview.localeCurrency}</span>
+                           <span className="text-xs text-gray-500">País: {emailPreview.country}</span>
+                        </div>
+                        {emailPreview.amountBRL > 0 && emailPreview.localeCurrency !== 'BRL' && (
+                           <p className="text-xs text-gray-500 mt-2">Cobrado em BRL: R$ {emailPreview.amountBRL?.toFixed(2).replace('.', ',')}</p>
+                        )}
+                     </div>
+                     {/* Aviso se moeda não tem valor exato */}
+                     {emailPreview._debug && !emailPreview._debug.car_totalRateEstimate && emailPreview.localeCurrency !== 'BRL' && (
+                        <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl p-3 text-xs text-yellow-400">
+                           ⚠️ Valor local não encontrado nos dados da reserva. O e-mail mostrará a moeda {emailPreview.localeCurrency} mas com o valor em BRL como referência.
+                        </div>
+                     )}
+                  </div>
+                  {/* Footer */}
+                  <div className="px-6 pb-5 flex gap-3">
+                     <button onClick={() => setEmailPreview(null)} className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-3 rounded-xl text-sm transition-colors">
+                        Cancelar
+                     </button>
+                     <button
+                        onClick={() => handleResendEmail(emailPreview.resNumber)}
+                        disabled={!!resendingEmail}
+                        className="flex-1 bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-wait text-white font-bold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+                     >
+                        {resendingEmail ? (
+                           <><svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>Enviando...</>
+                        ) : (
+                           <>✉️ Confirmar e Enviar</>
+                        )}
+                     </button>
+                  </div>
+               </div>
+            </div>
+         )}
          {cancelModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
                <div className="bg-gray-900 border border-red-800/40 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
@@ -629,12 +721,12 @@ export default function PainelReservas() {
                                     </button>
                                     {/* Botão Reenviar E-mail Localizado */}
                                     <button
-                                       onClick={() => handleResendEmail(res.resNumber || res.merchantOrderId)}
-                                       disabled={resendingEmail === (res.resNumber || res.merchantOrderId)}
+                                       onClick={() => handleOpenEmailPreview(res.resNumber || res.merchantOrderId)}
+                                       disabled={resendingEmail === (res.resNumber || res.merchantOrderId) || loadingPreview === (res.resNumber || res.merchantOrderId)}
                                        className="p-1.5 rounded-lg bg-gray-800 hover:bg-indigo-900/50 text-gray-400 hover:text-indigo-400 transition-colors disabled:opacity-50 disabled:cursor-wait"
                                        title="Reenviar e-mail no idioma e moeda local do cliente"
                                     >
-                                       {resendingEmail === (res.resNumber || res.merchantOrderId) ? (
+                                       {(resendingEmail === (res.resNumber || res.merchantOrderId) || loadingPreview === (res.resNumber || res.merchantOrderId)) ? (
                                           <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                           </svg>
