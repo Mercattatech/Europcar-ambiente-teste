@@ -1279,6 +1279,25 @@ function VehiclesContent() {
     return sum;
   }, [selectedExtrasMap, dbExtras]);
 
+  // BRL total de proteções XRS selecionadas (rentalPriceInBookingCurrencyAI = total do período)
+  const selectedInsuranceTotalBRL = useMemo(() => {
+    return quoteInsurances
+      .filter((ins: any) => selectedExtrasMap[ins.code] > 0)
+      .reduce((sum: number, ins: any) => sum + (parseFloat(ins.rentalPriceInBookingCurrencyAI || ins.priceInBookingCurrency || 0)), 0);
+  }, [quoteInsurances, selectedExtrasMap]);
+
+  // BRL total de equipamentos XRS selecionados
+  const selectedEquipmentTotalBRL = useMemo(() => {
+    return Object.entries(selectedEquipmentMap)
+      .filter(([, qty]) => (qty as number) > 0)
+      .reduce((sum: number, [code, qty]) => {
+        const ep = equipmentPrices[code];
+        if (!ep) return sum;
+        const total = ep.totalBRL > 0 ? ep.totalBRL : ep.priceBRL * bookingDurationDays;
+        return sum + total * (qty as number);
+      }, 0);
+  }, [selectedEquipmentMap, equipmentPrices, bookingDurationDays]);
+
   const filteredCars = useMemo(() => {
     let result = cars.filter((car: any) => {
       const auto = car.carCategoryAutomatic === "Y";

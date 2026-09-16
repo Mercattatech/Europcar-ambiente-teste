@@ -648,6 +648,28 @@ export async function POST(request: Request) {
           const pickupDateRaw = bookingData.pickupDate || '';
           const returnDateRaw = bookingData.returnDate || '';
 
+          // ── Moeda do e-mail: usa a moeda da estação de retirada ──────────────
+          const { getCurrencyFromStation } = await import('@/lib/receiptLocales');
+          const stationCurrency = getCurrencyFromStation(bookingData.pickupStation || '');
+          const totalBRLForEmail = (paymentData.amountInCents || 0) / 100;
+          let valorTotalEmail: string;
+          if (stationCurrency === 'BRL') {
+            valorTotalEmail = `R$ ${totalBRLForEmail.toFixed(2).replace('.', ',')}`;
+          } else {
+            // Converte BRL → moeda local usando taxa de câmbio do carro
+            const exchangeRate = parseFloat(bookingData.car?.exchangeRate || '1');
+            const totalLocal = exchangeRate > 0 ? totalBRLForEmail / exchangeRate : totalBRLForEmail;
+            try {
+              valorTotalEmail = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: stationCurrency,
+                minimumFractionDigits: stationCurrency === 'JPY' ? 0 : 2,
+              }).format(totalLocal);
+            } catch {
+              valorTotalEmail = `${stationCurrency} ${totalLocal.toFixed(2)}`;
+            }
+          }
+
           // Monta dicionário completo de variáveis para o template do painel
           const emailVars: Record<string, string> = {
             NOME: customerData.nome || '',
@@ -656,7 +678,7 @@ export async function POST(request: Request) {
             TELEFONE: customerData.telefone || '',
             CPF: customerData.cpf || '',
             NUMERO_RESERVA: finalResNumber,
-            VALOR_TOTAL: `R$ ${((paymentData.amountInCents || 0) / 100).toFixed(2).replace('.', ',')}`,
+            VALOR_TOTAL: valorTotalEmail,
             FORMA_PAGAMENTO: fmtPagamento[paymentData.method] || paymentData.method || '',
             CARRO: bookingData.car?.carCategoryName || bookingData.car?.name || '',
             CATEGORIA_CARRO: bookingData.car?.acrissCode || bookingData.carCategory || '',

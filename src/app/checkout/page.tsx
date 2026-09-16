@@ -604,6 +604,19 @@ export default function CheckoutPage() {
   const baseAmountBRL = Math.max(0, (totalBRL > 0 ? totalBRL : totalRateXRS) - airportSurchargeBRL);
   const amountInCents = Math.round(baseAmountBRL * 100);
 
+  // Para BALCÃO: total completo = veículo + aeroporto + extras + equipamentos
+  const _extrasSumBRL = extrasDetails.reduce((s: number, e: any) => {
+    const val = e.isTotal ? e.pricePerDay : e.pricePerDay * days;
+    return s + val * e.qty;
+  }, 0);
+  const _equipSumBRL = (booking?.xrsEquipment || []).reduce((s: number, eq: any) => {
+    const t = parseFloat(eq.totalBRL || 0);
+    const d = parseFloat(eq.priceBRL || 0);
+    return s + (t > 0 ? t : d * days) * (eq.qty || 1);
+  }, 0);
+  // Full amount for BALCÃO confirmation page (all paid at counter)
+  const balcaoFullAmountCents = Math.round(((totalBRL > 0 ? totalBRL : totalRateXRS) + _extrasSumBRL + _equipSumBRL) * 100);
+
 
   // Envia a reserva de fato para o backend. threeDsAuth vem preenchido quando o
   // callback onSuccess do BP.Mpi trouxe CAVV/ECI; undefined nos demais casos
@@ -660,7 +673,7 @@ export default function CheckoutPage() {
           } catch { }
           // Redirect to thank you page after a brief delay (let on-request UI show first)
           setTimeout(() => {
-            window.location.href = `/obrigado?res=${encodeURIComponent(json.resNumber)}&method=${paymentMethod === 'BALCAO' ? 'BALCAO' : 'CREDIT'}&amount=${amountInCents}`;
+            window.location.href = `/obrigado?res=${encodeURIComponent(json.resNumber)}&method=${paymentMethod === 'BALCAO' ? 'BALCAO' : 'CREDIT'}&amount=${paymentMethod === 'BALCAO' ? balcaoFullAmountCents : amountInCents}`;
           }, 2000);
         } else {
           setResNumber(json.resNumber);
@@ -678,7 +691,7 @@ export default function CheckoutPage() {
             }
           } catch { }
           // Redirect to thank you page
-          window.location.href = `/obrigado?res=${encodeURIComponent(json.resNumber)}&method=${paymentMethod === 'BALCAO' ? 'BALCAO' : 'CREDIT'}&amount=${amountInCents}`;
+          window.location.href = `/obrigado?res=${encodeURIComponent(json.resNumber)}&method=${paymentMethod === 'BALCAO' ? 'BALCAO' : 'CREDIT'}&amount=${paymentMethod === 'BALCAO' ? balcaoFullAmountCents : amountInCents}`;
         }
       } else {
         alert("Erro ao finalizar reserva: " + (json.error || "Desconhecido"));
@@ -1776,7 +1789,7 @@ export default function CheckoutPage() {
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-gray-900 text-base">Proteção e extras</h3>
-                    <span className="text-[9px] bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full uppercase">🏪 Pago no balcão</span>
+                    <span className="text-[9px] bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full uppercase whitespace-nowrap">🏪 Pago no balcão</span>
                   </div>
                   <span className="font-bold text-gray-900 text-base">
                     R$ {(() => {
@@ -1873,11 +1886,28 @@ export default function CheckoutPage() {
                       <div className="text-xl font-black text-gray-900">
                         R$ {baseAmountBRL.toFixed(2).replace('.', ',')}
                       </div>
-                      {totalRateXRS > 0 && currency !== 'BRL' && (
-                        <div className="text-xs text-gray-400 mt-0.5">
-                          € {totalRateXRS.toFixed(2).replace('.', ',')}
-                        </div>
-                      )}
+                      {totalRateXRS > 0 && currency !== 'BRL' && (() => {
+                        // Full total in local currency (vehicle + extras + equipment)
+                        const vehicleTotal = totalBRL > 0 ? totalBRL : totalRateXRS;
+                        const extrasValLocal = extrasDetails.reduce((s: number, e: any) => {
+                          const v = e.isTotal ? e.pricePerDay : e.pricePerDay * days;
+                          return s + v * e.qty;
+                        }, 0);
+                        const equipValLocal = (booking?.xrsEquipment || []).reduce((s: number, eq: any) => {
+                          const t = parseFloat(eq.totalBRL || 0);
+                          const d = parseFloat(eq.priceBRL || 0);
+                          return s + (t > 0 ? t : d * days) * (eq.qty || 1);
+                        }, 0);
+                        const fullBRL = vehicleTotal + extrasValLocal + equipValLocal;
+                        const exchangeRate = parseFloat(car?.exchangeRate || '1');
+                        const fullLocal = exchangeRate > 0 ? fullBRL / exchangeRate : fullBRL;
+                        const localSymbol = currency === 'EUR' ? '€' : currency;
+                        return (
+                          <div className="text-xs text-gray-400 mt-0.5">
+                            {localSymbol} {fullLocal.toFixed(2).replace('.', ',')}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                   <p className="text-[10px] text-gray-400 mt-1">
