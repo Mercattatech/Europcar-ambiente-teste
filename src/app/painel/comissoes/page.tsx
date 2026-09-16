@@ -1,42 +1,47 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+
+type FilterType = 'ALL' | 'CREDIT_CARD' | 'PIX' | 'BALCAO';
+
+const FILTER_OPTIONS: { key: FilterType; label: string; emoji: string; color: string; active: string }[] = [
+   { key: 'ALL',         label: 'Todos',          emoji: '📋', color: 'text-gray-400  border-gray-700 bg-gray-800/50',         active: 'text-white    border-white      bg-gray-700' },
+   { key: 'CREDIT_CARD', label: 'Cartão Crédito', emoji: '💳', color: 'text-blue-400  border-blue-800  bg-blue-900/20',         active: 'text-white    border-blue-500   bg-blue-700' },
+   { key: 'PIX',         label: 'PIX',            emoji: '📱', color: 'text-green-400 border-green-800 bg-green-900/20',        active: 'text-white    border-green-500  bg-green-700' },
+   { key: 'BALCAO',      label: 'Pagto. Balcão',  emoji: '🏢', color: 'text-yellow-400 border-yellow-800 bg-yellow-900/20',    active: 'text-white    border-yellow-500 bg-yellow-700' },
+];
+
+function fmt(v: number) {
+   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
 
 export default function PainelComissoes() {
-   const [data, setData] = useState<any>(null);
-   const [loading, setLoading] = useState(true);
-   const [error, setError] = useState("");
-   
+   const [data, setData]           = useState<any>(null);
+   const [loading, setLoading]     = useState(true);
+   const [error, setError]         = useState("");
    const [startDate, setStartDate] = useState("");
-   const [endDate, setEndDate] = useState("");
-   
+   const [endDate, setEndDate]     = useState("");
    const [rateInput, setRateInput] = useState("");
    const [savingRate, setSavingRate] = useState(false);
+   const [filter, setFilter]       = useState<FilterType>('ALL');
 
    const fetchReport = useCallback(() => {
       setLoading(true);
       setError("");
       const params = new URLSearchParams();
       if (startDate) params.set("startDate", startDate);
-      if (endDate) params.set("endDate", endDate);
-      
+      if (endDate)   params.set("endDate", endDate);
       fetch(`/api/admin/comissoes?${params}`)
          .then(res => res.json())
          .then(d => {
-            if (d.error) {
-               setError(d.error);
-            } else {
-               setData(d);
-               setRateInput(d.rate.toString());
-            }
+            if (d.error) { setError(d.error); }
+            else          { setData(d); setRateInput(d.rate.toString()); }
             setLoading(false);
          })
-         .catch((e) => { setError("Erro de conexão com o servidor"); setLoading(false); });
+         .catch(() => { setError("Erro de conexão com o servidor"); setLoading(false); });
    }, [startDate, endDate]);
 
-   useEffect(() => {
-      fetchReport();
-   }, [fetchReport]);
+   useEffect(() => { fetchReport(); }, [fetchReport]);
 
    const handleSaveRate = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -47,17 +52,28 @@ export default function PainelComissoes() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ key: 'COMMISSION_RATE', value: rateInput })
          });
-         if (res.ok) {
-            fetchReport(); // recarregar com a nova taxa
-         } else {
-            alert("Erro ao salvar taxa");
-         }
-      } catch (error) {
-         alert("Erro de conexão");
-      } finally {
-         setSavingRate(false);
-      }
+         if (res.ok) fetchReport();
+         else alert("Erro ao salvar taxa");
+      } catch { alert("Erro de conexão"); }
+      finally { setSavingRate(false); }
    };
+
+   // ── Filtragem e totais derivados ────────────────────────────────────
+   const filtered = useMemo(() => {
+      if (!data?.reservations) return [];
+      if (filter === 'ALL') return data.reservations;
+      return data.reservations.filter((r: any) => r.tipoPagamento === filter);
+   }, [data, filter]);
+
+   const filteredTotals = useMemo(() => {
+      return filtered.reduce(
+         (acc: { vendas: number; comissao: number }, r: any) => ({
+            vendas:   acc.vendas   + (r.valorCalculado   || 0),
+            comissao: acc.comissao + (r.comissaoCalculada || 0),
+         }),
+         { vendas: 0, comissao: 0 }
+      );
+   }, [filtered]);
 
    return (
       <div className="space-y-8">
@@ -69,17 +85,14 @@ export default function PainelComissoes() {
             </div>
          </div>
 
-         {/* Controles: Taxa e Filtros */}
+         {/* Controles: Taxa e Período */}
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
                <h2 className="text-sm font-bold text-white mb-3">Configuração de Taxa (%)</h2>
                <form onSubmit={handleSaveRate} className="flex gap-3">
                   <input
-                     type="number"
-                     step="0.01"
-                     value={rateInput}
-                     onChange={e => setRateInput(e.target.value)}
-                     placeholder="Ex: 10.5"
+                     type="number" step="0.01" value={rateInput}
+                     onChange={e => setRateInput(e.target.value)} placeholder="Ex: 10.5"
                      className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-green-600 flex-1"
                   />
                   <button type="submit" disabled={savingRate} className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-bold px-5 py-2 rounded-lg text-sm transition-colors">
@@ -92,60 +105,89 @@ export default function PainelComissoes() {
                <h2 className="text-sm font-bold text-white mb-3">Período de Vendas</h2>
                <div className="flex gap-3">
                   <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-green-600 flex-1" />
-                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-green-600 flex-1" />
+                  <input type="date" value={endDate}   onChange={e => setEndDate(e.target.value)}   className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-green-600 flex-1" />
                </div>
             </div>
          </div>
 
          {error && (
-            <div className="bg-red-500/20 border border-red-500/50 p-4 rounded-xl text-red-400">
-               {error}
-            </div>
+            <div className="bg-red-500/20 border border-red-500/50 p-4 rounded-xl text-red-400">{error}</div>
          )}
 
          {loading && !data ? (
             <div className="flex items-center justify-center h-64">
-               <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+               <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
             </div>
          ) : data && (
             <>
-               {/* Resumo */}
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl p-5 shadow-lg relative overflow-hidden">
-                     <div className="absolute top-3 right-3 text-2xl opacity-30">💵</div>
-                     <p className="text-white/70 text-xs font-bold uppercase tracking-wide">Total em Vendas</p>
-                     <p className="text-3xl font-black text-white mt-2">
-                        {data.totalVendas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                     </p>
-                  </div>
-                  <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-xl p-5 shadow-lg relative overflow-hidden">
-                     <div className="absolute top-3 right-3 text-2xl opacity-30">🤑</div>
-                     <p className="text-white/70 text-xs font-bold uppercase tracking-wide">Total de Comissões</p>
-                     <p className="text-3xl font-black text-white mt-2">
-                        {data.totalComissao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                     </p>
-                  </div>
-                  <div className="bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl p-5 shadow-lg relative overflow-hidden">
-                     <div className="absolute top-3 right-3 text-2xl opacity-30">💳</div>
-                     <p className="text-white/70 text-xs font-bold uppercase tracking-wide">Comissão: Cartão ({data.grouped.CREDIT_CARD.count})</p>
-                     <p className="text-xl font-black text-emerald-400 mt-2">
-                        {data.grouped.CREDIT_CARD.comissao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                     </p>
-                  </div>
-                  <div className="bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl p-5 shadow-lg relative overflow-hidden">
-                     <div className="absolute top-3 right-3 text-2xl opacity-30">🏢</div>
-                     <p className="text-white/70 text-xs font-bold uppercase tracking-wide">Comissão: PIX/Balcão ({data.grouped.PIX.count + data.grouped.BALCAO.count})</p>
-                     <p className="text-xl font-black text-blue-400 mt-2">
-                        {(data.grouped.PIX.comissao + data.grouped.BALCAO.comissao).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                     </p>
+               {/* ── Filtros por tipo de pagamento ─────────────────────── */}
+               <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-3">Filtrar por Tipo de Transação</p>
+                  <div className="flex flex-wrap gap-2">
+                     {FILTER_OPTIONS.map(opt => {
+                        const isActive = filter === opt.key;
+                        const counts = opt.key === 'ALL'
+                           ? data.reservations.length
+                           : data.reservations.filter((r: any) => r.tipoPagamento === opt.key).length;
+                        return (
+                           <button
+                              key={opt.key}
+                              onClick={() => setFilter(opt.key)}
+                              className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-bold transition-all ${isActive ? opt.active : opt.color} hover:opacity-90`}
+                           >
+                              <span>{opt.emoji}</span>
+                              <span>{opt.label}</span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${isActive ? 'bg-white/20' : 'bg-gray-700'}`}>
+                                 {counts}
+                              </span>
+                           </button>
+                        );
+                     })}
                   </div>
                </div>
 
-               {/* Table */}
+               {/* ── Cards de resumo (respeitam filtro) ─────────────────── */}
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl p-5 shadow-lg relative overflow-hidden">
+                     <div className="absolute top-3 right-3 text-2xl opacity-30">💵</div>
+                     <p className="text-white/70 text-xs font-bold uppercase tracking-wide">
+                        Total em Vendas {filter !== 'ALL' && <span className="normal-case">(filtrado)</span>}
+                     </p>
+                     <p className="text-3xl font-black text-white mt-2">{fmt(filteredTotals.vendas)}</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-xl p-5 shadow-lg relative overflow-hidden">
+                     <div className="absolute top-3 right-3 text-2xl opacity-30">🤑</div>
+                     <p className="text-white/70 text-xs font-bold uppercase tracking-wide">
+                        Total de Comissões {filter !== 'ALL' && <span className="normal-case">(filtrado)</span>}
+                     </p>
+                     <p className="text-3xl font-black text-white mt-2">{fmt(filteredTotals.comissao)}</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl p-5 shadow-lg relative overflow-hidden">
+                     <div className="absolute top-3 right-3 text-2xl opacity-30">💳</div>
+                     <p className="text-white/70 text-xs font-bold uppercase tracking-wide">Cartão ({data.grouped.CREDIT_CARD.count})</p>
+                     <p className="text-xl font-black text-blue-400 mt-2">{fmt(data.grouped.CREDIT_CARD.comissao)}</p>
+                     <p className="text-xs text-gray-500 mt-1">Vendas: {fmt(data.grouped.CREDIT_CARD.vendas)}</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl p-5 shadow-lg relative overflow-hidden col-span-1">
+                     <div className="absolute top-3 right-3 text-2xl opacity-30">📱🏢</div>
+                     <p className="text-white/70 text-xs font-bold uppercase tracking-wide">PIX ({data.grouped.PIX.count}) + Balcão ({data.grouped.BALCAO.count})</p>
+                     <p className="text-xl font-black text-green-400 mt-2">{fmt(data.grouped.PIX.comissao + data.grouped.BALCAO.comissao)}</p>
+                     <p className="text-xs text-gray-500 mt-1">Vendas: {fmt(data.grouped.PIX.vendas + data.grouped.BALCAO.vendas)}</p>
+                  </div>
+               </div>
+
+               {/* ── Tabela de reservas (filtrada) ──────────────────────── */}
                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
                   <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
-                     <h3 className="font-bold text-white text-sm">Detalhamento de Reservas Válidas</h3>
-                     <span className="text-xs text-gray-400">{data.reservations.length} reservas encontradas</span>
+                     <h3 className="font-bold text-white text-sm">
+                        Detalhamento de Reservas
+                        {filter !== 'ALL' && (
+                           <span className="ml-2 text-[10px] font-normal text-gray-500">
+                              — {FILTER_OPTIONS.find(o => o.key === filter)?.emoji} {FILTER_OPTIONS.find(o => o.key === filter)?.label}
+                           </span>
+                        )}
+                     </h3>
+                     <span className="text-xs text-gray-400">{filtered.length} reservas</span>
                   </div>
                   <div className="overflow-x-auto">
                      <table className="w-full text-sm text-left">
@@ -154,19 +196,19 @@ export default function PainelComissoes() {
                               <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Reserva / Data</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cliente</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Valor Venda</th>
-                              <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tipo Pagamento</th>
+                              <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tipo</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-emerald-400 uppercase tracking-wider text-right">Comissão ({data.rate}%)</th>
                            </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-800/50">
-                           {data.reservations.length === 0 ? (
-                              <tr><td colSpan={5} className="text-center py-10 text-gray-500">Nenhuma reserva encontrada para o período.</td></tr>
+                           {filtered.length === 0 ? (
+                              <tr><td colSpan={5} className="text-center py-10 text-gray-500">Nenhuma reserva para este filtro.</td></tr>
                            ) : (
-                              data.reservations.map((res: any) => {
+                              filtered.map((res: any) => {
                                  let parsed: any = {};
                                  try { parsed = JSON.parse(res.customerData); } catch(e){}
                                  return (
-                                    <tr key={res.id} className="hover:bg-gray-800/30 transition-colors group">
+                                    <tr key={res.id} className="hover:bg-gray-800/30 transition-colors">
                                        <td className="px-5 py-4">
                                           <div className="font-black text-white text-sm">{res.resNumber || "—"}</div>
                                           <div className="text-[10px] text-gray-500">{new Date(res.createdAt).toLocaleDateString("pt-BR")}</div>
@@ -176,23 +218,19 @@ export default function PainelComissoes() {
                                           <div className="text-[10px] text-gray-500">{parsed?.cpf}</div>
                                        </td>
                                        <td className="px-5 py-4 text-right">
-                                          <div className="font-bold text-gray-300">
-                                             {res.valorCalculado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                          </div>
+                                          <div className="font-bold text-gray-300">{res.valorCalculado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                                        </td>
                                        <td className="px-5 py-4">
                                           <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${
-                                             res.tipoPagamento === 'CREDIT_CARD' ? 'bg-emerald-500/20 text-emerald-400' :
-                                             res.tipoPagamento === 'PIX' ? 'bg-yellow-500/20 text-yellow-400' :
-                                             'bg-blue-500/20 text-blue-400'
+                                             res.tipoPagamento === 'CREDIT_CARD' ? 'bg-blue-500/20 text-blue-400' :
+                                             res.tipoPagamento === 'PIX'         ? 'bg-green-500/20 text-green-400' :
+                                                                                   'bg-yellow-500/20 text-yellow-400'
                                           }`}>
-                                             {res.tipoPagamento === 'CREDIT_CARD' ? 'Cartão' : res.tipoPagamento === 'PIX' ? 'PIX' : 'Balcão'}
+                                             {res.tipoPagamento === 'CREDIT_CARD' ? '💳 Cartão' : res.tipoPagamento === 'PIX' ? '📱 PIX' : '🏢 Balcão'}
                                           </span>
                                        </td>
                                        <td className="px-5 py-4 text-right">
-                                          <div className="font-bold text-emerald-400">
-                                             {res.comissaoCalculada.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                          </div>
+                                          <div className="font-bold text-emerald-400">{res.comissaoCalculada.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                                        </td>
                                     </tr>
                                  );

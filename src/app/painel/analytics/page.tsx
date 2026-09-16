@@ -10,6 +10,77 @@ const STEP_LABELS: Record<number, { label: string; icon: string; color: string }
   5: { label: "Concluída", icon: "✅", color: "bg-green-500" },
 };
 
+
+// ─── Sales Comparison Component ────────────────────────────────────────────
+type CompTab = "monthly" | "quarterly" | "yearly";
+type CompItem = { label: string; vendas: number; count: number };
+
+function SalesComparisonSection() {
+  const [tab, setTab]   = useState<CompTab>("monthly");
+  const [compData, setCompData] = useState<{ monthly: CompItem[]; quarterly: CompItem[]; yearly: CompItem[] } | null>(null);
+  const [compLoading, setCompLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/admin/reservations/sales-comparison")
+      .then(r => r.json())
+      .then(d => { setCompData(d); setCompLoading(false); })
+      .catch(() => setCompLoading(false));
+  }, []);
+
+  const items = compData?.[tab] || [];
+  const maxVal = items.reduce((m: number, i: CompItem) => Math.max(m, i.vendas), 1);
+  const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <h3 className="text-white font-bold flex items-center gap-2">📊 Comparativo de Vendas</h3>
+        <div className="flex bg-gray-800 rounded-lg p-0.5 gap-0.5">
+          {(["monthly","quarterly","yearly"] as CompTab[]).map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${tab === t ? "bg-indigo-700 text-white" : "text-gray-400 hover:text-white"}`}>
+              {t === "monthly" ? "Mensal" : t === "quarterly" ? "Trimestral" : "Anual"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {compLoading ? (
+        <div className="flex justify-center py-10"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"/></div>
+      ) : items.length === 0 ? (
+        <p className="text-gray-500 text-sm text-center py-8">Sem dados suficientes.</p>
+      ) : (
+        <div className="space-y-3">
+          {items.map((item: CompItem, i: number) => (
+            <div key={i} className="group">
+              <div className="flex items-center gap-3">
+                <span className="text-gray-400 text-xs font-bold w-12 shrink-0 text-right font-mono">{item.label}</span>
+                <div className="flex-1 h-7 bg-gray-800 rounded-lg overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-indigo-700 to-indigo-500 rounded-lg transition-all duration-700 ease-out"
+                    style={{ width: maxVal > 0 ? `${Math.max((item.vendas / maxVal) * 100, item.vendas > 0 ? 2 : 0)}%` : "0%" }}
+                  />
+                </div>
+                <div className="flex flex-col items-end shrink-0 w-28">
+                  <span className="text-white text-xs font-bold">{fmt(item.vendas)}</span>
+                  <span className="text-gray-500 text-[10px]">{item.count} reserva{item.count !== 1 ? "s" : ""}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+          <div className="border-t border-gray-800 pt-3 flex justify-between items-center mt-2">
+            <span className="text-gray-500 text-xs">Total do período</span>
+            <div className="text-right">
+              <p className="text-white font-black">{fmt(items.reduce((s: number, i: CompItem) => s + i.vendas, 0))}</p>
+              <p className="text-gray-500 text-[10px]">{items.reduce((s: number, i: CompItem) => s + i.count, 0)} reservas</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RankingCard({ title, icon, items, valueLabel }: { title: string; icon: string; items: { name: string; code?: string; count: number }[]; valueLabel?: string }) {
   const maxCount = items.length > 0 ? items[0].count : 1;
   return (
@@ -185,6 +256,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
           )}
+          <SalesComparisonSection />
         </>
       ) : (
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-8 text-center">

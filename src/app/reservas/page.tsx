@@ -107,6 +107,31 @@ export default function MeuPerfil() {
   // Voucher modal
   const [voucherTarget, setVoucherTarget] = useState<Reserva | null>(null);
 
+  // Resend email modal
+  const [resendTarget, setResendTarget]   = useState<Reserva | null>(null);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendDone, setResendDone]       = useState(false);
+  const [resendError, setResendError]     = useState('');
+  const [videoUrl, setVideoUrl]           = useState<string | null>(null);
+
+  // Load video URL for resend tutorial
+  useEffect(() => {
+    fetch('/api/config/resend-video').then(r => r.json()).then(d => setVideoUrl(d.url || null)).catch(() => {});
+  }, []);
+
+  const handleResendCustomer = async () => {
+    if (!resendTarget?.resNumber) return;
+    setResendLoading(true);
+    setResendError('');
+    try {
+      const r = await fetch(`/api/customer/resend-email/${encodeURIComponent(resendTarget.resNumber)}`, { method: 'POST' });
+      const d = await r.json();
+      if (d.ok) { setResendDone(true); }
+      else       { setResendError(d.error || 'Erro ao reenviar e-mail'); }
+    } catch { setResendError('Erro de conexão'); }
+    setResendLoading(false);
+  };
+
   // User profile
   const [activeTab, setActiveTab] = useState<'reservas'|'dados'>('reservas');
   const [profileData, setProfileData] = useState({ name: '', phone: '', city: '', cpf: '', password: '' });
@@ -524,6 +549,105 @@ export default function MeuPerfil() {
       )}
 
       {/* ── Cancel Modal ─────────────────────────────────────────────────── */}
+      {/* ── Modal Reenviar E-mail ──────────────────────────────────────────────── */}
+      {resendTarget && (
+        <ModalOverlay onClose={() => setResendTarget(null)}>
+          <div className="p-0">
+            {/* Header */}
+            <div className="bg-indigo-950 px-6 py-4 flex items-center justify-between border-b border-indigo-800/40 rounded-t-2xl">
+              <div>
+                <h2 className="text-white font-bold text-base">✉️ Reenviar E-mail de Confirmação</h2>
+                <p className="text-indigo-300 text-xs mt-0.5">Confirme os dados antes de reenviar</p>
+              </div>
+              <button onClick={() => setResendTarget(null)} className="text-gray-400 hover:text-white">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {/* Destinatário */}
+              <div className="bg-gray-800 rounded-xl p-4">
+                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-2">Destinatário</p>
+                <p className="text-white font-semibold">{session?.user?.name || session?.user?.email}</p>
+                <p className="text-indigo-300 text-sm">{session?.user?.email}</p>
+              </div>
+
+              {/* Resumo da reserva — idêntico ao painel */}
+              <div className="bg-gray-800 rounded-xl p-4">
+                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-2">Reserva</p>
+                <p className="text-white font-mono font-bold text-lg">{resendTarget.resNumber}</p>
+                <p className="text-gray-400 text-sm">{resendTarget.car || '—'}</p>
+                <p className="text-gray-400 text-sm mt-1">
+                  {resendTarget.pickupStation} → {resendTarget.returnStation || resendTarget.pickupStation}
+                </p>
+                <div className="flex gap-4 mt-2">
+                  <div>
+                    <p className="text-[10px] text-gray-600">Retirada</p>
+                    <p className="text-white text-sm font-bold">{formatDate(resendTarget.pickupDate)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-gray-600">Devolução</p>
+                    <p className="text-white text-sm font-bold">{formatDate(resendTarget.returnDate)}</p>
+                  </div>
+                  {resendTarget.total != null && (
+                    <div>
+                      <p className="text-[10px] text-gray-600">Valor</p>
+                      <p className="text-emerald-400 text-sm font-bold">{formatCurrency(resendTarget.total)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Vídeo tutorial */}
+              {videoUrl && !resendDone && (
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-2">Tutorial: como receber o e-mail</p>
+                  <div className="rounded-xl overflow-hidden border border-gray-700 bg-black" style={{aspectRatio: '16/9'}}>
+                    <iframe
+                      src={videoUrl}
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Sucesso */}
+              {resendDone && (
+                <div className="bg-emerald-900/30 border border-emerald-700/40 rounded-xl p-4 text-center">
+                  <p className="text-emerald-400 font-bold text-base">✅ E-mail enviado com sucesso!</p>
+                  <p className="text-emerald-300 text-sm mt-1">Verifique sua caixa de entrada e spam.</p>
+                </div>
+              )}
+
+              {/* Erro */}
+              {resendError && (
+                <div className="bg-red-900/30 border border-red-700/40 rounded-xl p-3 text-red-400 text-sm">{resendError}</div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-5 flex gap-3">
+              <button onClick={() => setResendTarget(null)} className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-3 rounded-xl text-sm transition-colors">
+                {resendDone ? 'Fechar' : 'Cancelar'}
+              </button>
+              {!resendDone && (
+                <button
+                  onClick={handleResendCustomer}
+                  disabled={resendLoading}
+                  className="flex-1 bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-wait text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors"
+                >
+                  {resendLoading ? (
+                    <><svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>Enviando...</>
+                  ) : '✉️ Confirmar e Enviar'}
+                </button>
+              )}
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+
       {cancelTarget && (
         <ModalOverlay onClose={() => setCancelTarget(null)}>
           <div className="p-6">
@@ -711,6 +835,12 @@ export default function MeuPerfil() {
                                 className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-lg transition-all"
                               >
                                 📄 Comprovante
+                              </button>
+                              <button
+                                onClick={() => { setResendTarget(r); setResendDone(false); setResendError(''); }}
+                                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-400 text-xs font-bold rounded-lg transition-all"
+                              >
+                                ✉️ Reenviar E-mail
                               </button>
                               <button
                                 onClick={() => setConfirmModifyTarget(r)}

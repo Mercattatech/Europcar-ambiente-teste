@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 
 import { useState, useEffect } from "react";
 
@@ -485,6 +486,72 @@ export default function PainelConfig() {
           </form>
         </div>
       )}
+
+      {/* ── Configurações de E-mail ao Cliente ──────────────────────── */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+        <h2 className="text-white font-bold text-base mb-1 flex items-center gap-2">✉️ E-mail ao Cliente</h2>
+        <p className="text-gray-500 text-xs mb-5">Configure o vídeo tutorial que aparece no popup de reenvio de e-mail na área do cliente (/reservas).</p>
+        <VideoTutorialConfig />
+      </div>
     </div>
+  );
+}
+
+function VideoTutorialConfig() {
+  const [url, setUrl]       = React.useState('');
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving]   = React.useState(false);
+  const [msg, setMsg]         = React.useState('');
+
+  React.useEffect(() => {
+    fetch('/api/admin/config?key=RESEND_EMAIL_VIDEO_URL')
+      .then(r => r.json())
+      .then(d => { setUrl(d.value || ''); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const r = await fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'RESEND_EMAIL_VIDEO_URL', value: url }),
+      });
+      if (r.ok) setMsg('✅ Salvo com sucesso!');
+      else      setMsg('❌ Erro ao salvar');
+    } catch { setMsg('❌ Erro de conexão'); }
+    setSaving(false);
+    setTimeout(() => setMsg(''), 3000);
+  };
+
+  return (
+    <form onSubmit={handleSave} className="space-y-3">
+      <div>
+        <label className="text-xs text-gray-400 block mb-1.5">
+          URL de Embed do Vídeo Tutorial
+          <span className="text-gray-600 ml-1">(YouTube: https://www.youtube.com/embed/ID)</span>
+        </label>
+        <input
+          value={loading ? 'Carregando...' : url}
+          onChange={e => setUrl(e.target.value)}
+          disabled={loading}
+          placeholder="https://www.youtube.com/embed/dQw4w9WgXcQ"
+          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white outline-none focus:border-indigo-600 disabled:opacity-50"
+        />
+      </div>
+      {url && !loading && (
+        <div className="rounded-xl overflow-hidden border border-gray-700 bg-black" style={{aspectRatio:'16/9', maxHeight: 200}}>
+          <iframe src={url} className="w-full h-full" allowFullScreen/>
+        </div>
+      )}
+      <div className="flex items-center gap-3">
+        <button type="submit" disabled={saving || loading} className="bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 text-white px-5 py-2.5 rounded-lg font-bold text-sm transition-colors">
+          {saving ? 'Salvando...' : 'Salvar URL do Vídeo'}
+        </button>
+        {msg && <span className="text-sm text-emerald-400">{msg}</span>}
+      </div>
+    </form>
   );
 }

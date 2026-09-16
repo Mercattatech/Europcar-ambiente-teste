@@ -33,7 +33,9 @@ const sidebarLinks = [
    { href: "/painel/logs-xrs", label: "XRS Debugger", icon: "🔍" },
    { href: "/painel/xrs-monitor", label: "Monitor XRS", icon: "🛰️" },
    { href: "/painel/logs", label: "Logs Cielo", icon: "📄" },
+   { href: "/painel/chamados", label: "Chamados Dev", icon: "🎫" },
 ];
+
 
 // Quick access items for mobile bottom tab bar
 const bottomTabItems = [
