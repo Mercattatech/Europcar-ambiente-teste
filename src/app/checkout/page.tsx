@@ -673,7 +673,16 @@ export default function CheckoutPage() {
           } catch { }
           // Redirect to thank you page after a brief delay (let on-request UI show first)
           setTimeout(() => {
-            window.location.href = `/obrigado?res=${encodeURIComponent(json.resNumber)}&method=${paymentMethod === 'BALCAO' ? 'BALCAO' : 'CREDIT'}&amount=${paymentMethod === 'BALCAO' ? balcaoFullAmountCents : amountInCents}`;
+            window.location.href = (() => {
+              const redirectAmount = paymentMethod === 'BALCAO' ? balcaoFullAmountCents : amountInCents;
+              const base = `/obrigado?res=${encodeURIComponent(json.resNumber)}&method=${paymentMethod === 'BALCAO' ? 'BALCAO' : 'CREDIT'}&amount=${redirectAmount}`;
+              // Para BALCÃO: passa moeda e taxa de câmbio para exibir na moeda da estação
+              if (paymentMethod === 'BALCAO' && currency && currency !== 'BRL') {
+                const exchRate = parseFloat(car?.exchangeRate || '1');
+                return base + `&currency=${encodeURIComponent(currency)}&exchangeRate=${exchRate}`;
+              }
+              return base;
+            })();
           }, 2000);
         } else {
           setResNumber(json.resNumber);
@@ -691,7 +700,16 @@ export default function CheckoutPage() {
             }
           } catch { }
           // Redirect to thank you page
-          window.location.href = `/obrigado?res=${encodeURIComponent(json.resNumber)}&method=${paymentMethod === 'BALCAO' ? 'BALCAO' : 'CREDIT'}&amount=${paymentMethod === 'BALCAO' ? balcaoFullAmountCents : amountInCents}`;
+          window.location.href = (() => {
+              const redirectAmount = paymentMethod === 'BALCAO' ? balcaoFullAmountCents : amountInCents;
+              const base = `/obrigado?res=${encodeURIComponent(json.resNumber)}&method=${paymentMethod === 'BALCAO' ? 'BALCAO' : 'CREDIT'}&amount=${redirectAmount}`;
+              // Para BALCÃO: passa moeda e taxa de câmbio para exibir na moeda da estação
+              if (paymentMethod === 'BALCAO' && currency && currency !== 'BRL') {
+                const exchRate = parseFloat(car?.exchangeRate || '1');
+                return base + `&currency=${encodeURIComponent(currency)}&exchangeRate=${exchRate}`;
+              }
+              return base;
+            })();
         }
       } else {
         alert("Erro ao finalizar reserva: " + (json.error || "Desconhecido"));

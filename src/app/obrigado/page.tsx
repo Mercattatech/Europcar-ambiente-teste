@@ -10,6 +10,28 @@ function ObrigadoContent() {
   const method = searchParams.get("method") || "";
   const amountCents = parseInt(searchParams.get("amount") || "0");
   const amountBRL = amountCents > 0 ? (amountCents / 100) : 0;
+  // Moeda da estação (enviado pelo checkout para reservas internacionais BALCÃO)
+  const stationCurrency  = searchParams.get("currency") || "BRL";
+  const exchangeRate     = parseFloat(searchParams.get("exchangeRate") || "1");
+
+  // Valor formatado na moeda da reserva
+  const displayAmount = (() => {
+    if (amountBRL <= 0) return null;
+    if (stationCurrency === "BRL" || exchangeRate <= 0) {
+      return `R$ ${amountBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+    }
+    // Converte BRL → moeda local
+    const localAmount = amountBRL / exchangeRate;
+    try {
+      return new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: stationCurrency,
+        minimumFractionDigits: stationCurrency === "JPY" ? 0 : 2,
+      }).format(localAmount);
+    } catch {
+      return `${stationCurrency} ${localAmount.toFixed(2)}`;
+    }
+  })();
 
   const [conversionFired, setConversionFired] = useState(false);
 
@@ -87,10 +109,15 @@ function ObrigadoContent() {
                 <span className="text-blue-700 font-bold">{methodLabel[method] || method}</span>
               </div>
             )}
-            {amountBRL > 0 && (
+            {amountBRL > 0 && displayAmount && (
               <div className="bg-green-50 border border-green-100 rounded-lg px-4 py-2">
                 <span className="text-green-400 text-xs font-bold block">Valor</span>
-                <span className="text-green-700 font-bold">R$ {amountBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                <span className="text-green-700 font-bold">{displayAmount}</span>
+                {stationCurrency !== "BRL" && (
+                  <span className="text-gray-400 text-[10px] block">
+                    ≈ R$ {amountBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </span>
+                )}
               </div>
             )}
           </div>
