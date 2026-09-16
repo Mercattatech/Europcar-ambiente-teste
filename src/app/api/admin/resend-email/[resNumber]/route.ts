@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: { resNumber: string } }
 ) {
   if (!(await checkAdmin())) {
@@ -14,6 +14,19 @@ export async function POST(
   }
 
   const { resNumber } = params;
+
+  // Lê opções opcionais do body (moeda e valor override do admin)
+  let overrideCurrency: string | undefined;
+  let overrideAmount:   number  | undefined;
+  try {
+    const body = await req.json().catch(() => ({}));
+    if (body?.currency && typeof body.currency === 'string' && body.currency.length === 3) {
+      overrideCurrency = body.currency.toUpperCase();
+    }
+    if (body?.amount && typeof body.amount === 'number' && body.amount > 0) {
+      overrideAmount = body.amount;
+    }
+  } catch { /* body vazio — usa detecção automática */ }
 
   // ── Busca reserva ─────────────────────────────────────────
   const reservation = await prisma.localReservation.findFirst({
@@ -125,25 +138,29 @@ export async function POST(
     '0'
   );
 
+  // Admin pode sobrescrever moeda e valor via body do request
+  const finalCurrency = overrideCurrency || localCurrency;
+  const finalAmount   = overrideAmount   || rawAmount;
+
   let valorTotal: string;
-  if (localCurrency !== 'BRL' && rawAmount > 0) {
-    // Reserva internacional com valor local disponivel
+  if (finalCurrency === 'BRL') {
+    // Brasil ou admin escolheu BRL
+    const brlAmt = overrideAmount || amountBRL;
+    valorTotal = `R$ ${brlAmt.toFixed(2).replace('.', ',')}`;
+  } else if (finalAmount > 0) {
+    // Moeda internacional com valor conhecido
     try {
       valorTotal = new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: localCurrency,
-        minimumFractionDigits: localCurrency === 'JPY' ? 0 : 2,
-      }).format(rawAmount);
+        currency: finalCurrency,
+        minimumFractionDigits: finalCurrency === 'JPY' ? 0 : 2,
+      }).format(finalAmount);
     } catch {
-      valorTotal = `${localCurrency} ${rawAmount.toFixed(2)}`;
+      valorTotal = `${finalCurrency} ${finalAmount.toFixed(2)}`;
     }
-  } else if (localCurrency !== 'BRL') {
-    // País internacional mas sem valor local salvo (pagamento foi em BRL)
-    // Mostra BRL mas indica a moeda do país
-    valorTotal = `${localCurrency} — (R$ ${amountBRL.toFixed(2).replace('.', ',')})`;
   } else {
-    // Brasil
-    valorTotal = `R$ ${amountBRL.toFixed(2).replace('.', ',')}`;
+    // Moeda internacional mas sem valor local — usa BRL como referência
+    valorTotal = `${finalCurrency} (ref. R$ ${amountBRL.toFixed(2).replace('.', ',')})`;
   }
 
   const emailVars: Record<string, string> = {
@@ -202,7 +219,7 @@ export async function POST(
     ok: true,
     sentTo:         toEmail,
     resNumber:      finalResNumber,
-    localeCurrency: localCurrency,
+    localeCurrency: finalCurrency,
     valorTotal,
     template:       result.success ? 'RESERVA_SUCESSO' : 'FALLBACK',
     provider:       'provider' in result ? result.provider : undefined,

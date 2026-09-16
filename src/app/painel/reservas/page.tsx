@@ -75,6 +75,8 @@ export default function PainelReservas() {
    const [adminModifyMsg, setAdminModifyMsg] = useState('');
    const [resendingEmail, setResendingEmail] = useState<string | null>(null);
    const [emailPreview, setEmailPreview] = useState<any | null>(null);
+   const [selectedCurrency, setSelectedCurrency] = useState<string>('BRL');
+   const [customAmount, setCustomAmount] = useState<string>('');
    const [loadingPreview, setLoadingPreview] = useState<string | null>(null);
 
    const showToast = (message: string, type: "success" | "error" = "success") => {
@@ -98,6 +100,9 @@ export default function PainelReservas() {
          const data = await r.json();
          if (r.ok) {
             setEmailPreview(data);
+            // Pré-preenche moeda e valor com os dados detectados
+            setSelectedCurrency(data.localeCurrency || 'BRL');
+            setCustomAmount(data.localAmount > 0 ? data.localAmount.toFixed(2) : (data.amountBRL || 0).toFixed(2));
          } else {
             showToast(`❌ Erro ao carregar preview: ${data.error || ''}`, 'error');
          }
@@ -114,7 +119,11 @@ export default function PainelReservas() {
       if (!key) return;
       setResendingEmail(key);
       try {
-         const r = await fetch(`/api/admin/resend-email/${encodeURIComponent(key)}`, { method: 'POST' });
+         const r = await fetch(`/api/admin/resend-email/${encodeURIComponent(key)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currency: selectedCurrency, amount: parseFloat(customAmount) || undefined }),
+         });
          const data = await r.json();
          if (r.ok) {
             showToast(`✅ E-mail reenviado para ${data.sentTo} · ${data.localeCurrency || ''}`, 'success');
@@ -364,32 +373,68 @@ export default function PainelReservas() {
                         <p className="text-gray-400 text-sm">{emailPreview.carName} · {emailPreview.carCategory}</p>
                         <p className="text-gray-400 text-sm mt-1">{emailPreview.pickupStation} → {emailPreview.returnStation}</p>
                      </div>
-                     {/* Valor - destaque principal */}
-                     <div className="bg-indigo-950 border border-indigo-700/50 rounded-xl p-4">
-                        <p className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider mb-2">Valor no E-mail (moeda local)</p>
-                        <p className="text-2xl font-black text-indigo-200">{emailPreview.valorTotal}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                           <span className="text-xs bg-indigo-900 text-indigo-300 px-2 py-0.5 rounded-full font-mono font-bold">{emailPreview.localeCurrency}</span>
-                           <span className="text-xs text-gray-500">País: {emailPreview.country}</span>
+                     {/* Seletor de Moeda e Valor */}
+                     <div className="bg-indigo-950 border border-indigo-700/50 rounded-xl p-4 space-y-3">
+                        <p className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider">Valor no E-mail</p>
+                        {/* Moeda detectada automaticamente */}
+                        {emailPreview._debug?.step2_stationCurrency && (
+                           <p className="text-xs text-green-400">
+                              ✅ Moeda detectada pela estação <span className="font-mono font-bold">{emailPreview._debug.pickupStation_raw}</span> → <span className="font-mono font-bold">{emailPreview._debug.step2_stationCurrency}</span>
+                           </p>
+                        )}
+                        {emailPreview.amountBRL > 0 && (
+                           <p className="text-xs text-gray-500">Cobrado em BRL (Cielo): <span className="font-mono font-bold text-gray-300">R$ {emailPreview.amountBRL?.toFixed(2).replace('.', ',')}</span></p>
+                        )}
+                        {/* Seletor de moeda */}
+                        <div>
+                           <label className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider block mb-1">Moeda do e-mail</label>
+                           <select
+                              value={selectedCurrency}
+                              onChange={e => setSelectedCurrency(e.target.value)}
+                              className="w-full bg-gray-800 border border-indigo-700/50 text-white rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                           >
+                              <option value="BRL">🇧🇷 BRL — Real Brasileiro</option>
+                              <option value="EUR">🇪🇺 EUR — Euro</option>
+                              <option value="USD">🇺🇸 USD — Dólar Americano</option>
+                              <option value="GBP">🇬🇧 GBP — Libra Esterlina</option>
+                              <option value="CHF">🇨🇭 CHF — Franco Suíço</option>
+                              <option value="ARS">🇦🇷 ARS — Peso Argentino</option>
+                              <option value="CAD">🇨🇦 CAD — Dólar Canadense</option>
+                              <option value="AUD">🇦🇺 AUD — Dólar Australiano</option>
+                              <option value="JPY">🇯🇵 JPY — Iene Japonês</option>
+                              <option value="MXN">🇲🇽 MXN — Peso Mexicano</option>
+                              <option value="CLP">🇨🇱 CLP — Peso Chileno</option>
+                              <option value="COP">🇨🇴 COP — Peso Colombiano</option>
+                              <option value="PEN">🇵🇪 PEN — Sol Peruano</option>
+                              <option value="NOK">🇳🇴 NOK — Coroa Norueguesa</option>
+                              <option value="SEK">🇸🇪 SEK — Coroa Sueca</option>
+                              <option value="DKK">🇩🇰 DKK — Coroa Dinamarquesa</option>
+                              <option value="PLN">🇵🇱 PLN — Zloty Polonês</option>
+                           </select>
                         </div>
-                        {emailPreview.amountBRL > 0 && emailPreview.localeCurrency !== 'BRL' && (
-                           <p className="text-xs text-gray-500 mt-2">Cobrado em BRL: R$ {emailPreview.amountBRL?.toFixed(2).replace('.', ',')}</p>
+                        {/* Valor editável */}
+                        <div>
+                           <label className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider block mb-1">Valor ({selectedCurrency})</label>
+                           <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={customAmount}
+                              onChange={e => setCustomAmount(e.target.value)}
+                              placeholder="Ex: 285.50"
+                              className="w-full bg-gray-800 border border-indigo-700/50 text-white rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                           />
+                        </div>
+                        {/* Preview do valor formatado */}
+                        {customAmount && parseFloat(customAmount) > 0 && (
+                           <div className="bg-indigo-900/30 rounded-lg px-3 py-2">
+                              <p className="text-[10px] text-indigo-400 uppercase tracking-wider mb-0.5">Aparecerá no e-mail como:</p>
+                              <p className="text-xl font-black text-indigo-200">
+                                 {(() => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: selectedCurrency, minimumFractionDigits: selectedCurrency === 'JPY' ? 0 : 2 }).format(parseFloat(customAmount)); } catch { return `${selectedCurrency} ${parseFloat(customAmount).toFixed(2)}`; } })()}
+                              </p>
+                           </div>
                         )}
                      </div>
-                     {/* Debug de detecção de moeda */}
-                     {emailPreview._debug && (
-                        <div className="bg-gray-900 border border-gray-700/40 rounded-xl p-3 text-xs space-y-1">
-                           <p className="text-gray-500 font-bold uppercase tracking-wider mb-1">Detecção de Moeda</p>
-                           <p className="text-gray-400">📍 Estação: <span className="text-white font-mono">{emailPreview._debug.pickupStation_raw || '—'}</span> → prefixo <span className="text-yellow-300 font-mono">{emailPreview._debug.pickupStation_prefix || '—'}</span></p>
-                           <p className="text-gray-400">① XRS: <span className={`font-mono ${emailPreview._debug.step1_xrsCurrency ? 'text-green-400' : 'text-red-400'}`}>{emailPreview._debug.step1_xrsCurrency || 'não encontrado'}</span></p>
-                           <p className="text-gray-400">② Estação: <span className={`font-mono ${emailPreview._debug.step2_stationCurrency ? 'text-green-400' : 'text-red-400'}`}>{emailPreview._debug.step2_stationCurrency || 'não mapeado'}</span></p>
-                           <p className="text-gray-400">③ País booking: <span className="text-yellow-300 font-mono">{emailPreview._debug.booking_country || '—'}</span> → <span className="font-mono">{emailPreview._debug.step3_localeCurrency}</span> <span className="text-gray-600">(pode ser nacionalidade do cliente!)</span></p>
-                           <p className="text-white font-bold mt-1">✅ Final: <span className="text-indigo-300 font-mono">{emailPreview._debug.finalCurrency}</span></p>
-                           {!emailPreview._debug.car_totalRateEstimate && (
-                              <p className="text-yellow-500 mt-1">⚠️ Valor na moeda local não disponível nos dados XRS. Será mostrado o BRL como referência.</p>
-                           )}
-                        </div>
-                     )}
                   </div>
                   {/* Footer */}
                   <div className="px-6 pb-5 flex gap-3">
