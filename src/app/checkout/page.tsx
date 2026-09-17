@@ -1555,13 +1555,25 @@ export default function CheckoutPage() {
             {/* ═══════════════ SEÇÃO 1: VEÍCULO ═══════════════ */}
             <div className="p-5 pb-4">
               {/* Header: Veículo + preço */}
-              <div className="flex justify-between items-baseline mb-4">
+              <div className="flex justify-between items-start mb-4">
                 <h3 className="font-bold text-gray-900 text-base">Veículo</h3>
-                <span className="font-bold text-gray-900 text-base">
-                  {totalBRL > 0
-                    ? `R$ ${totalBRL.toFixed(2).replace('.', ',')}`
-                    : `${currency} ${totalRateXRS.toFixed(2).replace('.', ',')}`}
-                </span>
+                <div className="text-right">
+                  <span className="font-bold text-gray-900 text-base">
+                    {totalBRL > 0
+                      ? `R$ ${totalBRL.toFixed(2).replace('.', ',')}`
+                      : `${currency} ${totalRateXRS.toFixed(2).replace('.', ',')}`}
+                  </span>
+                  {currency !== 'BRL' && totalRateXRS > 0 && (() => {
+                    const exchRate = parseFloat(car?.exchangeRate || '1');
+                    const localSymbol = currency === 'EUR' ? '€' : currency;
+                    const localVal = totalBRL > 0 ? totalBRL / exchRate : totalRateXRS;
+                    return (
+                      <div className="text-[11px] text-gray-400 mt-0.5">
+                        ≈ {localSymbol} {localVal.toFixed(2).replace('.', ',')}
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
 
               {/* Nome do carro + imagem */}
@@ -1980,58 +1992,85 @@ export default function CheckoutPage() {
 
                     return (
                       <div className="mt-4 bg-orange-50 border border-orange-200 rounded-lg p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-bold text-orange-800 text-sm flex items-center gap-1.5">
-                            🏪 Pagamento no Balcão
-                          </h3>
-                          <span className="font-black text-orange-800 text-base">
-                            R$ {totalBalcao.toFixed(2).replace('.', ',')}
-                          </span>
-                        </div>
-
-                        <div className="space-y-1">
-                          {/* Sobretaxa aeroporto */}
-                          {airportSurchargeBRL > 0 && (
-                            <div className="flex justify-between text-xs text-orange-700">
-                              <span>✈ Sobretaxa de aeroporto</span>
-                              <span className="font-bold">R$ {airportSurchargeBRL.toFixed(2).replace('.', ',')}</span>
-                            </div>
-                          )}
-
-                          {/* Proteções/extras adicionais */}
-                          {extrasDetails.map((extra: any, idx: number) => {
-                            const insNamesBalcao: Record<string, string> = {
-                              PREMIUM: "Cobertura Premium", PREMPRE: "Premium Pré-pago", PREMUP: "Premium Plus",
-                              SPCDW: "Super CDW", SPTHW: "Super THW", STHW: "THW+",
-                              SCDW: "CDW+", MEDIUM: "Cobertura Média", RSA: "Assistência na Estrada",
-                              APP: "Proteção Aparência", WWI: "Proteção para-brisas", PAI: "Acidentes pessoais",
-                            };
-                            const totalExtra = (extra.isTotal ? extra.pricePerDay : extra.pricePerDay * days) * extra.qty;
-                            return (
-                              <div key={`e-${idx}`} className="flex justify-between text-xs text-orange-700">
-                                <span>🛡️ {insNamesBalcao[extra.id] || extra.id}</span>
-                                <span className="font-bold">R$ {totalExtra.toFixed(2).replace('.', ',')}</span>
+                        {/* Header: título + total BRL + total EUR */}
+                        {(() => {
+                          const exchRate = parseFloat(car?.exchangeRate || '1');
+                          const hasLocal = currency !== 'BRL' && exchRate > 0;
+                          const localSymbol = currency === 'EUR' ? '€' : currency;
+                          const toLocal = (brl: number) => hasLocal ? `≈ ${localSymbol} ${(brl / exchRate).toFixed(2).replace('.', ',')}` : '';
+                          return (
+                            <>
+                              <div className="flex justify-between items-start mb-2">
+                                <h3 className="font-bold text-orange-800 text-sm flex items-center gap-1.5">
+                                  🏪 Pagamento no Balcão
+                                </h3>
+                                <div className="text-right">
+                                  <span className="font-black text-orange-800 text-base">
+                                    R$ {totalBalcao.toFixed(2).replace('.', ',')}
+                                  </span>
+                                  {hasLocal && (
+                                    <div className="text-[10px] text-orange-600 mt-0.5">
+                                      {toLocal(totalBalcao)}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            );
-                          })}
 
-                          {/* Equipamentos/acessórios */}
-                          {booking?.xrsEquipment?.map((eq: any) => {
-                            const eqT = parseFloat(eq.totalBRL || 0);
-                            const eqD = parseFloat(eq.priceBRL || 0);
-                            const eqTotal = (eqT > 0 ? eqT : eqD * days) * (eq.qty || 1);
-                            return (
-                              <div key={`eq-${eq.code}`} className="flex justify-between text-xs text-orange-700">
-                                <span>{eq.icon || '📦'} {eq.name || eq.code} ×{eq.qty || 1}</span>
-                                <span className="font-bold">R$ {eqTotal.toFixed(2).replace('.', ',')}</span>
+                              <div className="space-y-1">
+                                {/* Sobretaxa aeroporto */}
+                                {airportSurchargeBRL > 0 && (
+                                  <div className="flex justify-between text-xs text-orange-700">
+                                    <span>✈ Sobretaxa de aeroporto</span>
+                                    <div className="text-right">
+                                      <span className="font-bold">R$ {airportSurchargeBRL.toFixed(2).replace('.', ',')}</span>
+                                      {hasLocal && <div className="text-[10px] text-orange-500">{toLocal(airportSurchargeBRL)}</div>}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Proteções/extras adicionais */}
+                                {extrasDetails.map((extra: any, idx: number) => {
+                                  const insNamesBalcao: Record<string, string> = {
+                                    PREMIUM: "Cobertura Premium", PREMPRE: "Premium Pré-pago", PREMUP: "Premium Plus",
+                                    SPCDW: "Super CDW", SPTHW: "Super THW", STHW: "THW+",
+                                    SCDW: "CDW+", MEDIUM: "Cobertura Média", RSA: "Assistência na Estrada",
+                                    APP: "Proteção Aparência", WWI: "Proteção para-brisas", PAI: "Acidentes pessoais",
+                                  };
+                                  const totalExtra = (extra.isTotal ? extra.pricePerDay : extra.pricePerDay * days) * extra.qty;
+                                  return (
+                                    <div key={`e-${idx}`} className="flex justify-between text-xs text-orange-700">
+                                      <span>🛡️ {insNamesBalcao[extra.id] || extra.id}</span>
+                                      <div className="text-right">
+                                        <span className="font-bold">R$ {totalExtra.toFixed(2).replace('.', ',')}</span>
+                                        {hasLocal && <div className="text-[10px] text-orange-500">{toLocal(totalExtra)}</div>}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+
+                                {/* Equipamentos/acessórios */}
+                                {booking?.xrsEquipment?.map((eq: any) => {
+                                  const eqT = parseFloat(eq.totalBRL || 0);
+                                  const eqD = parseFloat(eq.priceBRL || 0);
+                                  const eqTotal = (eqT > 0 ? eqT : eqD * days) * (eq.qty || 1);
+                                  return (
+                                    <div key={`eq-${eq.code}`} className="flex justify-between text-xs text-orange-700">
+                                      <span>{eq.icon || '📦'} {eq.name || eq.code} ×{eq.qty || 1}</span>
+                                      <div className="text-right">
+                                        <span className="font-bold">R$ {eqTotal.toFixed(2).replace('.', ',')}</span>
+                                        {hasLocal && <div className="text-[10px] text-orange-500">{toLocal(eqTotal)}</div>}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            );
-                          })}
-                        </div>
 
-                        <p className="text-[9px] text-orange-600 mt-2 pt-2 border-t border-orange-200 leading-tight">
-                          ⓘ Estes valores são cobrados diretamente no balcão de retirada do veículo, na moeda local.
-                        </p>
+                              <p className="text-[9px] text-orange-600 mt-2 pt-2 border-t border-orange-200 leading-tight">
+                                ⓘ Estes valores são cobrados no balcão na moeda local ({localSymbol}).
+                              </p>
+                            </>
+                          );
+                        })()}
                       </div>
                     );
                   })()}
