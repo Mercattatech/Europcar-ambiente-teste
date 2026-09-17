@@ -1946,8 +1946,15 @@ export default function CheckoutPage() {
                   </div>
                   <p className="text-[10px] text-gray-400 mt-1">
                     Inclui aluguel do veículo, proteções incluídas, taxas e impostos.
-                    {airportSurchargeBRL > 0 && ' A sobretaxa de aeroporto foi subtraída deste valor (paga no balcão).'}
                   </p>
+                  {airportSurchargeBRL > 0 && (
+                    <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <span className="text-amber-500 text-sm mt-0.5 shrink-0">✈</span>
+                      <p className="text-[11px] text-amber-800 leading-snug">
+                        <strong>Sobretaxa de aeroporto</strong> (R$ {airportSurchargeBRL.toFixed(2).replace('.', ',')}) foi <strong>descontada</strong> do valor online — será cobrada separadamente no balcão de retirada.
+                      </p>
+                    </div>
+                  )}
                   {paymentMethod === 'CREDIT' && ccInstallments > 1 && (
                     <div className="mt-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-center">
                       <span className="text-sm font-black text-[#008d36]">
