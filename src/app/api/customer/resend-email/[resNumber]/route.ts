@@ -56,7 +56,35 @@ export async function POST(
   const xrsEquipment  = cd?.xrsEquipment || booking?.xrsEquipment || [];
   const extrasMap     = booking?.extras || {};
   const paymentMethod = cd?.paymentMethod || 'CREDIT';
-  const amountBRL     = (reservation.amountInCents || 0) / 100;
+  // Para BALCÃO: amountInCents só tem o veículo base → recalcula total completo
+  const _baseAmountBRL = (reservation.amountInCents || 0) / 100;
+  const _isBalcaoResend = (cd?.paymentMethod || '').toUpperCase() === 'BALCAO' ||
+                          (cd?.paymentMethod || '').toUpperCase() === 'VOUCHER';
+  let amountBRL: number;
+  if (_isBalcaoResend) {
+    const _vehicleBRL = parseFloat(
+      car?.totalRateEstimateInBookingCurrency || car?.totalRateEstimate || '0'
+    );
+    const _xrsIns  = cd?.xrsInsurances || cd?.booking?.xrsInsurances || [];
+    const _xrsEq   = cd?.xrsEquipment  || cd?.booking?.xrsEquipment  || [];
+    const _pickupD = booking?.pickupDate || '';
+    const _returnD = booking?.returnDate || '';
+    const _days = (() => {
+      try {
+        const diff = Math.ceil((new Date(_returnD).getTime() - new Date(_pickupD).getTime()) / 86400000);
+        return diff > 0 ? diff : 1;
+      } catch { return 1; }
+    })();
+    const _insBRL = Array.isArray(_xrsIns) ? _xrsIns.reduce((s: number, ins: any) => s + parseFloat(ins.priceBRL || 0), 0) : 0;
+    const _eqBRL  = Array.isArray(_xrsEq)  ? _xrsEq.reduce((s: number, eq: any) => {
+      const t = parseFloat(eq.totalBRL || 0);
+      const d = parseFloat(eq.priceBRL || 0);
+      return s + (t > 0 ? t : d * _days) * (eq.qty || 1);
+    }, 0) : 0;
+    amountBRL = _vehicleBRL + _insBRL + _eqBRL || _baseAmountBRL;
+  } else {
+    amountBRL = _baseAmountBRL;
+  }
   const finalResNumber = reservation.resNumber || reservation.merchantOrderId || resNumber;
 
   // Valor na moeda da estação de retirada (+ estimativa BRL)
