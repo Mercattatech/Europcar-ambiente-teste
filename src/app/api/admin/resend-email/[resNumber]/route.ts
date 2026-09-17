@@ -142,26 +142,44 @@ export async function POST(
   const finalCurrency = overrideCurrency || localCurrency;
   const finalAmount   = overrideAmount   || rawAmount;
 
-  let valorTotal: string;
+  // Valor local + estimativa BRL para templates de e-mail
+  const _valorBRL = `R$ ${amountBRL.toFixed(2).replace('.', ',')}`;
+  let _valorLocal: string;
   if (finalCurrency === 'BRL') {
-    // Brasil ou admin escolheu BRL
     const brlAmt = overrideAmount || amountBRL;
-    valorTotal = `R$ ${brlAmt.toFixed(2).replace('.', ',')}`;
+    _valorLocal = `R$ ${brlAmt.toFixed(2).replace('.', ',')}`;
   } else if (finalAmount > 0) {
-    // Moeda internacional com valor conhecido
     try {
-      valorTotal = new Intl.NumberFormat('en-US', {
+      _valorLocal = new Intl.NumberFormat('pt-BR', {
         style: 'currency',
         currency: finalCurrency,
-        minimumFractionDigits: finalCurrency === 'JPY' ? 0 : 2,
+        minimumFractionDigits: finalCurrency === 'JPY' || finalCurrency === 'KRW' ? 0 : 2,
       }).format(finalAmount);
     } catch {
-      valorTotal = `${finalCurrency} ${finalAmount.toFixed(2)}`;
+      _valorLocal = `${finalCurrency} ${finalAmount.toFixed(2)}`;
     }
   } else {
-    // Moeda internacional mas sem valor local — usa BRL como referência
-    valorTotal = `${finalCurrency} (ref. R$ ${amountBRL.toFixed(2).replace('.', ',')})`;
+    // Sem valor local — converte via taxa de câmbio se disponível
+    const exchRate = parseFloat(car?.exchangeRate || '0');
+    if (exchRate > 0) {
+      const converted = amountBRL / exchRate;
+      try {
+        _valorLocal = new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: finalCurrency,
+          minimumFractionDigits: 2,
+        }).format(converted);
+      } catch {
+        _valorLocal = `${finalCurrency} ${converted.toFixed(2)}`;
+      }
+    } else {
+      _valorLocal = `${finalCurrency} (ref. ${_valorBRL})`;
+    }
   }
+  // VALOR_TOTAL: moeda local + estimativa BRL (para estações internacionais)
+  const valorTotal = finalCurrency === 'BRL'
+    ? _valorLocal
+    : `${_valorLocal} (≈ ${_valorBRL})`;
 
   const emailVars: Record<string, string> = {
     NOME:              cd?.nome        || '',
@@ -171,7 +189,9 @@ export async function POST(
     CPF:               cd?.cpf         || '',
     NUMERO_RESERVA:    finalResNumber,
     VALOR_TOTAL:       valorTotal,
-    MOEDA:             localCurrency || 'BRL',
+    VALOR_LOCAL:       _valorLocal,
+    VALOR_BRL:         _valorBRL,
+    MOEDA:             finalCurrency,
     FORMA_PAGAMENTO:   fmtPagamento[paymentMethod] || paymentMethod,
     CARRO:             car?.carCategoryName || car?.carCategorySample || car?.name || '',
     CATEGORIA_CARRO:   car?.carCategoryCode || car?.acrissCode || '',

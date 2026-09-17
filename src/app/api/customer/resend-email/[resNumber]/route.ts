@@ -59,8 +59,16 @@ export async function POST(
   const amountBRL     = (reservation.amountInCents || 0) / 100;
   const finalResNumber = reservation.resNumber || reservation.merchantOrderId || resNumber;
 
-  // Valor em BRL (cliente não tem seletor de moeda — usa sempre BRL)
-  const valorTotal = `R$ ${amountBRL.toFixed(2).replace('.', ',')}`;
+  // Valor na moeda da estação de retirada (+ estimativa BRL)
+  const { buildEmailCurrencyVars } = await import('@/lib/receiptLocales');
+  const _resExchangeRate = parseFloat(car?.exchangeRate || '0');
+  const _currVars = buildEmailCurrencyVars(
+    amountBRL,
+    booking?.pickupStation || null,
+    _resExchangeRate,
+    car?.currency || null,
+  );
+  const valorTotal = _currVars.VALOR_TOTAL;
 
   function fmtDate(d?: string) {
     if (!d) return '';
@@ -98,7 +106,10 @@ export async function POST(
     TELEFONE:          cd?.telefone    || '',
     CPF:               cd?.cpf         || '',
     NUMERO_RESERVA:    finalResNumber,
-    VALOR_TOTAL:       valorTotal,
+    VALOR_TOTAL:       _currVars.VALOR_TOTAL,
+    VALOR_LOCAL:       _currVars.VALOR_LOCAL,
+    VALOR_BRL:         _currVars.VALOR_BRL,
+    MOEDA:             _currVars.MOEDA,
     MOEDA:             'BRL',
     FORMA_PAGAMENTO:   fmtPagamento[paymentMethod] || paymentMethod,
     CARRO:             car?.carCategoryName || car?.carCategorySample || car?.name || '',

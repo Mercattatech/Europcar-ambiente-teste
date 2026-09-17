@@ -697,3 +697,60 @@ export function getCurrencyFromStation(stationCode?: string | null): string | nu
 
   return stationCurrencyMap[prefix] || null;
 }
+
+/**
+ * buildEmailCurrencyVars
+ * ─────────────────────────────────────────────────────────────
+ * Retorna variáveis de valor prontas para usar em templates de e-mail.
+ * Para estações internacionais, exibe o valor na moeda local
+ * com uma estimativa em BRL entre parênteses.
+ *
+ * @param totalBRL        - Valor total em BRL (centavos / 100)
+ * @param pickupStation   - Código da estação de retirada (ex: LIST01, CDGT01)
+ * @param exchangeRate    - Taxa de câmbio BRL/Moedal (ex: 6.1858 para EUR)
+ * @param carCurrency     - Moeda da reserva vinda do XRS (opcional, fallback p/ mapa)
+ *
+ * Retorna:
+ *   VALOR_TOTAL   = "€ 383,74 (≈ R$ 2.373,73)"  |  "R$ 2.373,73"
+ *   VALOR_LOCAL   = "€ 383,74"                   |  "R$ 2.373,73"
+ *   VALOR_BRL     = "R$ 2.373,73"
+ *   MOEDA         = "EUR" | "BRL" | "CHF" …
+ */
+export function buildEmailCurrencyVars(
+  totalBRL: number,
+  pickupStation: string | null | undefined,
+  exchangeRate: number | null | undefined,
+  carCurrency?: string | null,
+): { VALOR_TOTAL: string; VALOR_LOCAL: string; VALOR_BRL: string; MOEDA: string } {
+  const fmtBRL = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
+  const valorBRL = fmtBRL(totalBRL);
+
+  // Determina moeda: prioridade = carCurrency > mapa de estação
+  const currency =
+    (carCurrency && carCurrency !== 'BRL' ? carCurrency : null) ||
+    getCurrencyFromStation(pickupStation) ||
+    'BRL';
+
+  if (currency === 'BRL' || !(exchangeRate && exchangeRate > 0)) {
+    return { VALOR_TOTAL: valorBRL, VALOR_LOCAL: valorBRL, VALOR_BRL: valorBRL, MOEDA: 'BRL' };
+  }
+
+  const localAmount = totalBRL / exchangeRate;
+  let valorLocal: string;
+  try {
+    valorLocal = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: currency === 'JPY' || currency === 'KRW' ? 0 : 2,
+    }).format(localAmount);
+  } catch {
+    valorLocal = `${currency} ${localAmount.toFixed(2)}`;
+  }
+
+  return {
+    VALOR_TOTAL:  `${valorLocal} (≈ ${valorBRL})`,
+    VALOR_LOCAL:  valorLocal,
+    VALOR_BRL:    valorBRL,
+    MOEDA:        currency,
+  };
+}

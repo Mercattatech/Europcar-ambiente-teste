@@ -160,7 +160,15 @@ export async function GET(request: Request) {
                  TELEFONE: parsedData.telefone || '',
                  CPF: parsedData.cpf || '',
                  NUMERO_RESERVA: resNumber,
-                 VALOR_TOTAL: `R$ ${totalBRL}`,
+                 VALOR_TOTAL: (() => {
+                   const _ex = parseFloat(booking.car?.exchangeRate || '0');
+                   if (!_ex || (booking.car?.currency || 'BRL') === 'BRL') return `R$ ${totalBRL}`;
+                   const _local = (cieloJson.Payment.Amount / 100) / _ex;
+                   try {
+                     const _fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: booking.car?.currency || 'BRL' }).format(_local);
+                     return `${_fmt} (≈ R$ ${totalBRL})`;
+                   } catch { return `R$ ${totalBRL}`; }
+                 })(),
                  FORMA_PAGAMENTO: 'PIX',
                  CARRO: booking.car?.carCategoryName || booking.car?.name || '',
                  CATEGORIA_CARRO: booking.car?.acrissCode || booking.carCategory || '',
