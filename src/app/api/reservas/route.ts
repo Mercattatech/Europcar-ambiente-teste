@@ -649,42 +649,40 @@ export async function POST(request: Request) {
           const returnDateRaw = bookingData.returnDate || '';
 
           // ── Moeda do e-mail: usa a moeda da estação de retirada ──────────────
-          // Para BALCÃO: o amountInCents só tem o veículo base → recalcula total completo
+          // Para TODOS os métodos de pagamento em estações internacionais:
+          // o e-mail mostra o TOTAL COMPLETO na moeda de destino + estimativa BRL.
+          // (Para CREDIT/PIX o cliente paga parte online e parte no balcão —
+          //  o total de referência é sempre veículo + proteções + equipamentos)
           const { buildEmailCurrencyVars } = await import('@/lib/receiptLocales');
           const _exchangeRate  = parseFloat(bookingData.car?.exchangeRate || '0');
           const _carCurrency   = bookingData.car?.currency || null;
-          const _isBalcao      = paymentData.method === 'BALCAO' || paymentData.method === 'VOUCHER';
 
-          let _totalBRLForEmail: number;
-          if (_isBalcao) {
-            // Veículo BRL (total do período)
-            const _vehicleBRL = parseFloat(
-              bookingData.car?.totalRateEstimateInBookingCurrency ||
-              bookingData.car?.totalRateEstimate || '0'
-            );
-            // Proteções selecionadas
-            const _insBRL = (Array.isArray(xrsInsurances) ? xrsInsurances : [])
-              .reduce((s: number, ins: any) => s + parseFloat(ins.priceBRL || 0), 0);
-            // Equipamentos selecionados
-            const _bookingDays = (() => {
-              try {
-                const p = new Date(bookingData.pickupDate);
-                const r = new Date(bookingData.returnDate);
-                const diff = Math.ceil((r.getTime() - p.getTime()) / 86400000);
-                return diff > 0 ? diff : 1;
-              } catch { return 1; }
-            })();
-            const _equipBRL = (Array.isArray(xrsEquipment) ? xrsEquipment : [])
-              .reduce((s: number, eq: any) => {
-                const t = parseFloat(eq.totalBRL || 0);
-                const d = parseFloat(eq.priceBRL || 0);
-                return s + (t > 0 ? t : d * _bookingDays) * (eq.qty || 1);
-              }, 0);
-            _totalBRLForEmail = _vehicleBRL + _insBRL + _equipBRL;
-          } else {
-            // PIX / CREDIT: valor exato cobrado
-            _totalBRLForEmail = (paymentData.amountInCents || 0) / 100;
-          }
+          // Veículo BRL (total do período, inclui sobretaxa de aeroporto)
+          const _vehicleBRL = parseFloat(
+            bookingData.car?.totalRateEstimateInBookingCurrency ||
+            bookingData.car?.totalRateEstimate || '0'
+          );
+          // Proteções selecionadas
+          const _insBRL = (Array.isArray(xrsInsurances) ? xrsInsurances : [])
+            .reduce((s: number, ins: any) => s + parseFloat(ins.priceBRL || 0), 0);
+          // Equipamentos selecionados
+          const _bookingDays = (() => {
+            try {
+              const p = new Date(bookingData.pickupDate);
+              const r = new Date(bookingData.returnDate);
+              const diff = Math.ceil((r.getTime() - p.getTime()) / 86400000);
+              return diff > 0 ? diff : 1;
+            } catch { return 1; }
+          })();
+          const _equipBRL = (Array.isArray(xrsEquipment) ? xrsEquipment : [])
+            .reduce((s: number, eq: any) => {
+              const t = parseFloat(eq.totalBRL || 0);
+              const d = parseFloat(eq.priceBRL || 0);
+              return s + (t > 0 ? t : d * _bookingDays) * (eq.qty || 1);
+            }, 0);
+          // Total completo (fallback para amountInCents se não tiver dados do booking)
+          const _totalBRLForEmail = (_vehicleBRL + _insBRL + _equipBRL) ||
+            ((paymentData.amountInCents || 0) / 100);
 
           const _currencyVars = buildEmailCurrencyVars(
             _totalBRLForEmail,
