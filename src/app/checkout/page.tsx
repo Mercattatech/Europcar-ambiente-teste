@@ -604,7 +604,7 @@ export default function CheckoutPage() {
   const baseAmountBRL = Math.max(0, (totalBRL > 0 ? totalBRL : totalRateXRS) - airportSurchargeBRL);
   const amountInCents = Math.round(baseAmountBRL * 100);
 
-  // Para BALCÃO: total completo = veículo + aeroporto + extras + equipamentos
+  // Para BALCÃO: total completo = veículo + proteções (xrsInsurances) + equipamentos + extras DB
   const _extrasSumBRL = extrasDetails.reduce((s: number, e: any) => {
     const val = e.isTotal ? e.pricePerDay : e.pricePerDay * days;
     return s + val * e.qty;
@@ -614,8 +614,12 @@ export default function CheckoutPage() {
     const d = parseFloat(eq.priceBRL || 0);
     return s + (t > 0 ? t : d * days) * (eq.qty || 1);
   }, 0);
-  // Full amount for BALCÃO confirmation page (all paid at counter)
-  const balcaoFullAmountCents = Math.round(((totalBRL > 0 ? totalBRL : totalRateXRS) + _extrasSumBRL + _equipSumBRL) * 100);
+  // Proteções XRS selecionadas (Super CDW, WWI, PREMIUM, etc.)
+  const _insSumBRL = (booking?.xrsInsurances || []).reduce((s: number, ins: any) => {
+    return s + parseFloat(ins.priceBRL || 0);
+  }, 0);
+  // Full amount for BALCÃO confirmation page and EUR display (all paid at counter)
+  const balcaoFullAmountCents = Math.round(((totalBRL > 0 ? totalBRL : totalRateXRS) + _extrasSumBRL + _equipSumBRL + _insSumBRL) * 100);
 
 
   // Envia a reserva de fato para o backend. threeDsAuth vem preenchido quando o
@@ -1905,18 +1909,24 @@ export default function CheckoutPage() {
                         R$ {baseAmountBRL.toFixed(2).replace('.', ',')}
                       </div>
                       {totalRateXRS > 0 && currency !== 'BRL' && (() => {
-                        // Full total in local currency (vehicle + extras + equipment)
+                        // EUR total = veículo + proteções (xrsInsurances) + equipamentos (xrsEquipment) + extras DB
                         const vehicleTotal = totalBRL > 0 ? totalBRL : totalRateXRS;
-                        const extrasValLocal = extrasDetails.reduce((s: number, e: any) => {
-                          const v = e.isTotal ? e.pricePerDay : e.pricePerDay * days;
-                          return s + v * e.qty;
+                        // Proteções selecionadas (Super CDW, WWI, etc.)
+                        const insValLocal = (booking?.xrsInsurances || []).reduce((s: number, ins: any) => {
+                          return s + parseFloat(ins.priceBRL || 0);
                         }, 0);
+                        // Equipamentos (GPS, cadeirinha, taxa transfronteirica, etc.)
                         const equipValLocal = (booking?.xrsEquipment || []).reduce((s: number, eq: any) => {
                           const t = parseFloat(eq.totalBRL || 0);
                           const d = parseFloat(eq.priceBRL || 0);
                           return s + (t > 0 ? t : d * days) * (eq.qty || 1);
                         }, 0);
-                        const fullBRL = vehicleTotal + extrasValLocal + equipValLocal;
+                        // Extras do painel (DB)
+                        const extrasValLocal = extrasDetails.reduce((s: number, e: any) => {
+                          const v = e.isTotal ? e.pricePerDay : e.pricePerDay * days;
+                          return s + v * e.qty;
+                        }, 0);
+                        const fullBRL = vehicleTotal + insValLocal + equipValLocal + extrasValLocal;
                         const exchangeRate = parseFloat(car?.exchangeRate || '1');
                         const fullLocal = exchangeRate > 0 ? fullBRL / exchangeRate : fullBRL;
                         const localSymbol = currency === 'EUR' ? '€' : currency;
