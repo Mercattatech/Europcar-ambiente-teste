@@ -58,6 +58,8 @@ function VehiclesContent() {
   const [carImageOverrides, setCarImageOverrides] = useState<Record<string, string>>({});
   const [carCategoryOverrides, setCarCategoryOverrides] = useState<Record<string, string>>({});
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  // On-request modal
+  const [onRequestModal, setOnRequestModal] = useState<{ car: any; tariff: 'POA' | 'ETO' } | null>(null);
 
   // URL params
   const pickupStation = searchParams.get("pickup") || "";
@@ -1358,6 +1360,16 @@ function VehiclesContent() {
     } catch {}
   };
 
+  /** Intercepts car selection — shows on-request popup when statusCode=R */
+  const handleSelectCarWithOnRequestCheck = (car: any, tariff: 'POA' | 'ETO') => {
+    if (car.statusCode === 'R') {
+      setOnRequestModal({ car, tariff });
+    } else {
+      setSelectedTariffType(tariff);
+      handleSelectCar(car);
+    }
+  };
+
   const fmtPrice = (v: any) => parseFloat(String(v || 0)).toFixed(2).replace(".", ",");
 
   // ---- RENDER ----
@@ -1657,6 +1669,17 @@ function VehiclesContent() {
                                   </span>
                                 </span>
                               )}
+
+                              {/* LIMITED badge for on-request vehicles */}
+                              {car.statusCode === 'R' && (
+                                <span className="group relative inline-flex items-center gap-1.5 bg-black rounded-full px-3 py-1 text-[10px] font-black text-white uppercase cursor-help">
+                                  LIMITED
+                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
+                                  <span className="absolute bottom-full left-0 mb-2 w-64 bg-gray-900 text-white text-[11px] font-normal normal-case rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl">
+                                    Disponibilidade limitada. A estação tem 8 horas úteis para confirmar esta reserva.
+                                  </span>
+                                </span>
+                              )}
                             </div>
 
                             {/* 2.2 Vehicle Specs Icons Row */}
@@ -1720,7 +1743,7 @@ function VehiclesContent() {
                                 </div>
                               </div>
                               <button
-                                onClick={() => { setSelectedTariffType('POA'); handleSelectCar(car); }}
+                                onClick={() => handleSelectCarWithOnRequestCheck(car, 'POA')}
                                 className="w-full mt-4 bg-[#FFD100] hover:bg-[#F2C700] text-black font-black py-3 px-4 rounded text-base transition-colors"
                               >
                                 {isSelected && selectedTariffType === 'POA' ? "Selecionado" : "Selecionar"}
@@ -1752,9 +1775,8 @@ function VehiclesContent() {
                                   </div>
                                   <button
                                     onClick={() => {
-                                      setSelectedTariffType('ETO');
                                       const merged = { ...car, ...etoCar, totalRateEstimate: totalPriceETO.toFixed(2), totalRateEstimateInBookingCurrency: totalBRL_ETO.toFixed(2), optionalInsurances: car.optionalInsurances, imageUrl: car.imageUrl, _etoCID: '56935466' };
-                                      handleSelectCar(merged);
+                                      handleSelectCarWithOnRequestCheck(merged, 'ETO');
                                     }}
                                     className="w-full mt-4 bg-[#008d36] hover:bg-[#007530] text-white font-black py-3 px-4 rounded text-base transition-colors"
                                   >
@@ -2534,6 +2556,54 @@ function VehiclesContent() {
                 className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-xl text-xs transition-colors"
               >
                 {promoPopupConfig?.secondaryBtnText || "Continuar sem Desconto (Pagar no Balcão)"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ═══ ON-REQUEST VEHICLE MODAL ═══ */}
+      {onRequestModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)' }}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative">
+            <button
+              onClick={() => setOnRequestModal(null)}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+            >
+              ×
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 bg-black rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-white text-xl font-black">!</span>
+              </div>
+              <h2 className="text-xl font-black text-gray-900 mb-3">
+                Você selecionou um veículo “Sob Consulta”
+              </h2>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Este modelo tem disponibilidade limitada. Após concluir a reserva, a estação tem{' '}
+                <strong>8 horas úteis</strong> para confirmar ou recusar.
+                Um e-mail será enviado com o resultado.{' '}
+                Se não confirmado, você deverá fazer uma nova reserva.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  const { car, tariff } = onRequestModal;
+                  setOnRequestModal(null);
+                  setSelectedTariffType(tariff);
+                  handleSelectCar(car);
+                }}
+                className="w-full bg-[#FFD100] hover:bg-[#F2C700] text-black font-black py-3.5 px-6 rounded-xl text-sm transition-colors"
+              >
+                Continuar com este veículo
+              </button>
+              <button
+                onClick={() => setOnRequestModal(null)}
+                className="w-full bg-white border-2 border-[#008d36] hover:bg-green-50 text-[#008d36] font-black py-3.5 px-6 rounded-xl text-sm transition-colors"
+              >
+                Escolher outro veículo
               </button>
             </div>
           </div>

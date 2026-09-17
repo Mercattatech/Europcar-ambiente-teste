@@ -715,12 +715,15 @@ export async function POST(request: Request) {
             LOCAL_DEVOLUCAO: bookingData.returnStation || bookingData.pickupStation || '',
             LISTA_PROTECOES: listaProtecoes,
             LISTA_EXTRAS: listaExtras,
+            ITENS_SOB_CONSULTA: onRequestItems.map((i: any) => i.description || i.code).join(', ') || '',
           };
 
-          // Tenta enviar usando o template do painel (RESERVA_SUCESSO)
-          const trigger = paymentData.method === 'BALCAO' ? 'RESERVA_SUCESSO' : 'RESERVA_SUCESSO';
+          // Tenta enviar usando o template do painel
+          // On-request → RESERVA_SOB_SOLICITACAO; BALCÃO ou pré-pago → RESERVA_SUCESSO
+          const trigger = isOnRequest ? 'RESERVA_SOB_SOLICITACAO' : 'RESERVA_SUCESSO';
           const { sendTransactionalEmail } = await import('@/lib/emailService');
           const tplResult = await sendTransactionalEmail(customerData.email, trigger, emailVars);
+          console.log(`[reservas] Email trigger=${trigger} isOnRequest=${isOnRequest} result=`, tplResult.success);
 
           if (!tplResult.success && tplResult.error === 'Template não encontrado') {
             // Fallback: nenhum template cadastrado no painel → usa template hardcoded
@@ -748,7 +751,8 @@ export async function POST(request: Request) {
         // WhatsApp: disparo para o cliente + números internos (fire-and-forget)
         // Usa RESERVA_BALCAO para pagamento no balcão (loja) e RESERVA_SUCESSO para pré-pagos
         import('@/lib/whatsapp/whatsappService').then(({ sendWhatsappTrigger }) => {
-          const waTrigger = paymentData.method === 'BALCAO' ? 'RESERVA_BALCAO' : 'RESERVA_SUCESSO';
+          // On-request usa trigger diferente
+          const waTrigger = isOnRequest ? 'RESERVA_SOB_SOLICITACAO' : (paymentData.method === 'BALCAO' ? 'RESERVA_BALCAO' : 'RESERVA_SUCESSO');
           sendWhatsappTrigger(
             waTrigger,
             {
