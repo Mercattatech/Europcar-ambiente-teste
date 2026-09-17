@@ -2039,6 +2039,7 @@ export default function CheckoutPage() {
                       <div className="text-xl font-black text-gray-900">
                         {(() => {
                           const vehicleTotal = totalBRL > 0 ? totalBRL : totalRateXRS;
+                          const insVal = (booking?.xrsInsurances || []).reduce((s: number, ins: any) => s + parseFloat(ins.priceBRL || 0), 0);
                           const extrasVal = extrasDetails.reduce((s: number, e: any) => {
                             const val = e.isTotal ? e.pricePerDay : e.pricePerDay * days;
                             return s + val * e.qty;
@@ -2048,14 +2049,32 @@ export default function CheckoutPage() {
                             const eqD = parseFloat(eq.priceBRL || 0);
                             return s + (eqT > 0 ? eqT : eqD * days) * (eq.qty || 1);
                           }, 0);
-                          return `R$ ${(vehicleTotal + extrasVal + equipVal).toFixed(2).replace('.', ',')}`;
+                          return `R$ ${(vehicleTotal + insVal + extrasVal + equipVal).toFixed(2).replace('.', ',')}`;
                         })()}
                       </div>
-                      {totalRateXRS > 0 && currency !== 'BRL' && (
-                        <div className="text-xs text-gray-400 mt-0.5">
-                          € {totalRateXRS.toFixed(2).replace('.', ',')}
-                        </div>
-                      )}
+                      {totalRateXRS > 0 && currency !== 'BRL' && (() => {
+                        // EUR = total completo (veículo + proteções + equipamentos + extras) / taxa de câmbio
+                        const vehicleTotal = totalBRL > 0 ? totalBRL : totalRateXRS;
+                        const insVal  = (booking?.xrsInsurances || []).reduce((s: number, ins: any) => s + parseFloat(ins.priceBRL || 0), 0);
+                        const equipVal = (booking?.xrsEquipment || []).reduce((s: number, eq: any) => {
+                          const eqT = parseFloat(eq.totalBRL || 0);
+                          const eqD = parseFloat(eq.priceBRL || 0);
+                          return s + (eqT > 0 ? eqT : eqD * days) * (eq.qty || 1);
+                        }, 0);
+                        const extrasVal = extrasDetails.reduce((s: number, e: any) => {
+                          const val = e.isTotal ? e.pricePerDay : e.pricePerDay * days;
+                          return s + val * e.qty;
+                        }, 0);
+                        const fullBRL = vehicleTotal + insVal + equipVal + extrasVal;
+                        const exchRate = parseFloat(car?.exchangeRate || '1');
+                        const fullLocal = exchRate > 0 ? fullBRL / exchRate : fullBRL;
+                        const localSymbol = currency === 'EUR' ? '€' : currency;
+                        return (
+                          <div className="text-xs text-gray-400 mt-0.5">
+                            ≈ {localSymbol} {fullLocal.toFixed(2).replace('.', ',')}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </>
