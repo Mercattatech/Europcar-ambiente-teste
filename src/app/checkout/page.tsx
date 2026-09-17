@@ -1811,7 +1811,9 @@ export default function CheckoutPage() {
                 <div className="flex justify-between items-center mb-4">
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-gray-900 text-base">Proteção e extras</h3>
-                    <span className="text-[9px] bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full uppercase whitespace-nowrap">🏪 Pago no balcão</span>
+                    {paymentMethod !== 'BALCAO' && (
+                      <span className="text-[9px] bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full uppercase whitespace-nowrap">🏪 Pago no balcão</span>
+                    )}
                   </div>
                   <span className="font-bold text-gray-900 text-base">
                     R$ {(() => {
