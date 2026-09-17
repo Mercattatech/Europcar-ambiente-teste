@@ -2021,10 +2021,7 @@ export default function CheckoutPage() {
                                 {airportSurchargeBRL > 0 && (
                                   <div className="flex justify-between text-xs text-orange-700">
                                     <span>✈ Sobretaxa de aeroporto</span>
-                                    <div className="text-right">
-                                      <span className="font-bold">R$ {airportSurchargeBRL.toFixed(2).replace('.', ',')}</span>
-                                      {hasLocal && <div className="text-[10px] text-orange-500">{toLocal(airportSurchargeBRL)}</div>}
-                                    </div>
+                                    <span className="font-bold">R$ {airportSurchargeBRL.toFixed(2).replace('.', ',')}</span>
                                   </div>
                                 )}
 
@@ -2040,10 +2037,7 @@ export default function CheckoutPage() {
                                   return (
                                     <div key={`e-${idx}`} className="flex justify-between text-xs text-orange-700">
                                       <span>🛡️ {insNamesBalcao[extra.id] || extra.id}</span>
-                                      <div className="text-right">
-                                        <span className="font-bold">R$ {totalExtra.toFixed(2).replace('.', ',')}</span>
-                                        {hasLocal && <div className="text-[10px] text-orange-500">{toLocal(totalExtra)}</div>}
-                                      </div>
+                                      <span className="font-bold">R$ {totalExtra.toFixed(2).replace('.', ',')}</span>
                                     </div>
                                   );
                                 })}
@@ -2056,10 +2050,7 @@ export default function CheckoutPage() {
                                   return (
                                     <div key={`eq-${eq.code}`} className="flex justify-between text-xs text-orange-700">
                                       <span>{eq.icon || '📦'} {eq.name || eq.code} ×{eq.qty || 1}</span>
-                                      <div className="text-right">
-                                        <span className="font-bold">R$ {eqTotal.toFixed(2).replace('.', ',')}</span>
-                                        {hasLocal && <div className="text-[10px] text-orange-500">{toLocal(eqTotal)}</div>}
-                                      </div>
+                                      <span className="font-bold">R$ {eqTotal.toFixed(2).replace('.', ',')}</span>
                                     </div>
                                   );
                                 })}
