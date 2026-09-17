@@ -830,12 +830,7 @@ export default function MeuPerfil() {
 
                           {!isCancelled && r.resNumber && (
                             <div className="flex flex-col gap-2 shrink-0">
-                              <button
-                                onClick={() => setVoucherTarget(r)}
-                                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-lg transition-all"
-                              >
-                                📄 Comprovante
-                              </button>
+
                               <button
                                 onClick={() => { setResendTarget(r); setResendDone(false); setResendError(''); }}
                                 className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-400 text-xs font-bold rounded-lg transition-all"
