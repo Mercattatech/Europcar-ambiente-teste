@@ -217,6 +217,7 @@ model CarImageOverride {
 model CarCategoryOverride {
   carCode      String   @id
   friendlyName String
+  onRequest    Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

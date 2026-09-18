@@ -60,6 +60,8 @@ function VehiclesContent() {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   // On-request modal
   const [onRequestModal, setOnRequestModal] = useState<{ car: any; tariff: 'POA' | 'ETO' } | null>(null);
+  // Set of carCodes marked as on-request in admin
+  const [onRequestCarCodes, setOnRequestCarCodes] = useState<Set<string>>(new Set());
 
   // URL params
   const pickupStation = searchParams.get("pickup") || "";
@@ -87,8 +89,11 @@ function VehiclesContent() {
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
-          const map = data.reduce((acc: any, item: any) => ({ ...acc, [item.carCode]: item.friendlyName }), {});
-          setCarCategoryOverrides(map);
+          const nameMap = data.reduce((acc: any, item: any) => ({ ...acc, [item.carCode]: item.friendlyName }), {});
+          setCarCategoryOverrides(nameMap);
+          // Extract on-request codes
+          const onReqSet = new Set<string>(data.filter((item: any) => item.onRequest).map((item: any) => item.carCode as string));
+          setOnRequestCarCodes(onReqSet);
         }
       })
       .catch(console.error);
@@ -1364,9 +1369,13 @@ function VehiclesContent() {
     } catch {}
   };
 
-  /** Intercepts car selection — shows on-request popup when statusCode=R */
+  /** Returns true if a car is marked as on-request (from admin config or XRS statusCode) */
+  const isCarOnRequest = (car: any): boolean =>
+    car.statusCode === 'R' || onRequestCarCodes.has(car.carCategoryCode?.toUpperCase() || '');
+
+  /** Intercepts car selection — shows on-request popup when car is on-request */
   const handleSelectCarWithOnRequestCheck = (car: any, tariff: 'POA' | 'ETO') => {
-    if (car.statusCode === 'R') {
+    if (isCarOnRequest(car)) {
       setOnRequestModal({ car, tariff });
     } else {
       setSelectedTariffType(tariff);
@@ -1675,7 +1684,7 @@ function VehiclesContent() {
                               )}
 
                               {/* LIMITED badge for on-request vehicles */}
-                              {car.statusCode === 'R' && (
+                              {isCarOnRequest(car) && (
                                 <span className="group relative inline-flex items-center gap-1.5 bg-black rounded-full px-3 py-1 text-[10px] font-black text-white uppercase cursor-help">
                                   LIMITED
                                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
