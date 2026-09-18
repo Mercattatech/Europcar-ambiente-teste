@@ -46,11 +46,12 @@ function formatCurrency(v?: number) {
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
-  CONFIRMED_PREPAID:     { label: 'Confirmada',     color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/30' },
-  CONFIRMED_NON_PREPAID: { label: 'Confirmada',     color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/30' },
-  PENDING_PIX:           { label: 'Aguard. PIX',    color: 'text-yellow-400',  bg: 'bg-yellow-400/10 border-yellow-400/30' },
-  ON_REQUEST:            { label: 'Sob Consulta',   color: 'text-blue-400',    bg: 'bg-blue-400/10 border-blue-400/30' },
-  CANCELLED:             { label: 'Cancelada',      color: 'text-red-400',     bg: 'bg-red-400/10 border-red-400/30' },
+  CONFIRMED_PREPAID:     { label: 'Confirmada',        color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/30' },
+  CONFIRMED_NON_PREPAID: { label: 'Confirmada',        color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/30' },
+  PENDING_PIX:           { label: 'Aguard. PIX',       color: 'text-yellow-400',  bg: 'bg-yellow-400/10 border-yellow-400/30' },
+  ON_REQUEST:            { label: '⏳ Sob Consulta',   color: 'text-blue-400',    bg: 'bg-blue-400/10 border-blue-400/30' },
+  ON_REQUEST_REJECTED:   { label: '❌ Recusada (OR)',  color: 'text-orange-400',  bg: 'bg-orange-400/10 border-orange-400/30' },
+  CANCELLED:             { label: 'Cancelada',         color: 'text-red-400',     bg: 'bg-red-400/10 border-red-400/30' },
 };
 
 function StatusBadge({ status }: { status: string }) {

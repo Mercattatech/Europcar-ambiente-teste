@@ -475,8 +475,8 @@ export default function PainelUsuarios() {
                            <tbody className="divide-y divide-gray-800/50">
                               {historyData.map((res: any) => {
                                  const parsed = (() => { try { return JSON.parse(res.customerData || '{}'); } catch { return {}; } })();
-                                 const STATUS_LABELS: Record<string,string> = { CONFIRMED_PREPAID: 'Pago Online', CONFIRMED_NON_PREPAID: 'Pagar Balcão', PENDING_PIX: 'PIX Aguardando', CANCELLED: 'Cancelada', ON_REQUEST: 'Sob Consulta' };
-                                 const STATUS_COLORS: Record<string,string> = { CONFIRMED_PREPAID: 'bg-green-500/20 text-green-400', CONFIRMED_NON_PREPAID: 'bg-blue-500/20 text-blue-400', PENDING_PIX: 'bg-yellow-500/20 text-yellow-400', CANCELLED: 'bg-red-500/20 text-red-400', ON_REQUEST: 'bg-purple-500/20 text-purple-400' };
+                                 const STATUS_LABELS: Record<string,string> = { CONFIRMED_PREPAID: 'Pago Online', CONFIRMED_NON_PREPAID: 'Pagar Balcão', PENDING_PIX: 'PIX Aguardando', CANCELLED: 'Cancelada', ON_REQUEST: '⏳ Sob Consulta', ON_REQUEST_REJECTED: '❌ Recusada (OR)' };
+                                 const STATUS_COLORS: Record<string,string> = { CONFIRMED_PREPAID: 'bg-green-500/20 text-green-400', CONFIRMED_NON_PREPAID: 'bg-blue-500/20 text-blue-400', PENDING_PIX: 'bg-yellow-500/20 text-yellow-400', CANCELLED: 'bg-red-500/20 text-red-400', ON_REQUEST: 'bg-blue-500/20 text-blue-400', ON_REQUEST_REJECTED: 'bg-orange-500/20 text-orange-400' };
                                  const pickupDate = parsed?.booking?.pickupDate || parsed?.booking?.pickupdate || '';
                                  const formattedDate = pickupDate ? `${pickupDate.slice(6,8)}/${pickupDate.slice(4,6)}/${pickupDate.slice(0,4)}` : '—';
                                  const carName = parsed?.booking?.car?.carCategoryName || parsed?.booking?.car?.name || parsed?.booking?.car?.carCategoryCode || '—';
