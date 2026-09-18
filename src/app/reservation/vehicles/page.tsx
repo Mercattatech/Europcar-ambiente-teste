@@ -516,6 +516,10 @@ function VehiclesContent() {
               distanceRaw: '',
               specs 
             });
+            // DEBUG: log statusCode para identificar veículos on-request
+            if (attrs.statusCode) {
+              console.log(`[DEBUG on-request] Car ${attrs.carCategoryCode} statusCode=${attrs.statusCode}`);
+            }
           }
         }
         return { rates: allRates, equipment: allEquipment };
