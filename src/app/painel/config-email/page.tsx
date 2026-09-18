@@ -20,7 +20,11 @@ const TRIGGERS = [
   { id: 'RESERVA_ALTERADA', label: 'Reserva Alterada / Modificada' },
   { id: 'ATUALIZA_DADOS', label: 'Atualização de Perfil' },
   { id: 'RESET_SENHA', label: 'Reset de Senha' },
-  { id: 'FALHA_PAGAMENTO', label: 'Falha no Pagamento (PIX/Cartão/Etc)' }
+  { id: 'FALHA_PAGAMENTO', label: 'Falha no Pagamento (PIX/Cartão/Etc)' },
+  // On-Request
+  { id: 'RESERVA_SOB_SOLICITACAO', label: '⏳ Reserva Sob Consulta (On Request) — aguardando aprovação' },
+  { id: 'RESERVA_CONFIRMADA', label: '✅ Reserva Confirmada pela Estação (On Request aprovado)' },
+  { id: 'RESERVA_REJEITADA', label: '❌ Reserva Rejeitada pela Estação (On Request recusado)' },
 ];
 
 export default function ConfigEmailPage() {
