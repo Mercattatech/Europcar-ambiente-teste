@@ -459,6 +459,25 @@ export async function POST(request: Request) {
           } else if (raw) {
             onRequestItems = [raw.$ || raw];
           }
+
+          // Auto-aprendizado: salva automaticamente categorias de veículo on-request no banco
+          // para que o badge LIMITED apareça automaticamente nas próximas pesquisas
+          const vcItems = onRequestItems.filter((i: any) => (i.type || '').toUpperCase() === 'VC');
+          for (const item of vcItems) {
+            const carCode = (item.code || '').toUpperCase();
+            if (carCode) {
+              try {
+                await prisma.carCategoryOverride.upsert({
+                  where: { carCode },
+                  update: { onRequest: true },
+                  create: { carCode, friendlyName: item.description || carCode, onRequest: true },
+                });
+                console.log(`[reservas] Auto-marcado on-request: ${carCode}`);
+              } catch (e) {
+                console.warn(`[reservas] Falha ao auto-marcar ${carCode}:`, e);
+              }
+            }
+          }
         }
 
         if (resNumber) {
