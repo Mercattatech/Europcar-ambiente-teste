@@ -5,6 +5,18 @@ import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { buildEmailCurrencyVars } from '@/lib/receiptLocales';
 export const dynamic = 'force-dynamic';
 
+/**
+ * Cron: GET /api/cron/sync-on-request
+ * Schedule (Coolify): */5 * * * *  (a cada 5 minutos)
+ *
+ * Polls XRS search.searchbyid for all reservations with status=ON_REQUEST.
+ *
+ * Transitions:
+ *   ON_REQUEST + CF       → CONFIRMED_NON_PREPAID  (email: RESERVA_CONFIRMADA)
+ *   ON_REQUEST + R + warn → ON_REQUEST_REJECTED    (cancela XRS + email: RESERVA_REJEITADA)
+ *   ON_REQUEST + R        → still pending
+ */
+
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET || '';
