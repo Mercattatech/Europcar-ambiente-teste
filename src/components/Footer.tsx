@@ -84,6 +84,7 @@ export default function Footer() {
                 )}
                 <li><a href="/termos/privacidade" className="hover:text-white transition-colors py-1 block">Segurança e Política de Privacidade</a></li>
                 <li><a href="/termos/cookies" className="hover:text-white transition-colors py-1 block">Política de Cookies</a></li>
+                <li><a href="/termos/uso-site" className="hover:text-white transition-colors py-1 block">Termo de Uso do Site</a></li>
               </ul>
             </FooterAccordion>
 
@@ -91,7 +92,8 @@ export default function Footer() {
             <FooterAccordion id="atendimento" title="Atendimento">
               <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Termos</p>
               <ul className="space-y-1 text-xs mb-3">
-                <li><a href="/termos/reserva-online" className="hover:text-white transition-colors py-1 block">Termos e Condições da Reserva Online</a></li>
+                <li><a href="/termos/reserva-online" className="hover:text-white transition-colors py-1 block">Termos e Condições de Reserva</a></li>
+                <li><a href="/termos/locacao" className="hover:text-white transition-colors py-1 block">Termos e Condições Gerais de Locação</a></li>
               </ul>
               <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Canais</p>
               <ul className="space-y-2 text-xs">
