@@ -6,7 +6,6 @@ export default function Footer() {
   const year = new Date().getFullYear();
   const [termsAvailable, setTermsAvailable] = useState<{reserva: boolean, pais: boolean, paisUrl: string, brasil: boolean}>({reserva: false, pais: false, paisUrl: '', brasil: false});
   const [openSection, setOpenSection] = useState<string | null>(null);
-  const [privacyUrl, setPrivacyUrl] = useState('https://www.europcar.com/privacy-policy');
 
   useEffect(() => {
     fetch('/api/admin/terms')
@@ -22,12 +21,6 @@ export default function Footer() {
           });
         }
       })
-      .catch(() => {});
-
-    // Load privacy policy URL from admin panel
-    fetch('/api/admin/config?key=PRIVACY_POLICY_URL')
-      .then(r => r.json())
-      .then(d => { if (d.value) setPrivacyUrl(d.value); })
       .catch(() => {});
   }, []);
 
@@ -73,34 +66,33 @@ export default function Footer() {
             <FooterAccordion id="international" title="Europcar Internacional">
               <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Informações legais</p>
               <ul className="space-y-2 text-xs">
-                <li><a href="https://www.europcar.com/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Informação Legal</a></li>
-                <li><a href="https://www.europcar.com/damage-management-policy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Política de Gerenciamento de Danos</a></li>
-                <li><a href="https://www.europcar.com/deposit-policy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Política de Depósito</a></li>
-                <li><a href={privacyUrl} target={privacyUrl.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Segurança e Política de Privacidade</a></li>
-                <li><a href="https://www.europcar.com/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Termos e Condições</a></li>
+                <li><a href="https://www.europcar.com/en-us/p/legal-information" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Informações Legais</a></li>
+                <li><a href="https://www.europcar.com/en-us/legal-pages/termsAndConditions" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Termos e Condições</a></li>
+                <li><a href="https://www.europcar.com/en-us/p/legal-information/deposit-policy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Política de Depósito</a></li>
               </ul>
             </FooterAccordion>
 
             {/* Col 3 - Europcar Brasil */}
             <FooterAccordion id="brasil" title="Europcar Brasil">
-              <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Mais informações</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Documentos</p>
               <ul className="space-y-2 text-xs">
                 {termsAvailable.reserva && (
-                  <li><a href="/termos/reserva" className="hover:text-white transition-colors py-1 block">Condições Gerais de Reserva</a></li>
+                  <li><a href="/termos/reserva" className="hover:text-white transition-colors py-1 block">Contrato de Aluguel de Carro</a></li>
                 )}
                 {termsAvailable.pais && (
-                  <li><a href={termsAvailable.paisUrl} target={termsAvailable.paisUrl.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Condições Gerais — País</a></li>
+                  <li><a href={termsAvailable.paisUrl} target={termsAvailable.paisUrl.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Condições Gerais de Aluguel de Carro</a></li>
                 )}
-                {termsAvailable.brasil && (
-                  <li><a href="/termos/brasil-online" className="hover:text-white transition-colors py-1 block">Condições — Brasil Online</a></li>
-                )}
-                <li><a href="https://www.europcar.com/pt-br/contact-us" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Contato / Ajuda</a></li>
-                <li><a href="/filiais" className="hover:text-white transition-colors py-1 block">Nossas Filiais</a></li>
+                <li><a href="/termos/privacidade" className="hover:text-white transition-colors py-1 block">Segurança e Política de Privacidade</a></li>
+                <li><a href="/termos/cookies" className="hover:text-white transition-colors py-1 block">Política de Cookies</a></li>
               </ul>
             </FooterAccordion>
 
             {/* Col 4 - Atendimento */}
             <FooterAccordion id="atendimento" title="Atendimento">
+              <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Termos</p>
+              <ul className="space-y-1 text-xs mb-3">
+                <li><a href="/termos/reserva-online" className="hover:text-white transition-colors py-1 block">Termos e Condições da Reserva Online</a></li>
+              </ul>
               <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Canais</p>
               <ul className="space-y-2 text-xs">
                 <li className="flex items-center gap-2">
@@ -154,9 +146,6 @@ export default function Footer() {
                 Europcar™ é marca registrada do Europcar Groupe S.A.
               </p>
             </div>
-            <p className="text-[10px] text-gray-500 text-center border-t border-gray-800 pt-2 w-full">
-              * O cancelamento gratuito é válido exclusivamente para reservas pagas antecipadamente via cartão de crédito ou PIX. Reservas com pagamento no balcão estão sujeitas às políticas de cancelamento da estação.
-            </p>
           </div>
         </div>
       </footer>

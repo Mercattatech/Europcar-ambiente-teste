@@ -2,16 +2,31 @@
 
 import { useParams } from "next/navigation";
 
-const TERMS_MAP: Record<string, { title: string; apiPath: string }> = {
-  reserva: { title: "Termos e Condições da Reserva", apiPath: "/api/terms/reserva" },
-  pais: { title: "Termos e Condições do País de Destino", apiPath: "/api/terms/pais" },
+// Rotas que usam iframe (PDF/API)
+const PDF_TERMS: Record<string, { title: string; apiPath: string }> = {
+  reserva: { title: "Contrato de Aluguel de Carro", apiPath: "/api/terms/reserva" },
+  pais: { title: "Condições Gerais de Aluguel de Carro", apiPath: "/api/terms/pais" },
   brasil: { title: "Termos de Reserva Online — Brasil", apiPath: "/api/terms/brasil" },
+};
+
+// Rotas que redirecionam para páginas HTML dedicadas
+const HTML_ROUTES: Record<string, string> = {
+  privacidade: "/termos/privacidade",
+  cookies: "/termos/cookies",
+  "reserva-online": "/termos/reserva-online",
 };
 
 export default function TermosViewPage() {
   const params = useParams();
   const type = (params.type as string)?.toLowerCase();
-  const config = TERMS_MAP[type];
+
+  // Se for rota HTML, redireciona (client-side)
+  if (typeof window !== "undefined" && HTML_ROUTES[type]) {
+    window.location.replace(HTML_ROUTES[type]);
+    return null;
+  }
+
+  const config = PDF_TERMS[type];
 
   if (!config) {
     return (

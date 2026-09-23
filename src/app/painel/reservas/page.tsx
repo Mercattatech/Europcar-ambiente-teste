@@ -813,6 +813,19 @@ export default function PainelReservas() {
                                            <p className="text-gray-300"><strong>E-mail:</strong> {parsed?.email || "—"}</p>
                                            <p className="text-gray-300"><strong>CPF:</strong> {parsed?.cpf || "—"}</p>
                                            <p className="text-gray-300"><strong>Telefone:</strong> {parsed?.telefone || "—"}</p>
+                                           {/* 🇮🇹 PID+CNH Acknowledgment Badge */}
+                                           {parsed?.pidAcknowledged && (
+                                              <div className="mt-3 bg-blue-900/30 border border-blue-700/40 rounded-lg px-3 py-2">
+                                                 <p className="text-blue-300 text-[11px] font-bold flex items-center gap-1.5">
+                                                    <span>🇮🇹</span> PID + CNH físicas confirmadas
+                                                 </p>
+                                                 {parsed?.pidAcknowledgedAt && (
+                                                    <p className="text-blue-500 text-[10px] mt-0.5">
+                                                       Ciência em: {new Date(parsed.pidAcknowledgedAt).toLocaleString('pt-BR')}
+                                                    </p>
+                                                 )}
+                                              </div>
+                                           )}
                                         </div>
                                         <div className="bg-gray-900 rounded-lg p-4 border border-gray-700/50 flex-1 min-w-[200px]">
                                            <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Veículo e Período</p>

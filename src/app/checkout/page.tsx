@@ -106,6 +106,11 @@ export default function CheckoutPage() {
   const [showBalcaoPromoModal, setShowBalcaoPromoModal] = useState(false);
   const [promoPopupConfig, setPromoPopupConfig] = useState<any>(null);
 
+  // 🇮🇹 Modal alerta PID+CNH para reservas na Itália
+  const [showPidModal, setShowPidModal] = useState(false);
+  const [pidAcknowledged, setPidAcknowledged] = useState(false);
+  const [pidCheckbox, setPidCheckbox] = useState(false);
+
   useEffect(() => {
     fetch("/api/admin/config/promo-popup")
       .then(res => res.json())
@@ -632,7 +637,9 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bookingData: booking,
-          customerData: { nome, sobrenome, email, telefone, cpf, loyaltyProgramId, loyaltyProgramName, loyaltyId, flightNumber },
+          customerData: { nome, sobrenome, email, telefone, cpf, loyaltyProgramId, loyaltyProgramName, loyaltyId, flightNumber,
+            ...(pidAcknowledged ? { pidAcknowledged: true, pidAcknowledgedAt: new Date().toISOString() } : {}),
+          },
           paymentData: {
             method: paymentMethod,
             amountInCents,
@@ -741,6 +748,14 @@ export default function CheckoutPage() {
       return;
     }
     setEmailError("");
+
+    // 🇮🇹 Alerta PID+CNH para reservas na Itália — exige confirmação antes de prosseguir
+    const isItalyReservation = (booking?.stationCountry || '').toUpperCase() === 'IT';
+    if (isItalyReservation && !pidAcknowledged) {
+      setShowPidModal(true);
+      return;
+    }
+
     setLoading(true);
 
     // Cartão de crédito precisa autenticar 3DS ANTES de cobrar — a submissão real
@@ -1258,7 +1273,7 @@ export default function CheckoutPage() {
       <div className="max-w-7xl mx-auto px-4 py-6 md:py-10 flex flex-col-reverse md:flex-row gap-6 md:gap-8">
         {/* Form */}
         <div className="flex-1">
-          <form onSubmit={handleCheckout} className="space-y-8">
+          <form id="checkout-form" onSubmit={handleCheckout} className="space-y-8">
             {/* Dados condutor */}
             <div className="bg-white rounded-lg border border-gray-200 p-5 md:p-8 shadow-sm">
               <h2 className="text-lg md:text-xl font-black text-gray-900 mb-4 md:mb-6">1. Dados do Condutor Principal</h2>
@@ -2122,6 +2137,98 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+      {/* 🇮🇹 Modal Alerta PID+CNH — Reservas na Itália */}
+      {showPidModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#009246] via-white to-[#ce2b37] p-1" />
+            <div className="bg-[#1a1a1a] px-6 py-5">
+              <div className="flex items-center gap-3">
+                <span className="text-4xl">🇮🇹</span>
+                <div>
+                  <h2 className="text-white font-black text-lg">Atenção — Reserva na Itália</h2>
+                  <p className="text-gray-400 text-sm">Documentação obrigatória para retirada do veículo</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <p className="text-red-800 font-bold text-sm mb-2 flex items-center gap-2">
+                  <span>⚠️</span> Exigência obrigatória das locadoras na Itália
+                </p>
+                <p className="text-red-700 text-sm leading-relaxed">
+                  Para retirar o veículo na Itália, é <strong>obrigatória</strong> a apresentação dos seguintes documentos <strong>FÍSICOS</strong> no balcão:
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                  <div className="text-3xl mb-2">🪪</div>
+                  <p className="font-black text-blue-900 text-sm">PID</p>
+                  <p className="text-blue-700 text-xs mt-1">Permissão Internacional para Dirigir</p>
+                  <p className="text-blue-600 text-[11px] mt-2 italic">Documento físico — não aceito digital</p>
+                </div>
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                  <div className="text-3xl mb-2">📄</div>
+                  <p className="font-black text-green-900 text-sm">CNH Brasileira</p>
+                  <p className="text-green-700 text-xs mt-1">Carteira Nacional de Habilitação</p>
+                  <p className="text-green-600 text-[11px] mt-2 italic">Documento físico — não aceito digital</p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <p className="text-amber-800 text-xs leading-relaxed">
+                  <strong>📋 Como obter a PID:</strong> Emitida pelo DETRAN do seu estado ou pelo Departamento Nacional de Trânsito (DENATRAN). Válida por 3 anos. Necessária apenas para conduzir no exterior.
+                </p>
+              </div>
+
+              {/* Checkbox de ciência */}
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  id="pid-acknowledge-checkbox"
+                  type="checkbox"
+                  checked={pidCheckbox}
+                  onChange={e => setPidCheckbox(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-[#008d36] shrink-0 cursor-pointer"
+                />
+                <span className="text-sm text-gray-700 leading-relaxed group-hover:text-gray-900 transition-colors">
+                  Estou ciente de que é <strong>obrigatório</strong> apresentar minha <strong>PID física</strong> e <strong>CNH física brasileira</strong> no balcão da locadora na Itália. A não apresentação pode resultar na <strong>recusa do veículo</strong>.
+                </span>
+              </label>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => { setShowPidModal(false); setPidCheckbox(false); }}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl text-sm transition-colors"
+              >
+                Voltar
+              </button>
+              <button
+                id="pid-confirm-btn"
+                disabled={!pidCheckbox}
+                onClick={() => {
+                  setPidAcknowledged(true);
+                  setShowPidModal(false);
+                  // Retoma o checkout automaticamente após confirmação
+                  setTimeout(() => {
+                    const form = document.getElementById('checkout-form') as HTMLFormElement | null;
+                    if (form) form.requestSubmit();
+                  }, 100);
+                }}
+                className="flex-1 bg-[#008d36] hover:bg-[#007a2e] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl text-sm transition-colors"
+              >
+                ✅ Confirmar ciência e continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Promo Alert Modal for International Pay at Counter */}
       {showBalcaoPromoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
