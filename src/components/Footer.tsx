@@ -79,9 +79,7 @@ export default function Footer() {
                 {termsAvailable.reserva && (
                   <li><a href="/termos/reserva" className="hover:text-white transition-colors py-1 block">Contrato de Aluguel de Carro</a></li>
                 )}
-                {termsAvailable.pais && (
-                  <li><a href={termsAvailable.paisUrl} target={termsAvailable.paisUrl.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Condições Gerais de Aluguel de Carro</a></li>
-                )}
+
                 <li><a href="/termos/privacidade" className="hover:text-white transition-colors py-1 block">Segurança e Política de Privacidade</a></li>
                 <li><a href="/termos/cookies" className="hover:text-white transition-colors py-1 block">Política de Cookies</a></li>
                 <li><a href="/termos/uso-site" className="hover:text-white transition-colors py-1 block">Termo de Uso do Site</a></li>
