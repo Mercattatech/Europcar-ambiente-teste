@@ -77,7 +77,7 @@ export default function Footer() {
               <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Documentos</p>
               <ul className="space-y-2 text-xs">
                 {termsAvailable.reserva && (
-                  <li><a href="/termos/reserva" className="hover:text-white transition-colors py-1 block">Contrato de Aluguel de Carro</a></li>
+                  <li><a href="/termos/contrato" className="hover:text-white transition-colors py-1 block">Contrato de Locação de Veículo</a></li>
                 )}
 
                 <li><a href="/termos/privacidade" className="hover:text-white transition-colors py-1 block">Segurança e Política de Privacidade</a></li>
