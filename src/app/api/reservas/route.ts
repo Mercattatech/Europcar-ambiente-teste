@@ -606,6 +606,8 @@ export async function POST(request: Request) {
               customerData: JSON.stringify({
                 ...safeCustomerData,      // sem creditCard, cvv, cardNumber
                 booking: bookingData,
+                xrsInsurances: Array.isArray(xrsInsurances) ? xrsInsurances : [],
+                xrsEquipment:  Array.isArray(xrsEquipment)  ? xrsEquipment  : [],
                 paymentId: pixData?.paymentId || cieloPaymentId,
                 // Metadados de pagamento — usados pelo painel admin para exibição
                 // NÃO afeta lógica de cobrança (estrutura de pagamento inalterada)

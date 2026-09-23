@@ -82,17 +82,22 @@ export async function POST(
     return '';
   };
 
-  // Extras / proteções (mesma lógica do reservas/route.ts)
+  // Extras / proteções — usa xrsInsurances (salvo no customerData) para nomes amigáveis
+  const xrsInsArr: any[] = cd?.xrsInsurances || cd?.booking?.xrsInsurances || [];
   const extrasArr = Object.entries(extrasMap)
     .filter(([, v]: any) => (v as number) > 0)
-    .map(([code, qty]: any) => ({ code, name: code, qty, priceBRL: 0 }));
+    .map(([code, qty]: any) => {
+      const qi = xrsInsArr.find((i: any) => i.code === code);
+      return { code, name: qi?.name || code, qty, priceBRL: qi?.priceBRL || 0 };
+    });
 
   const listaProtecoes = extrasArr.length > 0
-    ? extrasArr.map((ex: any) => `• ${ex.name || ex.code} ×${ex.qty}`).join('<br/>')
+    ? extrasArr.map((ex: any) => `• 🛡️ ${ex.name || ex.code} ×${ex.qty}${ex.priceBRL > 0 ? ` — R$ ${parseFloat(ex.priceBRL).toFixed(2).replace('.', ',')}` : ''}`).join('<br/>')
     : 'Nenhuma proteção adicional selecionada';
 
-  const listaExtras = xrsEquipment.length > 0
-    ? xrsEquipment.map((eq: any) =>
+  const equipArr: any[] = Array.isArray(xrsEquipment) ? xrsEquipment : [];
+  const listaExtras = equipArr.length > 0
+    ? equipArr.map((eq: any) =>
         `• ${eq.icon || '📦'} ${eq.name || eq.code} ×${eq.qty || 1}${eq.priceBRL ? ` — R$ ${parseFloat(eq.priceBRL).toFixed(2).replace('.', ',')} /dia` : ''}`
       ).join('<br/>')
     : 'Nenhum acessório selecionado';

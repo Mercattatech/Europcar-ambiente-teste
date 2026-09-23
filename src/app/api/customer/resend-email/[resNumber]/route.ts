@@ -102,14 +102,23 @@ export async function POST(
     return s.length >= 4 ? `${s.slice(0,2)}:${s.slice(2,4)}` : t;
   }
 
-  // Lista de proteções
-  const listaProtecoes = Array.isArray(xrsEquipment)
-    ? xrsEquipment.map((eq: any) => eq.description || eq.name || eq.code || '').filter(Boolean).join(', ')
-    : '';
+  // Proteções (extras = seguros/proteções contratadas: LDW, TPL, etc.)
+  const xrsInsArr: any[] = cd?.xrsInsurances || [];
+  const extrasArr = Object.entries(extrasMap)
+    .filter(([, v]: any) => (v as number) > 0)
+    .map(([code, qty]: any) => {
+      const qi = xrsInsArr.find((i: any) => i.code === code);
+      return { code, name: qi?.name || code, qty, priceBRL: qi?.priceBRL || 0 };
+    });
+  const listaProtecoes = extrasArr.length > 0
+    ? extrasArr.map(ex => `• 🛡️ ${ex.name || ex.code} ×${ex.qty}${ex.priceBRL > 0 ? ` — R$ ${parseFloat(String(ex.priceBRL)).toFixed(2).replace('.', ',')}` : ''}`).join('<br/>')
+    : 'Nenhuma proteção adicional selecionada';
 
-  // Lista de extras
-  const extrasArr = Object.values(extrasMap || {}) as any[];
-  const listaExtras = extrasArr.map((ex: any) => `${ex.name || ex.description || ''} (x${ex.quantity || 1})`).filter(Boolean).join(', ');
+  // Acessórios (xrsEquipment = equipamentos: GPS, cadeirinha, etc.)
+  const equipArr: any[] = Array.isArray(xrsEquipment) ? xrsEquipment : [];
+  const listaExtras = equipArr.length > 0
+    ? equipArr.map((eq: any) => `• ${eq.icon || '📦'} ${eq.name || eq.code} ×${eq.qty || 1}${eq.priceBRL ? ` — R$ ${parseFloat(eq.priceBRL).toFixed(2).replace('.', ',')} /dia` : ''}`).join('<br/>')
+    : 'Nenhum acessório selecionado';
 
   const fmtPagamento: Record<string, string> = {
     CREDIT:  'Cartão de Crédito',
@@ -130,7 +139,6 @@ export async function POST(
     VALOR_LOCAL:       _currVars.VALOR_LOCAL,
     VALOR_BRL:         _currVars.VALOR_BRL,
     MOEDA:             _currVars.MOEDA,
-    MOEDA:             'BRL',
     FORMA_PAGAMENTO:   fmtPagamento[paymentMethod] || paymentMethod,
     CARRO:             car?.carCategoryName || car?.carCategorySample || car?.name || '',
     CATEGORIA_CARRO:   car?.carCategoryCode || car?.acrissCode || '',
