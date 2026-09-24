@@ -18,6 +18,7 @@ export async function POST(
   // Lê opções opcionais do body (moeda e valor override do admin)
   let overrideCurrency: string | undefined;
   let overrideAmount:   number  | undefined;
+  let requestedTrigger: string  = 'RESERVA_SUCESSO';
   try {
     const body = await req.json().catch(() => ({}));
     if (body?.currency && typeof body.currency === 'string' && body.currency.length === 3) {
@@ -25,6 +26,9 @@ export async function POST(
     }
     if (body?.amount && typeof body.amount === 'number' && body.amount > 0) {
       overrideAmount = body.amount;
+    }
+    if (body?.trigger && typeof body.trigger === 'string') {
+      requestedTrigger = body.trigger.toUpperCase();
     }
   } catch { /* body vazio — usa detecção automática */ }
 
@@ -231,11 +235,7 @@ export async function POST(
   };
 
   // ── Determina qual trigger/template usar ──
-  // Lê do body (padrão: RESERVA_SUCESSO para compatibilidade)
   const VALID_TRIGGERS = ['RESERVA_SUCESSO', 'CANCELAMENTO', 'RESERVA_SOB_SOLICITACAO'];
-  let body2: any = {};
-  try { body2 = await req.clone().json().catch(() => ({})); } catch {}
-  const requestedTrigger: string = (body2?.trigger || 'RESERVA_SUCESSO').toUpperCase();
   const trigger = VALID_TRIGGERS.includes(requestedTrigger) ? requestedTrigger : 'RESERVA_SUCESSO';
 
   const { sendTransactionalEmail } = await import('@/lib/emailService');
