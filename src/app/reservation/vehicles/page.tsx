@@ -1411,50 +1411,86 @@ function VehiclesContent() {
       </header>
 
       {/* Stepper */}
-      <div className="bg-white border-b border-gray-200 py-4">
-        <div className="max-w-7xl mx-auto px-4 flex gap-2 md:gap-4 overflow-x-auto scroll-x-mobile pb-2 md:pb-0">
-          {/* Step 1 */}
-          <div className="min-w-[120px] md:min-w-0 flex-1 bg-white border border-gray-200 rounded p-2 md:p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="bg-[#008d36] text-white font-bold text-[10px] md:text-xs w-4 h-4 md:w-5 md:h-5 flex items-center justify-center rounded-sm">1</span>
-              <span className="text-[9px] md:text-[11px] font-bold text-gray-500 uppercase">LOCAL</span>
-            </div>
-            <div className="flex justify-between text-[10px] md:text-xs">
-              <div>
-                <div className="font-bold text-gray-900 uppercase text-[10px]">Retirada</div>
-                <div className="font-bold truncate max-w-[130px]">{stationName || pickupStation}</div>
-                <div className="text-gray-500">{formatDate(pickupDate)}</div>
+      <div className="bg-white border-b border-gray-200 py-2 md:py-4">
+        <div className="max-w-7xl mx-auto px-3 md:px-4">
+          {/* Mobile: compact horizontal stepper */}
+          <div className="flex md:hidden items-center gap-1 mb-2">
+            {[{ n: 1, label: 'LOCAL', active: true }, { n: 2, label: 'VEÍCULO', active: currentStep >= 2 }, { n: 3, label: 'EXTRAS', active: currentStep >= 3 }, { n: 4, label: 'REVISAR', active: false }].map((s, i) => (
+              <div key={s.n} className="flex items-center gap-1 flex-1">
+                <span className={`${s.active ? 'bg-[#008d36] text-white' : 'bg-gray-200 text-gray-500'} font-bold text-[9px] w-4 h-4 flex items-center justify-center rounded-sm shrink-0`}>{s.n}</span>
+                <span className={`text-[8px] font-bold uppercase ${s.active ? 'text-[#008d36]' : 'text-gray-400'}`}>{s.label}</span>
+                {i < 3 && <div className="flex-1 h-px bg-gray-200 mx-1" />}
               </div>
-              <div>
-                <div className="font-bold text-gray-900 uppercase text-[10px]">Devolução</div>
-                <div className={`font-bold truncate max-w-[130px] ${isOneWay ? 'text-[#e67e00]' : ''}`}>{isOneWay ? (returnStationName || returnStation) : (stationName || pickupStation)}</div>
-                <div className="text-gray-500">{formatDate(returnDate)}</div>
+            ))}
+          </div>
+          {/* Mobile: show only current step details */}
+          <div className="md:hidden bg-gray-50 rounded-lg p-3 text-[10px]">
+            {currentStep <= 2 ? (
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <div className="font-bold text-gray-400 uppercase text-[9px]">Retirada</div>
+                  <div className="font-bold text-gray-900 truncate">{stationName || pickupStation}</div>
+                  <div className="text-gray-500">{formatDate(pickupDate)}</div>
+                </div>
+                <div className="flex-1">
+                  <div className="font-bold text-gray-400 uppercase text-[9px]">Devolução</div>
+                  <div className={`font-bold truncate ${isOneWay ? 'text-[#e67e00]' : 'text-gray-900'}`}>{isOneWay ? (returnStationName || returnStation) : (stationName || pickupStation)}</div>
+                  <div className="text-gray-500">{formatDate(returnDate)}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-[#008d36] font-bold">✓ {selectedCar?.carCategorySample || selectedCar?.carCategoryName || ''}</span>
+                <span className="text-gray-400">·</span>
+                <span className="text-gray-500 truncate">{stationName || pickupStation}</span>
+              </div>
+            )}
+          </div>
+          {/* Desktop: full stepper */}
+          <div className="hidden md:flex gap-4">
+            {/* Step 1 */}
+            <div className="flex-1 bg-white border border-gray-200 rounded p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="bg-[#008d36] text-white font-bold text-xs w-5 h-5 flex items-center justify-center rounded-sm">1</span>
+                <span className="text-[11px] font-bold text-gray-500 uppercase">LOCAL</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <div>
+                  <div className="font-bold text-gray-900 uppercase text-[10px]">Retirada</div>
+                  <div className="font-bold truncate max-w-[130px]">{stationName || pickupStation}</div>
+                  <div className="text-gray-500">{formatDate(pickupDate)}</div>
+                </div>
+                <div>
+                  <div className="font-bold text-gray-900 uppercase text-[10px]">Devolução</div>
+                  <div className={`font-bold truncate max-w-[130px] ${isOneWay ? 'text-[#e67e00]' : ''}`}>{isOneWay ? (returnStationName || returnStation) : (stationName || pickupStation)}</div>
+                  <div className="text-gray-500">{formatDate(returnDate)}</div>
+                </div>
               </div>
             </div>
-          </div>
-          {/* Step 2 */}
-          <div className={`min-w-[100px] md:min-w-0 flex-1 bg-white border-2 ${currentStep === 2 ? "border-[#008d36]" : "border-gray-200"} rounded p-2 md:p-4 relative`}>
-            <div className="absolute -top-3 left-4 bg-white px-2 flex items-center gap-2">
-              <span className="bg-[#008d36] text-white font-bold text-xs w-5 h-5 flex items-center justify-center rounded-sm">2</span>
-              <span className="text-[11px] font-bold text-[#008d36] uppercase">VEÍCULO</span>
+            {/* Step 2 */}
+            <div className={`flex-1 bg-white border-2 ${currentStep === 2 ? "border-[#008d36]" : "border-gray-200"} rounded p-4 relative`}>
+              <div className="absolute -top-3 left-4 bg-white px-2 flex items-center gap-2">
+                <span className="bg-[#008d36] text-white font-bold text-xs w-5 h-5 flex items-center justify-center rounded-sm">2</span>
+                <span className="text-[11px] font-bold text-[#008d36] uppercase">VEÍCULO</span>
+              </div>
+              <p className="text-[13px] text-gray-500 mt-2">
+                {selectedCar ? `${selectedCar.carCategorySample || carCategoryOverrides[selectedCar.carCategoryCode] || selectedCar.carCategoryName || selectedCar.carCategoryCode} ✓` : "Selecione um veículo abaixo."}
+              </p>
             </div>
-            <p className="text-[13px] text-gray-500 mt-2">
-              {selectedCar ? `${selectedCar.carCategorySample || carCategoryOverrides[selectedCar.carCategoryCode] || selectedCar.carCategoryName || selectedCar.carCategoryCode} ✓` : "Selecione um veículo abaixo."}
-            </p>
-          </div>
-          {/* Step 3 */}
-          <div className={`min-w-[100px] md:min-w-0 flex-1 bg-white border-2 ${currentStep === 3 ? "border-[#008d36]" : "border-gray-200"} rounded p-2 md:p-4 relative`}>
-            <div className="absolute -top-3 left-4 bg-white px-2 flex items-center gap-2">
-              <span className={`${currentStep === 3 ? "bg-[#008d36] text-white" : "bg-gray-200 text-gray-500"} font-bold text-xs w-5 h-5 flex items-center justify-center rounded-sm`}>3</span>
-              <span className={`text-[11px] font-bold ${currentStep === 3 ? "text-[#008d36]" : "text-gray-400"} uppercase`}>PROTEÇÃO, EXTRAS</span>
+            {/* Step 3 */}
+            <div className={`flex-1 bg-white border-2 ${currentStep === 3 ? "border-[#008d36]" : "border-gray-200"} rounded p-4 relative`}>
+              <div className="absolute -top-3 left-4 bg-white px-2 flex items-center gap-2">
+                <span className={`${currentStep === 3 ? "bg-[#008d36] text-white" : "bg-gray-200 text-gray-500"} font-bold text-xs w-5 h-5 flex items-center justify-center rounded-sm`}>3</span>
+                <span className={`text-[11px] font-bold ${currentStep === 3 ? "text-[#008d36]" : "text-gray-400"} uppercase`}>PROTEÇÃO, EXTRAS</span>
+              </div>
+              <p className="text-[13px] text-gray-500 mt-2">{currentStep === 3 ? "Escolha extras opcionais." : "Disponível após selecionar veículo."}</p>
             </div>
-            <p className="text-[13px] text-gray-500 mt-2">{currentStep === 3 ? "Escolha extras opcionais." : "Disponível após selecionar veículo."}</p>
-          </div>
-          {/* Step 4 */}
-          <div className="min-w-[80px] md:min-w-0 flex-1 bg-white border border-gray-200 rounded p-2 md:p-4">
-            <div className="flex items-center gap-2">
-              <span className="bg-gray-200 text-gray-500 font-bold text-xs w-5 h-5 flex items-center justify-center rounded-sm">4</span>
-              <span className="text-[11px] font-bold text-gray-400 uppercase">REVISAR</span>
+            {/* Step 4 */}
+            <div className="flex-1 bg-white border border-gray-200 rounded p-4">
+              <div className="flex items-center gap-2">
+                <span className="bg-gray-200 text-gray-500 font-bold text-xs w-5 h-5 flex items-center justify-center rounded-sm">4</span>
+                <span className="text-[11px] font-bold text-gray-400 uppercase">REVISAR</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1936,63 +1972,58 @@ function VehiclesContent() {
             /* Step 3 */
             <div className="bg-white rounded border border-gray-200 relative">
               {/* Step 3 Header bar */}
-              <div className="border-b border-gray-200 p-6 flex items-center justify-between gap-6">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <button onClick={() => { setCurrentStep(2); setEquipmentPrices({}); setXrsEquipment([]); setQuoteInsurances([]); setQuoteMileage(null); setQuoteTotals(null); setSelectedEquipmentMap({}); }} className="text-[#008d36] font-bold hover:underline text-sm">← Voltar</button>
-                  </div>
-                  <h2 className="text-2xl font-black text-gray-900">Escolha sua proteção e seus extras</h2>
+              <div className="border-b border-gray-200 p-4 md:p-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <button onClick={() => { setCurrentStep(2); setEquipmentPrices({}); setXrsEquipment([]); setQuoteInsurances([]); setQuoteMileage(null); setQuoteTotals(null); setSelectedEquipmentMap({}); }} className="text-[#008d36] font-bold hover:underline text-sm">← Voltar</button>
                 </div>
-                <div className="text-right shrink-0">
-                  <div className="text-xs text-gray-500 uppercase font-bold">TOTAL</div>
-                  <div className="text-3xl font-black text-gray-900">
-                    R$ {fmtPrice(
-                      (parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || selectedCar?.totalRateEstimate || "0")) +
-                      (selectedExtrasPricePerDay * bookingDurationDays)
-                    )}
+                <h2 className="text-lg md:text-2xl font-black text-gray-900 mb-3">Escolha sua proteção e seus extras</h2>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] md:text-xs text-gray-500 uppercase font-bold">TOTAL</div>
+                    <div className="text-xl md:text-3xl font-black text-gray-900">
+                      R$ {fmtPrice(
+                        (parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || selectedCar?.totalRateEstimate || "0")) +
+                        (selectedExtrasPricePerDay * bookingDurationDays)
+                      )}
+                    </div>
                   </div>
+                  <button
+                    onClick={() => {
+                      const selectedInsuranceCodes = Object.keys(selectedExtrasMap).filter(k => selectedExtrasMap[k] > 0);
+                      const xrsEquipmentPayload = Object.entries(selectedEquipmentMap).filter(([, qty]) => qty > 0).map(([code, qty]) => {
+                        const ep = equipmentPrices[code];
+                        const meta = xrsEquipment.find((e: any) => e.code === code);
+                        return { code, qty, name: meta?.name || code, icon: meta?.icon || '📦', price: ep?.price || 0, priceBRL: ep?.priceBRL || 0, totalBRL: ep?.totalBRL || 0, currency: ep?.currency || 'EUR' };
+                      });
+                      const xrsInsurancesPayload = selectedInsuranceCodes.map(code => {
+                        const qi = quoteInsurances.find((i: any) => i.code === code);
+                        const insNamesPT: Record<string, string> = { WWI: 'Proteção de para-brisas, vidros, faróis e pneus', THW: 'Proteção contra Roubo (THW)', STHW: 'Super Proteção contra Roubo', SPTHW: 'Proteção Total contra Roubo', SPCDW: 'Proteção Total contra Danos e Acidentes', SCDW: 'Super Proteção contra Danos', RSA: 'Assistência na estrada 24h', PREMPRE: 'Proteção Plus', PREMPLUS: 'Proteção Premium Plus', PREMIUM: 'Proteção Premium', PAI: 'Proteção para acidentes pessoais', MEDIUM: 'Proteção Média', INTERIOR: 'Cobertura de danos ao interior', AWC: 'Cobertura de estradas não pavimentadas', CDW: 'Proteção contra Danos por Colisão', LDW: 'Proteção Básica', TPL: 'Responsabilidade Civil', ECOLOGIC: 'Contribuição Ambiental', PEP: 'Proteção de Efeitos Pessoais', APP: 'Proteção de Aparência', LAF: 'Taxas e Impostos (Road Tax & License Fees)', HS: 'Adicional de Alta Temporada', HB: 'Seguro de Alto Risco', FP: 'Proteção contra Combustível', XCU: 'Proteção Estendida', RELOC: 'Taxa de Relocalização', YS: 'Sobretaxa Jovem Condutor', YOUNGDRI: 'Seguro Jovem Condutor', ONEWAY: 'Taxa de Viagem de Ida', DELIVER: 'Taxa de Entrega', COLLECT: 'Taxa de Coleta', REGFEE: 'Taxa Regulatória', AIRPORTFEE: 'Taxa de Aeroporto', CITYFEE: 'Taxa Municipal', NIGHTFEE: 'Taxa Fora de Horário', HOLIDAYFEE: 'Taxa de Feriado', ADMINFEE: 'Taxa Administrativa', SAFERETURN: 'Retorno Seguro' };
+                        return { code, name: insNamesPT[code] || qi?.descr || code, price: qi?.rentalPriceAI || 0, priceBRL: qi?.rentalPriceInBookingCurrencyAI || 0 };
+                      });
+                      const cidForTariff = selectedTariffType === 'ETO'
+                        ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
+                        : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID);
+                      const enrichedCar = { ...selectedCar, ...quoteTotals };
+                      const payload = { car: enrichedCar, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit };
+                      sessionStorage.setItem("europcar_booking", JSON.stringify(payload));
+                      try {
+                        const sessionId = sessionStorage.getItem("europcar_journey_session");
+                        if (sessionId) {
+                          const extraNames = [...xrsEquipmentPayload.map((e: any) => e.name), ...xrsInsurancesPayload.map((e: any) => e.name)];
+                          fetch("/api/journey/track", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ sessionId, step: 3, selectedExtras: extraNames.length > 0 ? extraNames : null }),
+                          }).catch(() => {});
+                        }
+                      } catch {}
+                      window.location.href = "/checkout";
+                    }}
+                    className="bg-[#008d36] hover:bg-[#007530] text-white font-black py-3 px-4 md:px-6 rounded text-xs md:text-sm whitespace-nowrap"
+                  >
+                    Ir para revisão →
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    const selectedInsuranceCodes = Object.keys(selectedExtrasMap).filter(k => selectedExtrasMap[k] > 0);
-                    const xrsEquipmentPayload = Object.entries(selectedEquipmentMap).filter(([, qty]) => qty > 0).map(([code, qty]) => {
-                      const ep = equipmentPrices[code];
-                      const meta = xrsEquipment.find((e: any) => e.code === code);
-                      return { code, qty, name: meta?.name || code, icon: meta?.icon || '📦', price: ep?.price || 0, priceBRL: ep?.priceBRL || 0, totalBRL: ep?.totalBRL || 0, currency: ep?.currency || 'EUR' };
-                    });
-                    const xrsInsurancesPayload = selectedInsuranceCodes.map(code => {
-                      const qi = quoteInsurances.find((i: any) => i.code === code);
-                      const insNamesPT: Record<string, string> = { WWI: 'Proteção de para-brisas, vidros, faróis e pneus', THW: 'Proteção contra Roubo (THW)', STHW: 'Super Proteção contra Roubo', SPTHW: 'Proteção Total contra Roubo', SPCDW: 'Proteção Total contra Danos e Acidentes', SCDW: 'Super Proteção contra Danos', RSA: 'Assistência na estrada 24h', PREMPRE: 'Proteção Plus', PREMPLUS: 'Proteção Premium Plus', PREMIUM: 'Proteção Premium', PAI: 'Proteção para acidentes pessoais', MEDIUM: 'Proteção Média', INTERIOR: 'Cobertura de danos ao interior', AWC: 'Cobertura de estradas não pavimentadas', CDW: 'Proteção contra Danos por Colisão', LDW: 'Proteção Básica', TPL: 'Responsabilidade Civil', ECOLOGIC: 'Contribuição Ambiental', PEP: 'Proteção de Efeitos Pessoais', APP: 'Proteção de Aparência', LAF: 'Taxas e Impostos (Road Tax & License Fees)', HS: 'Adicional de Alta Temporada', HB: 'Seguro de Alto Risco', FP: 'Proteção contra Combustível', XCU: 'Proteção Estendida', RELOC: 'Taxa de Relocalização', YS: 'Sobretaxa Jovem Condutor', YOUNGDRI: 'Seguro Jovem Condutor', ONEWAY: 'Taxa de Viagem de Ida', DELIVER: 'Taxa de Entrega', COLLECT: 'Taxa de Coleta', REGFEE: 'Taxa Regulatória', AIRPORTFEE: 'Taxa de Aeroporto', CITYFEE: 'Taxa Municipal', NIGHTFEE: 'Taxa Fora de Horário', HOLIDAYFEE: 'Taxa de Feriado', ADMINFEE: 'Taxa Administrativa', SAFERETURN: 'Retorno Seguro' };
-                      return { code, name: insNamesPT[code] || qi?.descr || code, price: qi?.rentalPriceAI || 0, priceBRL: qi?.rentalPriceInBookingCurrencyAI || 0 };
-                    });
-                    const cidForTariff = selectedTariffType === 'ETO'
-                      ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
-                      : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID);
-                    const enrichedCar = { ...selectedCar, ...quoteTotals };
-                    const payload = { car: enrichedCar, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit };
-                    sessionStorage.setItem("europcar_booking", JSON.stringify(payload));
-                    // Journey tracking — Step 3: Extras selected, going to checkout
-                    try {
-                      const sessionId = sessionStorage.getItem("europcar_journey_session");
-                      if (sessionId) {
-                        const extraNames = [...xrsEquipmentPayload.map((e: any) => e.name), ...xrsInsurancesPayload.map((e: any) => e.name)];
-                        fetch("/api/journey/track", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            sessionId,
-                            step: 3,
-                            selectedExtras: extraNames.length > 0 ? extraNames : null,
-                          }),
-                        }).catch(() => {});
-                      }
-                    } catch {}
-                    window.location.href = "/checkout";
-                  }}
-                  className="bg-[#008d36] hover:bg-[#007530] text-white font-black py-3 px-6 rounded shrink-0 text-sm"
-                >
-                  Ir para revisão e check-out →
-                </button>
               </div>
 
               <div className="p-8">
@@ -2096,19 +2127,19 @@ function VehiclesContent() {
                     const upgradeBRL = zeroBRL - currentBRL;
                     if (upgradeCost <= 0) return null;
                     return (
-                      <div className={`border-2 rounded-xl p-6 mb-8 transition-all ${zeroExcessUpgrade ? 'border-[#008d36] bg-green-50 shadow-lg shadow-green-100' : 'border-[#e67e00] bg-gradient-to-r from-orange-50 to-amber-50 hover:shadow-md'}`}>
-                        <div className="flex items-start gap-5">
-                          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#e67e00] to-[#ff9800] flex items-center justify-center text-white text-2xl shrink-0 shadow-lg">🛡️</div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-black text-gray-900 text-lg">Proteção Premium — Franquia Zero</h3>
+                      <div className={`border-2 rounded-xl p-4 md:p-6 mb-8 transition-all ${zeroExcessUpgrade ? 'border-[#008d36] bg-green-50 shadow-lg shadow-green-100' : 'border-[#e67e00] bg-gradient-to-r from-orange-50 to-amber-50 hover:shadow-md'}`}>
+                        <div className="flex flex-col md:flex-row items-start gap-3 md:gap-5">
+                          <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-[#e67e00] to-[#ff9800] flex items-center justify-center text-white text-xl md:text-2xl shrink-0 shadow-lg">🛡️</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <h3 className="font-black text-gray-900 text-base md:text-lg">Proteção Premium — Franquia Zero</h3>
                               <span className="text-[9px] bg-[#e67e00] text-white px-2 py-0.5 rounded-full font-black uppercase">Recomendado</span>
                             </div>
-                            <p className="text-sm text-gray-600 mb-3">Elimine completamente a franquia em caso de dano ou roubo. Viaje com tranquilidade total — você não paga <strong>nenhum valor adicional</strong> em caso de sinistro.</p>
-                            <div className="flex items-center gap-6">
+                            <p className="text-xs md:text-sm text-gray-600 mb-3">Elimine completamente a franquia em caso de dano ou roubo. Viaje com tranquilidade total — você não paga <strong>nenhum valor adicional</strong> em caso de sinistro.</p>
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 md:gap-6">
                               <div>
                                 <span className="text-[10px] text-gray-400 uppercase font-bold block">Upgrade por apenas</span>
-                                <span className="text-2xl font-black text-[#e67e00]">+ {currency} {fmtPrice(upgradeCost)}</span>
+                                <span className="text-xl md:text-2xl font-black text-[#e67e00]">+ {currency} {fmtPrice(upgradeCost)}</span>
                                 {upgradeBRL > 0 && <span className="text-xs text-gray-500 ml-2">(+ R$ {fmtPrice(upgradeBRL)})</span>}
                               </div>
                               <button
@@ -2119,7 +2150,6 @@ function VehiclesContent() {
                                     setSelectedCar((prev: any) => ({
                                       ...prev,
                                       ...etoZeroCar,
-                                      // Store margin-adjusted prices so totals downstream are consistent
                                       totalRateEstimate: zeroTotal.toFixed(2),
                                       totalRateEstimateInBookingCurrency: zeroBRL.toFixed(2),
                                       optionalInsurances: prev?.optionalInsurances,
@@ -2128,13 +2158,13 @@ function VehiclesContent() {
                                     }));
                                   }
                                 }}
-                                className={`font-bold py-3 px-8 rounded-lg text-sm transition-all ${zeroExcessUpgrade ? 'bg-[#008d36] text-white shadow-lg' : 'bg-[#e67e00] hover:bg-[#cc6f00] text-white shadow-lg shadow-[#e67e00]/25'}`}
+                                className={`font-bold py-3 px-6 md:px-8 rounded-lg text-sm transition-all w-full sm:w-auto text-center ${zeroExcessUpgrade ? 'bg-[#008d36] text-white shadow-lg' : 'bg-[#e67e00] hover:bg-[#cc6f00] text-white shadow-lg shadow-[#e67e00]/25'}`}
                               >
                                 {zeroExcessUpgrade ? '✓ Adicionado' : 'Adicionar Proteção'}
                               </button>
                             </div>
                             {zeroExcessUpgrade && (
-                              <div className="mt-3 text-sm text-[#008d36] font-bold flex items-center gap-2">
+                              <div className="mt-3 text-xs md:text-sm text-[#008d36] font-bold flex flex-wrap items-center gap-2">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                                 Franquia zero ativada! Novo total: {currency} {fmtPrice(zeroTotal)}
                                 {zeroBRL > 0 && <span className="text-gray-500 font-normal">(R$ {fmtPrice(zeroBRL)})</span>}
