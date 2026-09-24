@@ -49,7 +49,7 @@ export async function GET(req: Request) {
         const car = booking.car || {};
         const fmtDate = (d: string) => d && d.length >= 8 ? `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}` : d || '';
         if (isConfirmed) {
-          await prisma.localReservation.update({ where: { id: reserva.id }, data: { status: 'CONFIRMED_NON_PREPAID' } });
+          await prisma.localReservation.update({ where: { id: reserva.id }, data: { status: 'CONFIRMED_NON_PREPAID', operationalStatus: 'CF' } });
           const totalBRL = reserva.amountInCents ? reserva.amountInCents / 100 : 0;
           const cv = buildEmailCurrencyVars(totalBRL, booking.pickupStation, parseFloat(car.exchangeRate||'1'), car.currency||'BRL');
           const { sendTransactionalEmail } = await import('@/lib/emailService');
@@ -70,7 +70,7 @@ export async function GET(req: Request) {
               { callerCode: xrsConfig.callerCode, password: xrsConfig.password, action: 'cancelReservation', sourceFile: 'cron/sync-on-request' }
             );
           } catch(e) { console.error('[sync-on-request] cancel XRS falhou:', e); }
-          await prisma.localReservation.update({ where: { id: reserva.id }, data: { status: 'ON_REQUEST_REJECTED' } });
+          await prisma.localReservation.update({ where: { id: reserva.id }, data: { status: 'ON_REQUEST_REJECTED', operationalStatus: 'CC' } });
           const { sendTransactionalEmail } = await import('@/lib/emailService');
           await sendTransactionalEmail(parsedData.email, 'RESERVA_REJEITADA', {
             NOME: parsedData.nome||'', SOBRENOME: parsedData.sobrenome||'', EMAIL: parsedData.email||'',

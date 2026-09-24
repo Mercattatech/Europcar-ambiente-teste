@@ -8,6 +8,8 @@ const PAYMENT_STATUS_OPTIONS = [
    { value: "CONFIRMED_PREPAID", label: "Pago Online", color: "bg-green-500/20 text-green-400" },
    { value: "PENDING_PIX", label: "PIX Pendente", color: "bg-yellow-500/20 text-yellow-400" },
    { value: "CONFIRMED_NON_PREPAID", label: "Pagar no Balcão", color: "bg-blue-500/20 text-blue-400" },
+   { value: "ON_REQUEST", label: "⏳ Sob Consulta", color: "bg-amber-500/20 text-amber-400" },
+   { value: "ON_REQUEST_REJECTED", label: "❌ Recusada (OR)", color: "bg-orange-500/20 text-orange-400" },
    { value: "CANCELLED", label: "Cancelada", color: "bg-red-500/20 text-red-400" },
 ];
 
@@ -15,12 +17,16 @@ const STATUS_COLORS: Record<string, string> = {
    "CONFIRMED_PREPAID": "bg-green-500/20 text-green-400 border-green-600/30",
    "PENDING_PIX": "bg-yellow-500/20 text-yellow-400 border-yellow-600/30",
    "CONFIRMED_NON_PREPAID": "bg-blue-500/20 text-blue-300 border-blue-600/30",
+   "ON_REQUEST": "bg-amber-500/20 text-amber-400 border-amber-600/30",
+   "ON_REQUEST_REJECTED": "bg-orange-500/20 text-orange-400 border-orange-600/30",
    "CANCELLED": "bg-red-500/20 text-red-400 border-red-600/30",
 };
 const STATUS_LABELS: Record<string, string> = {
    "CONFIRMED_PREPAID": "Pago Online (Cielo)",
    "PENDING_PIX": "PIX Aguardando",
    "CONFIRMED_NON_PREPAID": "Pagar no Balcão",
+   "ON_REQUEST": "⏳ Sob Consulta",
+   "ON_REQUEST_REJECTED": "❌ Recusada (OR)",
    "CANCELLED": "Cancelada / Erro",
 };
 
