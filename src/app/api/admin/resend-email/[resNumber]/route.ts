@@ -230,34 +230,58 @@ export async function POST(
     LISTA_EXTRAS:      listaExtras,
   };
 
-  // ── Envia usando o template cadastrado no painel (RESERVA_SUCESSO) ──
+  // ── Determina qual trigger/template usar ──
+  // Lê do body (padrão: RESERVA_SUCESSO para compatibilidade)
+  const VALID_TRIGGERS = ['RESERVA_SUCESSO', 'CANCELAMENTO', 'RESERVA_SOB_SOLICITACAO'];
+  let body2: any = {};
+  try { body2 = await req.clone().json().catch(() => ({})); } catch {}
+  const requestedTrigger: string = (body2?.trigger || 'RESERVA_SUCESSO').toUpperCase();
+  const trigger = VALID_TRIGGERS.includes(requestedTrigger) ? requestedTrigger : 'RESERVA_SUCESSO';
+
   const { sendTransactionalEmail } = await import('@/lib/emailService');
-  const result = await sendTransactionalEmail(toEmail, 'RESERVA_SUCESSO', emailVars);
+  const result = await sendTransactionalEmail(toEmail, trigger, emailVars);
 
   if (!result.success && result.error === 'Template não encontrado') {
     // Fallback: template não cadastrado → usa template hardcoded
-    console.warn('[resend-email] Template RESERVA_SUCESSO não encontrado — usando fallback hardcoded.');
-    const { sendBookingConfirmation } = await import('@/lib/email/sendBookingConfirmation');
-    await sendBookingConfirmation({
-      toEmail,
-      customerName: `${cd?.nome || ''} ${cd?.sobrenome || ''}`.trim(),
-      resNumber:    finalResNumber,
-      carName:      car?.carCategoryName || car?.carCategorySample || '',
-      pickupStation: booking?.pickupStation || '',
-      returnStation: booking?.returnStation || booking?.pickupStation || '',
-      pickupDate:   booking?.pickupDate || '',
-      returnDate:   booking?.returnDate || '',
-      paymentMethod,
-      totalBRL:     amountBRL,
-      isOnRequest:  reservation.operationalStatus === 'R',
-      xrsEquipment: xrsEquipment,
-      extras:       extrasArr,
-    });
+    if (trigger === 'CANCELAMENTO') {
+      console.warn('[resend-email] Template CANCELAMENTO não encontrado — usando fallback hardcoded.');
+      const { sendCancellationEmail } = await import('@/lib/email/sendCancellationEmail');
+      await sendCancellationEmail({
+        toEmail,
+        customerName: `${cd?.nome || ''} ${cd?.sobrenome || ''}`.trim(),
+        resNumber:    finalResNumber,
+        carName:      car?.carCategoryName || car?.carCategorySample || '',
+        pickupStation: booking?.pickupStation || '',
+        returnStation: booking?.returnStation || booking?.pickupStation || '',
+        pickupDate:   booking?.pickupDate || '',
+        returnDate:   booking?.returnDate || '',
+        paymentMethod,
+        totalBRL:     amountBRL,
+      });
+    } else {
+      console.warn(`[resend-email] Template ${trigger} não encontrado — usando fallback hardcoded.`);
+      const { sendBookingConfirmation } = await import('@/lib/email/sendBookingConfirmation');
+      await sendBookingConfirmation({
+        toEmail,
+        customerName: `${cd?.nome || ''} ${cd?.sobrenome || ''}`.trim(),
+        resNumber:    finalResNumber,
+        carName:      car?.carCategoryName || car?.carCategorySample || '',
+        pickupStation: booking?.pickupStation || '',
+        returnStation: booking?.returnStation || booking?.pickupStation || '',
+        pickupDate:   booking?.pickupDate || '',
+        returnDate:   booking?.returnDate || '',
+        paymentMethod,
+        totalBRL:     amountBRL,
+        isOnRequest:  trigger === 'RESERVA_SOB_SOLICITACAO' || reservation.operationalStatus === 'R',
+        xrsEquipment: xrsEquipment,
+        extras:       extrasArr,
+      });
+    }
   }
 
   console.log(
     `[resend-email] E-mail reenviado para ${toEmail} | Reserva ${finalResNumber} | ` +
-    `Template: ${result.success ? 'painel (RESERVA_SUCESSO)' : 'fallback hardcoded'}`
+    `Trigger: ${trigger} | Template: ${result.success ? `painel (${trigger})` : 'fallback hardcoded'}`
   );
 
   return NextResponse.json({
@@ -266,7 +290,8 @@ export async function POST(
     resNumber:      finalResNumber,
     localeCurrency: finalCurrency,
     valorTotal,
-    template:       result.success ? 'RESERVA_SUCESSO' : 'FALLBACK',
+    trigger,
+    template:       result.success ? trigger : 'FALLBACK',
     provider:       'provider' in result ? result.provider : undefined,
   });
 }

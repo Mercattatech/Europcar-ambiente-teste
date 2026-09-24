@@ -85,6 +85,7 @@ export default function PainelReservas() {
    const [customAmount, setCustomAmount] = useState<string>('');
    const [loadingPreview, setLoadingPreview] = useState<string | null>(null);
    const [resendingCancelEmail, setResendingCancelEmail] = useState<string | null>(null);
+   const [emailDropdown, setEmailDropdown] = useState<string | null>(null);
 
    const showToast = (message: string, type: "success" | "error" = "success") => {
       setToast({ message, type });
@@ -120,22 +121,28 @@ export default function PainelReservas() {
       }
    };
 
-   // Reenviar e-mail de cancelamento
-   const handleResendCancelEmail = async (resNumber: string) => {
+   // Reenviar e-mail com trigger específico
+   const handleResendWithTrigger = async (resNumber: string, trigger: string) => {
       const key = resNumber || '';
       if (!key) return;
-      if (!confirm('Deseja reenviar o e-mail de CANCELAMENTO para o cliente?')) return;
+      const triggerLabels: Record<string,string> = { RESERVA_SUCESSO: 'Confirmação', CANCELAMENTO: 'Cancelamento', RESERVA_SOB_SOLICITACAO: 'Sob Solicitação' };
+      if (!confirm(`Deseja reenviar o e-mail de "${triggerLabels[trigger] || trigger}" para o cliente?`)) return;
       setResendingCancelEmail(key);
+      setEmailDropdown(null);
       try {
-         const r = await fetch(`/api/admin/resend-cancel-email/${encodeURIComponent(key)}`, { method: 'POST' });
+         const r = await fetch(`/api/admin/resend-email/${encodeURIComponent(key)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trigger }),
+         });
          const data = await r.json();
          if (r.ok) {
-            showToast(`✅ E-mail de cancelamento reenviado para ${data.sentTo}`);
+            showToast(`✅ E-mail de ${triggerLabels[trigger]} reenviado para ${data.sentTo}`);
          } else {
             showToast(`❌ Erro: ${data.error || 'Falha ao reenviar'}`, 'error');
          }
       } catch {
-         showToast('❌ Erro de conexão ao reenviar e-mail de cancelamento', 'error');
+         showToast('❌ Erro de conexão ao reenviar e-mail', 'error');
       } finally {
          setResendingCancelEmail(null);
       }
@@ -817,12 +824,13 @@ export default function PainelReservas() {
                                           </svg>
                                        )}
                                     </button>
-                                    {/* Botão Reenviar E-mail de Cancelamento */}
+                                    {/* Dropdown Reenviar E-mail (3 opções) */}
+                                    <div className="relative">
                                        <button
-                                          onClick={() => handleResendCancelEmail(res.resNumber || res.merchantOrderId)}
+                                          onClick={() => setEmailDropdown(emailDropdown === res.id ? null : res.id)}
                                           disabled={resendingCancelEmail === (res.resNumber || res.merchantOrderId)}
-                                          className="p-1.5 rounded-lg bg-gray-800 hover:bg-red-900/50 text-gray-400 hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-wait"
-                                          title="Reenviar e-mail de cancelamento"
+                                          className="p-1.5 rounded-lg bg-gray-800 hover:bg-indigo-900/50 text-gray-400 hover:text-indigo-400 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                                          title="Reenviar e-mail"
                                        >
                                           {resendingCancelEmail === (res.resNumber || res.merchantOrderId) ? (
                                              <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -830,10 +838,24 @@ export default function PainelReservas() {
                                              </svg>
                                           ) : (
                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                              </svg>
                                           )}
                                        </button>
+                                       {emailDropdown === res.id && (
+                                          <div className="absolute right-0 top-8 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[200px]">
+                                             <button onClick={() => handleResendWithTrigger(res.resNumber || res.merchantOrderId, 'RESERVA_SUCESSO')} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-green-900/40 hover:text-green-400 flex items-center gap-2">
+                                                <span className="text-green-400">✉</span> Confirmação de Reserva
+                                             </button>
+                                             <button onClick={() => handleResendWithTrigger(res.resNumber || res.merchantOrderId, 'CANCELAMENTO')} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-red-900/40 hover:text-red-400 flex items-center gap-2">
+                                                <span className="text-red-400">✘</span> Reserva Cancelada
+                                             </button>
+                                             <button onClick={() => handleResendWithTrigger(res.resNumber || res.merchantOrderId, 'RESERVA_SOB_SOLICITACAO')} className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-amber-900/40 hover:text-amber-400 flex items-center gap-2">
+                                                <span className="text-amber-400">⏳</span> Sob Solicitação (On Request)
+                                             </button>
+                                          </div>
+                                       )}
+                                    </div>
                                     <button onClick={() => setExpandedRow(isExpanded ? null : res.id)} className="p-1.5 rounded-lg bg-gray-800 hover:bg-blue-900/50 text-gray-400 hover:text-blue-400 transition-colors" title="Detalhes do Cliente">
                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                     </button>
