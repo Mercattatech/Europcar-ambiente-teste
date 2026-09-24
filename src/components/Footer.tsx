@@ -143,6 +143,9 @@ export default function Footer() {
                 © {year} Europcar Brasil — Grupo Mercatta. Todos os direitos reservados.
               </p>
               <p className="text-[10px] text-gray-700 text-center">
+                Rental Line Locadora Ltda. · CNPJ 00.938.766/0001-11
+              </p>
+              <p className="text-[10px] text-gray-700 text-center">
                 Europcar™ é marca registrada do Europcar Groupe S.A.
               </p>
             </div>
