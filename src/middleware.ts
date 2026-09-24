@@ -49,7 +49,17 @@ export async function middleware(request: NextRequest) {
       console.error('Maintenance middleware error:', error);
    }
 
-   return NextResponse.next();
+   return addSecurityHeaders(NextResponse.next());
+}
+
+/** Adiciona headers de segurança a toda response */
+function addSecurityHeaders(response: NextResponse): NextResponse {
+   response.headers.set('X-Frame-Options', 'SAMEORIGIN');
+   response.headers.set('X-Content-Type-Options', 'nosniff');
+   response.headers.set('X-XSS-Protection', '1; mode=block');
+   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+   response.headers.delete('X-Powered-By');
+   return response;
 }
 
 export const config = {

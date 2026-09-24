@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { callXRS } from '@/lib/europcar/xrsClient';
+import { checkAdmin } from '@/lib/checkAdmin';
 export const dynamic = 'force-dynamic';
 
-// ENDPOINT TEMPORÁRIO DE DEBUG — remover após uso
+// ENDPOINT DE DEBUG — somente admin
 export async function GET(req: Request) {
+  if (!(await checkAdmin())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   const { searchParams } = new URL(req.url);
   const station = searchParams.get('station') || 'LIST01';
 

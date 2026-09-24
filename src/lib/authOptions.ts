@@ -31,8 +31,8 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!user) {
-            console.log("[AUTH] Usuário não encontrado no DB");
-            throw new Error("Usuário não encontrado.");
+            console.log("[AUTH] Falha de login");
+            throw new Error("Credenciais inválidas");
           }
 
           if ((user as any).status === "BLOCKED") {
@@ -43,21 +43,19 @@ export const authOptions: NextAuthOptions = {
           if (user.password) {
             const isCorrectPassword = await bcrypt.compare(credentials.password, user.password);
             if (!isCorrectPassword) {
-              console.log("[AUTH] Senha incorreta");
-              throw new Error("Senha incorreta");
+              console.log("[AUTH] Falha de login");
+              throw new Error("Credenciais inválidas");
             }
           } else {
-            console.log("[AUTH] Usuário sem senha cadastrada");
-            throw new Error("Usuário sem senha definida");
+             console.log("[AUTH] Falha de login");
+            throw new Error("Credenciais inválidas");
           }
 
           console.log("[AUTH] Login bem-sucedido para:", user.email);
           return user;
         } catch (error: any) {
-          if (error.message === "Usuário não encontrado." || 
-              error.message === "Sua conta foi bloqueada. Entre em contato com o suporte." || 
-              error.message === "Senha incorreta" || 
-              error.message === "Usuário sem senha definida") {
+          if (error.message === "Credenciais inválidas" || 
+              error.message === "Sua conta foi bloqueada. Entre em contato com o suporte.") {
             throw error;
           }
           console.error("[AUTH] Erro no banco de dados durante authorize:", error.message);
