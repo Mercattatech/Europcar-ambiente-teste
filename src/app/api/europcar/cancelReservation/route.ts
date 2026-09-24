@@ -57,7 +57,7 @@ export async function POST(request: Request) {
                 }
                 const valorTotal = localCur === 'BRL' ? valorLocal : `${valorLocal} (≈ ${valorBRL})`;
                 const fmtPag: Record<string,string> = { BALCAO:'Pagamento no Balcão', PIX:'PIX', CREDIT:'Cartão de Crédito', VOUCHER:'Voucher ETO (Faturado)' };
-                await sendTransactionalEmail(cd.email, 'CANCELAMENTO', {
+                const cancelResult = await sendTransactionalEmail(cd.email, 'CANCELAMENTO', {
                    NOME: cd.nome || '',
                    SOBRENOME: cd.sobrenome || '',
                    EMAIL: cd.email || '',
@@ -77,6 +77,16 @@ export async function POST(request: Request) {
                    MOEDA: localCur,
                    FORMA_PAGAMENTO: fmtPag[cd.paymentMethod || ''] || cd.paymentMethod || '',
                 });
+                if (!cancelResult.success && cancelResult.error === 'Template não encontrado') {
+                  const { sendCancellationEmail } = await import('@/lib/email/sendCancellationEmail');
+                  await sendCancellationEmail({
+                    toEmail: cd.email, customerName: `${cd.nome||''} ${cd.sobrenome||''}`.trim(),
+                    resNumber, carName: car.carCategoryName || car.carCategorySample || '',
+                    pickupStation: booking.pickupStation || '', returnStation: booking.returnStation || booking.pickupStation || '',
+                    pickupDate: booking.pickupDate || '', returnDate: booking.returnDate || '',
+                    paymentMethod: cd.paymentMethod || '', totalBRL: amtBRL,
+                  });
+                }
              }
           }
         } catch (dbErr) {}
@@ -124,7 +134,7 @@ export async function POST(request: Request) {
               }
               const valorTotal = localCur === 'BRL' ? valorLocal : `${valorLocal} (≈ ${valorBRL})`;
               const fmtPag: Record<string,string> = { BALCAO:'Pagamento no Balcão', PIX:'PIX', CREDIT:'Cartão de Crédito', VOUCHER:'Voucher ETO (Faturado)' };
-              await sendTransactionalEmail(cd.email, 'CANCELAMENTO', {
+              const cancelResult2 = await sendTransactionalEmail(cd.email, 'CANCELAMENTO', {
                  NOME: cd.nome || '',
                  SOBRENOME: cd.sobrenome || '',
                  EMAIL: cd.email || '',
@@ -144,6 +154,16 @@ export async function POST(request: Request) {
                  MOEDA: localCur,
                  FORMA_PAGAMENTO: fmtPag[cd.paymentMethod || ''] || cd.paymentMethod || '',
               });
+              if (!cancelResult2.success && cancelResult2.error === 'Template não encontrado') {
+                const { sendCancellationEmail } = await import('@/lib/email/sendCancellationEmail');
+                await sendCancellationEmail({
+                  toEmail: cd.email, customerName: `${cd.nome||''} ${cd.sobrenome||''}`.trim(),
+                  resNumber, carName: car.carCategoryName || car.carCategorySample || '',
+                  pickupStation: booking.pickupStation || '', returnStation: booking.returnStation || booking.pickupStation || '',
+                  pickupDate: booking.pickupDate || '', returnDate: booking.returnDate || '',
+                  paymentMethod: cd.paymentMethod || '', totalBRL: amtBRL,
+                });
+              }
            }
         }
       } catch (dbErr) {

@@ -84,6 +84,7 @@ export default function PainelReservas() {
    const [selectedCurrency, setSelectedCurrency] = useState<string>('BRL');
    const [customAmount, setCustomAmount] = useState<string>('');
    const [loadingPreview, setLoadingPreview] = useState<string | null>(null);
+   const [resendingCancelEmail, setResendingCancelEmail] = useState<string | null>(null);
 
    const showToast = (message: string, type: "success" | "error" = "success") => {
       setToast({ message, type });
@@ -116,6 +117,27 @@ export default function PainelReservas() {
          showToast('❌ Erro de conexão ao carregar preview', 'error');
       } finally {
          setLoadingPreview(null);
+      }
+   };
+
+   // Reenviar e-mail de cancelamento
+   const handleResendCancelEmail = async (resNumber: string) => {
+      const key = resNumber || '';
+      if (!key) return;
+      if (!confirm('Deseja reenviar o e-mail de CANCELAMENTO para o cliente?')) return;
+      setResendingCancelEmail(key);
+      try {
+         const r = await fetch(`/api/admin/resend-cancel-email/${encodeURIComponent(key)}`, { method: 'POST' });
+         const data = await r.json();
+         if (r.ok) {
+            showToast(`✅ E-mail de cancelamento reenviado para ${data.sentTo}`);
+         } else {
+            showToast(`❌ Erro: ${data.error || 'Falha ao reenviar'}`, 'error');
+         }
+      } catch {
+         showToast('❌ Erro de conexão ao reenviar e-mail de cancelamento', 'error');
+      } finally {
+         setResendingCancelEmail(null);
       }
    };
 
@@ -795,6 +817,25 @@ export default function PainelReservas() {
                                           </svg>
                                        )}
                                     </button>
+                                    {/* Botão Reenviar E-mail de Cancelamento */}
+                                    {(res.status === 'CANCELLED' || res.status === 'ON_REQUEST_REJECTED') && (
+                                       <button
+                                          onClick={() => handleResendCancelEmail(res.resNumber || res.merchantOrderId)}
+                                          disabled={resendingCancelEmail === (res.resNumber || res.merchantOrderId)}
+                                          className="p-1.5 rounded-lg bg-gray-800 hover:bg-red-900/50 text-gray-400 hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                                          title="Reenviar e-mail de cancelamento"
+                                       >
+                                          {resendingCancelEmail === (res.resNumber || res.merchantOrderId) ? (
+                                             <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                             </svg>
+                                          ) : (
+                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                             </svg>
+                                          )}
+                                       </button>
+                                    )}
                                     <button onClick={() => setExpandedRow(isExpanded ? null : res.id)} className="p-1.5 rounded-lg bg-gray-800 hover:bg-blue-900/50 text-gray-400 hover:text-blue-400 transition-colors" title="Detalhes do Cliente">
                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                     </button>
