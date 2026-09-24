@@ -28,7 +28,8 @@ export async function POST(
     return NextResponse.json({ error: 'Reserva não encontrada' }, { status: 404 });
   }
 
-  const cd: any = reservation.customerData || {};
+  const rawCd = reservation.customerData;
+  const cd: any = typeof rawCd === 'string' ? JSON.parse(rawCd) : (rawCd || {});
   const booking = cd.booking || {};
   const car = booking.car || {};
 
