@@ -29,6 +29,7 @@ export default function CheckoutPage() {
   const [couponResult, setCouponResult] = useState<any>(null);
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState("");
+  const [acceptCouponTerms, setAcceptCouponTerms] = useState(false);
 
   const handleValidateCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -701,6 +702,16 @@ export default function CheckoutPage() {
           xrsEquipment: booking?.xrsEquipment || [],
           xrsInsurances: booking?.xrsInsurances || [],
           voucherData: undefined,
+          // Cupom de desconto
+          ...(couponResult ? {
+            couponData: {
+              code: couponCode,
+              discountLabel: couponResult.discountLabel,
+              accepted: acceptCouponTerms,
+              acceptedAt: new Date().toISOString(),
+              acceptedText: "Desconto válido exclusivamente para pagamentos via cartão de crédito ou PIX",
+            },
+          } : {}),
         }),
       });
       const json = await res.json();
@@ -1602,12 +1613,33 @@ export default function CheckoutPage() {
             <div className="bg-green-50 border border-green-100 rounded-xl p-5 space-y-3">
               <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">🎟️ Cupom de Desconto</h3>
               {couponResult ? (
-                <div className="flex items-center justify-between bg-green-100 rounded-lg p-3">
-                  <div>
-                    <p className="text-sm font-bold text-green-700">✅ {couponResult.discountLabel}</p>
-                    <p className="text-xs text-green-600">{couponResult.message}</p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between bg-green-100 rounded-lg p-3">
+                    <div>
+                      <p className="text-sm font-bold text-green-700">✅ {couponResult.discountLabel}</p>
+                      <p className="text-xs text-green-600">{couponResult.message}</p>
+                    </div>
+                    <button onClick={removeCoupon} className="text-xs text-red-500 font-bold hover:underline">Remover</button>
                   </div>
-                  <button onClick={removeCoupon} className="text-xs text-red-500 font-bold hover:underline">Remover</button>
+
+                  {/* Checkbox de aceite obrigatório */}
+                  <label className="flex items-start gap-2 cursor-pointer bg-amber-50 border border-amber-200 rounded-lg p-3 group">
+                    <input
+                      type="checkbox"
+                      checked={acceptCouponTerms}
+                      onChange={e => setAcceptCouponTerms(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 accent-green-600"
+                    />
+                    <span className="text-xs text-gray-700 leading-relaxed">
+                      Declaro que estou ciente que o <strong>desconto concedido pelo cupom</strong> é válido exclusivamente para pagamentos realizados via <strong>cartão de crédito</strong> ou <strong>PIX</strong>. Caso o pagamento seja feito por outro meio, o desconto não será aplicado.
+                    </span>
+                  </label>
+                  {!acceptCouponTerms && (
+                    <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                      Aceite os termos do cupom para prosseguir.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -1634,7 +1666,7 @@ export default function CheckoutPage() {
             </div>
 
             <div className="text-right">
-              <button disabled={loading || !acceptTermsReserva || !acceptTermsPais} type="submit" className="w-full md:w-auto bg-[#008d36] hover:bg-[#007a2d] text-white font-black py-4 md:py-5 px-8 md:px-10 rounded-lg shadow-lg uppercase tracking-wide text-base md:text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target">
+              <button disabled={loading || !acceptTermsReserva || !acceptTermsPais || (couponResult && !acceptCouponTerms)} type="submit" className="w-full md:w-auto bg-[#008d36] hover:bg-[#007a2d] text-white font-black py-4 md:py-5 px-8 md:px-10 rounded-lg shadow-lg uppercase tracking-wide text-base md:text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target">
                 {loading ? "Processando..." : "Finalizar e Reservar Agora"}
               </button>
             </div>

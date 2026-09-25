@@ -107,6 +107,51 @@ export default function HeroSearchForm() {
   // Tarifa Popover
   const [showTariffPopover, setShowTariffPopover] = useState(false);
   const [tarifNumber, setTarifNumber] = useState("");
+
+  // Cupom de desconto
+  const [showCouponField, setShowCouponField] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponValid, setCouponValid] = useState<boolean | null>(null);
+  const [couponMessage, setCouponMessage] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponLabel, setCouponLabel] = useState("");
+
+  const validateCouponCode = async (code: string) => {
+    if (!code.trim()) return;
+    setCouponLoading(true);
+    setCouponValid(null);
+    setCouponMessage("");
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code.toUpperCase().trim(), orderValue: 0 }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setCouponValid(true);
+        setCouponMessage(data.message || "Cupom válido!");
+        setCouponLabel(data.discountLabel || "");
+        // Salvar no cookie para o checkout auto-preencher
+        document.cookie = `ref_code=${code.toUpperCase().trim()};path=/;max-age=${60*60*24*30};samesite=lax`;
+      } else {
+        setCouponValid(false);
+        setCouponMessage(data.message || "Cupom inválido.");
+      }
+    } catch {
+      setCouponValid(false);
+      setCouponMessage("Erro ao validar. Tente novamente.");
+    }
+    setCouponLoading(false);
+  };
+
+  const removeCouponHome = () => {
+    setCouponCode("");
+    setCouponValid(null);
+    setCouponMessage("");
+    setCouponLabel("");
+    document.cookie = "ref_code=;path=/;max-age=0";
+  };
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // Auto-fill contractID from URL (e.g. when clicking a promotion)
@@ -918,6 +963,128 @@ export default function HeroSearchForm() {
                 </button>
               </div>
             )}
+
+            {/* ── Cupom de Desconto ── */}
+            <div className="relative w-full md:w-auto">
+              <div
+                onClick={() => setShowCouponField(!showCouponField)}
+                className="flex items-center gap-2 cursor-pointer group select-none"
+              >
+                <div
+                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                    couponValid === true
+                      ? "bg-[#008d36] border-[#008d36]"
+                      : "border-gray-400 group-hover:border-gray-600"
+                  }`}
+                >
+                  {couponValid === true && (
+                    <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                  )}
+                </div>
+                <span className="text-[14px] text-gray-500 font-bold">
+                  Tenho um <span className="text-gray-900">cupom de desconto</span>
+                </span>
+                <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+
+              {showCouponField && (
+                <div className="absolute top-full left-0 md:left-auto right-auto md:right-0 mt-4 w-[calc(100vw-3rem)] sm:w-[350px] bg-white rounded-lg shadow-2xl z-50 overflow-hidden border border-gray-200">
+                  <div className="p-5 flex flex-col gap-3">
+                    <h3 className="font-extrabold text-[#000000] text-[16px] leading-[22px]">
+                      🎟️ Cupom de Desconto
+                    </h3>
+                    <p className="text-[#000000] font-normal text-sm">
+                      Digite o código do seu cupom para aplicar o desconto
+                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 flex border-2 border-[#008d36] rounded px-3 py-2 items-center">
+                        <span className="text-[#008d36] mr-2 text-lg">🎟️</span>
+                        <input
+                          type="text"
+                          placeholder="Ex: JOAO10"
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); validateCouponCode(couponCode); } }}
+                          className="w-full text-base font-mono font-bold outline-none uppercase"
+                          autoFocus
+                        />
+                        {couponCode && (
+                          <button type="button" onClick={removeCouponHome} className="text-gray-400 hover:text-gray-600 ml-1 shrink-0" title="Limpar">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => validateCouponCode(couponCode)}
+                        disabled={couponLoading || !couponCode.trim()}
+                        className={`w-12 h-11 rounded flex justify-center items-center transition-colors ${
+                          couponCode ? 'bg-[#008d36] hover:bg-[#007530]' : 'bg-[#ebebeb] hover:bg-gray-200'
+                        }`}
+                      >
+                        {couponLoading ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <svg className={`w-6 h-6 font-bold ${couponCode ? 'text-white' : 'text-black'}`} fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Feedback */}
+                    {couponValid === true && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <div>
+                          <p className="text-sm font-bold text-green-700">{couponLabel}</p>
+                          <p className="text-xs text-green-600">{couponMessage}</p>
+                        </div>
+                      </div>
+                    )}
+                    {couponValid === false && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        <p className="text-sm font-medium text-red-600">{couponMessage}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-[#f2f2f2] p-5">
+                    <p className="text-gray-600 font-medium text-[13px] leading-snug">
+                      ⚠️ Descontos por cupom são válidos apenas para pagamentos via <strong>cartão de crédito</strong> ou <strong>PIX</strong>.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Badge cupom ativo */}
+              {!showCouponField && couponValid === true && (
+                <div className="absolute -bottom-7 right-0 flex items-center gap-1.5 bg-green-50 border border-green-300 rounded-full px-3 py-1">
+                  <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-[11px] font-bold text-green-700">Cupom ativo:</span>
+                  <span className="text-[11px] font-mono font-black text-green-800">{couponCode}</span>
+                  <button type="button" onClick={removeCouponHome} className="text-green-500 hover:text-red-500 ml-1" title="Remover cupom">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
 
             <button
               type="submit"

@@ -27,7 +27,7 @@ export async function POST(request: Request) {
    let isSandboxMode = false;
    let cieloPaymentId: string | undefined;
    try {
-      const { bookingData, customerData, paymentData, voucherData, xrsEquipment, xrsInsurances } = await request.json();
+      const { bookingData, customerData, paymentData, voucherData, xrsEquipment, xrsInsurances, couponData } = await request.json();
       customerEmail = customerData?.email || '';
       customerName = customerData?.nome || '';
 
@@ -617,6 +617,8 @@ export async function POST(request: Request) {
                 ...(cardLastFour && { cardLastFour }), // apenas **** **** **** 1234
                 // Split de pagamento XRS (payerList) — auditoria do que foi cobrado online
                 ...(bookingData?.payerSplit && { payerSplit: bookingData.payerSplit }),
+                // Cupom de desconto aplicado
+                ...(couponData && { couponData }),
               })
            }
         });

@@ -923,6 +923,23 @@ export default function PainelReservas() {
                                            <p className="text-gray-300"><strong>Método:</strong> <span className={`text-xs font-bold px-2 py-0.5 rounded ${res.status === 'CONFIRMED_PREPAID' ? 'bg-green-500/20 text-green-400' : res.status === 'PENDING_PIX' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-300'}`}>{STATUS_LABELS[res.status] || res.status}</span></p>
                                            {parsed?.contractID && <p className="text-gray-300 mt-1"><strong>ContractID:</strong> <span className="font-mono text-xs text-orange-400">{parsed.contractID}</span></p>}
                                            <p className="text-gray-300"><strong>Merchant Order:</strong> <span className="font-mono text-[10px] text-gray-500">{res.merchantOrderId || "—"}</span></p>
+                                           {parsed?.couponData && (
+                                              <>
+                                                 <div className="border-t border-gray-700/50 my-2"></div>
+                                                 <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">🎟️ Cupom de Desconto</p>
+                                                 <div className="bg-green-900/20 border border-green-700/30 rounded-lg p-3 space-y-1">
+                                                    <p className="text-green-400 font-mono font-bold text-sm">{parsed.couponData.code}</p>
+                                                    <p className="text-gray-300 text-xs">{parsed.couponData.discountLabel}</p>
+                                                    {parsed.couponData.accepted && (
+                                                       <div className="bg-amber-900/20 border border-amber-700/30 rounded p-2 mt-1">
+                                                          <p className="text-amber-400 text-[10px] font-bold">✅ ACEITE DOCUMENTADO</p>
+                                                          <p className="text-gray-400 text-[10px]">{parsed.couponData.acceptedText}</p>
+                                                          <p className="text-gray-500 text-[10px] mt-0.5">Data: {parsed.couponData.acceptedAt ? new Date(parsed.couponData.acceptedAt).toLocaleString('pt-BR') : '—'}</p>
+                                                       </div>
+                                                    )}
+                                                 </div>
+                                              </>
+                                           )}
                                         </div>
                                         <div className="bg-gray-900 rounded-lg p-4 border border-gray-700/50 flex-1 min-w-[200px]">
                                            <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Fidelidade, Voo e Extras</p>
