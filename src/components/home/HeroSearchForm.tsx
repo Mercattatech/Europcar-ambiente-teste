@@ -930,16 +930,6 @@ export default function HeroSearchForm() {
                     </svg>
                   </a>
                 </div>
-
-                <div className="bg-[#f2f2f2] p-5">
-                  <h3 className="font-extrabold text-[#000000] text-sm">
-                    Tem um código de cupão?
-                  </h3>
-                  <p className="text-gray-600 font-medium text-[13px] leading-snug mt-1">
-                    Se tiver um código de cupão alfanumérico, poderá aplicá-lo
-                    na página de pagamento deste site no ato da reserva.
-                  </p>
-                </div>
               </div>
             )}
 
