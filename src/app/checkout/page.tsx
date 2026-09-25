@@ -55,6 +55,18 @@ export default function CheckoutPage() {
 
   const removeCoupon = () => { setCouponResult(null); setCouponCode(""); setCouponError(""); };
 
+  // Auto-preencher cupom se veio por link de referral (cookie)
+  useEffect(() => {
+    const cookies = document.cookie.split(';').reduce((acc: Record<string, string>, c) => {
+      const [k, v] = c.trim().split('=');
+      if (k && v) acc[k] = v;
+      return acc;
+    }, {});
+    if (cookies.ref_code && !couponCode) {
+      setCouponCode(cookies.ref_code);
+    }
+  }, []);
+
   // Mascaras e Validações
   const maskPhone = (value: string) => {
     let r = value.replace(/\D/g, "");

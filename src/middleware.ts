@@ -49,7 +49,53 @@ export async function middleware(request: NextRequest) {
       console.error('Maintenance middleware error:', error);
    }
 
-   return addSecurityHeaders(NextResponse.next());
+   // ── Tracking de Referral (cupom por link) ──
+   const refCode = request.nextUrl.searchParams.get('ref');
+   const utmSource = request.nextUrl.searchParams.get('utm_source');
+   const utmMedium = request.nextUrl.searchParams.get('utm_medium');
+   const utmCampaign = request.nextUrl.searchParams.get('utm_campaign');
+   const utmContent = request.nextUrl.searchParams.get('utm_content');
+
+   const response = addSecurityHeaders(NextResponse.next());
+
+   if (refCode) {
+      // Salvar cookie com o código de referral (30 dias)
+      response.cookies.set('ref_code', refCode.toUpperCase(), {
+         maxAge: 60 * 60 * 24 * 30, // 30 dias
+         path: '/',
+         httpOnly: false,
+         sameSite: 'lax',
+      });
+
+      // Salvar UTMs se presentes
+      if (utmSource) response.cookies.set('utm_source', utmSource, { maxAge: 60 * 60 * 24 * 30, path: '/' });
+      if (utmMedium) response.cookies.set('utm_medium', utmMedium, { maxAge: 60 * 60 * 24 * 30, path: '/' });
+      if (utmCampaign) response.cookies.set('utm_campaign', utmCampaign, { maxAge: 60 * 60 * 24 * 30, path: '/' });
+      if (utmContent) response.cookies.set('utm_content', utmContent, { maxAge: 60 * 60 * 24 * 30, path: '/' });
+
+      // Registrar evento de referral (fire-and-forget via API)
+      try {
+         const protocol = request.headers.get('x-forwarded-proto') || 'https';
+         const host = request.headers.get('host') || request.nextUrl.host;
+         fetch(`${protocol}://${host}/api/referral-event`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+               couponCode: refCode.toUpperCase(),
+               event: 'LINK_OPENED',
+               source: utmSource,
+               medium: utmMedium,
+               campaign: utmCampaign,
+               content: utmContent,
+               referrer: request.headers.get('referer') || null,
+               ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || null,
+               userAgent: request.headers.get('user-agent') || null,
+            }),
+         }).catch(() => {}); // fire-and-forget
+      } catch { /* ignore */ }
+   }
+
+   return response;
 }
 
 /** Adiciona headers de segurança a toda response */

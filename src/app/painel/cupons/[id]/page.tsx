@@ -126,7 +126,26 @@ export default function DetalheCupom() {
           <div className="bg-gray-800 rounded-lg p-3 mt-2">
             <p className="text-[11px] text-gray-500 uppercase font-bold mb-1">Link de indicação</p>
             <p className="text-xs font-mono text-blue-400 break-all">{link}</p>
-            <button onClick={() => navigator.clipboard.writeText(link)} className="mt-2 text-xs text-green-400 font-bold hover:underline">📋 Copiar link</button>
+            <div className="flex items-center gap-3 mt-3">
+              <button onClick={() => navigator.clipboard.writeText(link)} className="text-xs text-green-400 font-bold hover:underline">📋 Copiar link</button>
+              <button onClick={() => window.open(`https://wa.me/?text=Use%20o%20cupom%20${coupon.code}%20no%20site%20${encodeURIComponent(link)}`, '_blank')} className="text-xs text-green-400 font-bold hover:underline">💬 WhatsApp</button>
+            </div>
+          </div>
+          <div className="bg-gray-800 rounded-lg p-3 mt-2 text-center">
+            <p className="text-[11px] text-gray-500 uppercase font-bold mb-2">QR Code</p>
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(link)}&format=png&margin=10`}
+              alt={`QR Code ${coupon.code}`}
+              className="mx-auto rounded-lg"
+              width={150}
+              height={150}
+            />
+            <a
+              href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(link)}&format=png&margin=10`}
+              download={`qr_${coupon.code}.png`}
+              target="_blank"
+              className="text-xs text-blue-400 font-bold hover:underline mt-2 inline-block"
+            >📥 Download HD</a>
           </div>
         </div>
       </div>
