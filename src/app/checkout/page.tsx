@@ -24,6 +24,37 @@ export default function CheckoutPage() {
   const [loyaltyId, setLoyaltyId] = useState("");
   const [flightNumber, setFlightNumber] = useState("");
 
+  // Cupom de desconto
+  const [couponCode, setCouponCode] = useState("");
+  const [couponResult, setCouponResult] = useState<any>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState("");
+
+  const handleValidateCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    setCouponError("");
+    setCouponResult(null);
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponCode.toUpperCase().trim(), customerEmail: email, orderValue: 0 }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setCouponResult(data);
+      } else {
+        setCouponError(data.message || "Cupom inválido.");
+      }
+    } catch {
+      setCouponError("Erro ao validar cupom.");
+    }
+    setCouponLoading(false);
+  };
+
+  const removeCoupon = () => { setCouponResult(null); setCouponCode(""); setCouponError(""); };
+
   // Mascaras e Validações
   const maskPhone = (value: string) => {
     let r = value.replace(/\D/g, "");
@@ -1553,6 +1584,41 @@ export default function CheckoutPage() {
                   Você precisa aceitar ambos os termos para finalizar a reserva.
                 </p>
               ) : null}
+            </div>
+
+            {/* Cupom de Desconto */}
+            <div className="bg-green-50 border border-green-100 rounded-xl p-5 space-y-3">
+              <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">🎟️ Cupom de Desconto</h3>
+              {couponResult ? (
+                <div className="flex items-center justify-between bg-green-100 rounded-lg p-3">
+                  <div>
+                    <p className="text-sm font-bold text-green-700">✅ {couponResult.discountLabel}</p>
+                    <p className="text-xs text-green-600">{couponResult.message}</p>
+                  </div>
+                  <button onClick={removeCoupon} className="text-xs text-red-500 font-bold hover:underline">Remover</button>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                      placeholder="Digite o código do cupom"
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-green-600 uppercase font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleValidateCoupon}
+                      disabled={couponLoading || !couponCode.trim()}
+                      className="bg-[#008d36] hover:bg-[#007a2d] text-white font-bold px-4 py-2.5 rounded-lg text-sm transition-colors disabled:opacity-50"
+                    >
+                      {couponLoading ? "..." : "Aplicar"}
+                    </button>
+                  </div>
+                  {couponError && <p className="text-xs text-red-500 font-medium mt-1">{couponError}</p>}
+                </div>
+              )}
             </div>
 
             <div className="text-right">

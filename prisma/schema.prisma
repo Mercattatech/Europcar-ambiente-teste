@@ -353,3 +353,259 @@ model SupportTicket {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: CUPONS, PARCEIROS & ACOMPANHAMENTO DE VENDAS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Parceiros / Influenciadores / Afiliados ──
+model Partner {
+  id              String   @id @default(cuid())
+  name            String
+  tradeName       String?  // Nome fantasia
+  type            String   @default("OTHER") // INFLUENCER | COMPANY | INDIVIDUAL | AFFILIATE | EMPLOYEE | CLIENT | AMBASSADOR | REPRESENTATIVE | OTHER
+  cpf             String?
+  cnpj            String?
+  email           String?  @unique
+  whatsapp        String?
+  phone           String?
+  company         String?
+  position        String?  // Cargo
+  city            String?
+  state           String?
+  country         String?  @default("BR")
+
+  // Redes sociais
+  instagram       String?
+  tiktok          String?
+  youtube         String?
+  linkedin        String?
+  website         String?
+  notes           String?  @db.Text
+
+  // Dados bancários (opcionais)
+  bankName        String?
+  bankAgency      String?
+  bankAccount     String?
+  pixKey          String?
+  bankHolder      String?
+  bankHolderDoc   String?
+
+  // Comissão
+  commissionEnabled         Boolean @default(false)
+  commissionType            String? // PERCENTAGE | FIXED
+  commissionValue           Float?  // ex: 10 (10%) ou 50.00 (R$50)
+  commissionBase            String? @default("PAID") // GROSS | NET | PAID | FIXED
+  commissionReleaseDelayDays Int?   @default(7)
+
+  // Portal de acesso
+  referralToken         String?  @unique // Token longo para acesso via link seguro
+  portalPasswordHash    String?          // Senha hashada para login no portal
+
+  status          String   @default("ACTIVE") // ACTIVE | INACTIVE | BLOCKED
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  coupons         Coupon[]
+  couponUsages    CouponUsage[]
+  commissions     Commission[]
+  referralEvents  ReferralEvent[]
+
+  @@index([type])
+  @@index([status])
+  @@index([email])
+  @@index([referralToken])
+}
+
+// ── Cupons de Desconto ──
+model Coupon {
+  id              String   @id @default(cuid())
+  code            String   @unique  // Código do cupom (ex: JOAO10)
+  name            String             // Nome interno
+  description     String?  @db.Text
+
+  // Tipo e benefício
+  couponType      String   @default("PROMOTIONAL") // INFLUENCER | COMPANY | INDIVIDUAL | AFFILIATE | EMPLOYEE | CLIENT | CAMPAIGN | COURTESY | FREE | PROMOTIONAL | OTHER
+  discountType    String   @default("PERCENTAGE")  // PERCENTAGE | FIXED_VALUE | FREE
+  discountValue   Float?   // ex: 10 (10%) ou 50.00 (R$50)
+  maxDiscount     Float?   // Teto do desconto (ex: R$300 em cupom de 20%)
+
+  // Regras comerciais
+  minimumOrderValue Float?  // Valor mínimo do pedido
+  stackable       Boolean  @default(false) // Pode combinar com outro cupom?
+
+  // Categorias/produtos permitidos (JSON arrays)
+  allowedCategories String? @db.Text // JSON: ["EDCI", "FDAR"] ou null = todos
+  excludedCategories String? @db.Text // JSON: ["XSAR"] blacklist
+
+  // Validade
+  startsAt        DateTime?
+  expiresAt       DateTime?
+  hasExpiration   Boolean  @default(false)
+
+  // Limites de uso
+  maxUses             Int?  // Limite total
+  maxUsesPerCustomer  Int?  @default(1) // Limite por cliente
+  maxUsesPerDay       Int?  // Limite diário
+  maxUsesPerMonth     Int?  // Limite mensal
+  currentUses         Int   @default(0) // Contador atual
+
+  // Status
+  status          String   @default("DRAFT") // DRAFT | SCHEDULED | ACTIVE | PAUSED | EXPIRED | BLOCKED | CLOSED
+
+  // Vinculação
+  partnerId       String?
+  partner         Partner? @relation(fields: [partnerId], references: [id])
+  campaign        String?  // Nome da campanha (ex: BLACK FRIDAY 2026)
+
+  // Cortesia/100%
+  requiresApproval Boolean @default(false) // Exigir autorização admin para uso
+
+  // Audit
+  createdBy       String?  // userId de quem criou
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  usages          CouponUsage[]
+  commissions     Commission[]
+  referralEvents  ReferralEvent[]
+  auditLogs       CouponAuditLog[]
+
+  @@index([code])
+  @@index([status])
+  @@index([couponType])
+  @@index([partnerId])
+  @@index([campaign])
+  @@index([startsAt, expiresAt])
+}
+
+// ── Utilizações de Cupom (cada uso = 1 registro) ──
+model CouponUsage {
+  id                  String   @id @default(cuid())
+
+  couponId            String
+  coupon              Coupon   @relation(fields: [couponId], references: [id])
+
+  partnerId           String?
+  partner             Partner? @relation(fields: [partnerId], references: [id])
+
+  reservationId       String?  // FK para LocalReservation.id
+  resNumber           String?  // Snapshot do número da reserva
+
+  // Snapshot das condições no momento do uso (imutável)
+  couponCodeSnapshot  String
+  discountTypeSnapshot String?
+  discountValueSnapshot Float?
+
+  // Valores
+  originalValue       Float    // Valor original do pedido
+  discountAmount      Float    // Valor do desconto concedido
+  finalValue          Float    // Valor efetivamente pago
+
+  // Cliente (dados parciais — LGPD)
+  customerEmail       String?
+  customerNamePartial String?  // Ex: "Mat*** C***"
+
+  // Comissão snapshot
+  commissionAmount    Float?   @default(0)
+
+  // Status
+  status              String   @default("CONFIRMED") // PENDING | CONFIRMED | PAID | CANCELLED | REFUNDED | COURTESY
+
+  usedAt              DateTime @default(now())
+
+  // Relations
+  commissions         Commission[]
+
+  @@index([couponId])
+  @@index([partnerId])
+  @@index([reservationId])
+  @@index([status])
+  @@index([usedAt])
+}
+
+// ── Comissões ──
+model Commission {
+  id                String   @id @default(cuid())
+
+  partnerId         String
+  partner           Partner  @relation(fields: [partnerId], references: [id])
+
+  couponId          String?
+  coupon            Coupon?  @relation(fields: [couponId], references: [id])
+
+  couponUsageId     String?
+  couponUsage       CouponUsage? @relation(fields: [couponUsageId], references: [id])
+
+  amount            Float    // Valor da comissão
+  status            String   @default("FORECAST") // FORECAST | PENDING | RELEASED | PAID | CANCELLED | REFUNDED
+
+  availableAt       DateTime? // Data em que será liberada
+  paidAt            DateTime?
+  paymentReference  String?   // Referência do pagamento (comprovante, nº transação)
+  notes             String?   @db.Text
+  paidBy            String?   // userId de quem pagou
+
+  createdAt         DateTime @default(now())
+
+  @@index([partnerId])
+  @@index([status])
+  @@index([availableAt])
+  @@index([couponId])
+}
+
+// ── Eventos de Referral / Tracking ──
+model ReferralEvent {
+  id          String   @id @default(cuid())
+
+  partnerId   String?
+  partner     Partner? @relation(fields: [partnerId], references: [id])
+
+  couponId    String?
+  coupon      Coupon?  @relation(fields: [couponId], references: [id])
+
+  sessionId   String?  // ID da sessão do navegador
+  event       String   // LINK_OPENED | COUPON_VIEWED | CHECKOUT_STARTED | COUPON_APPLIED | PURCHASE_COMPLETED
+
+  // UTMs e origem
+  source      String?  // utm_source
+  medium      String?  // utm_medium
+  campaign    String?  // utm_campaign
+  content     String?  // utm_content
+  referrer    String?  // HTTP referrer
+
+  ipAddress   String?
+  userAgent   String?  @db.Text
+  metadata    Json?    // Dados extras
+
+  createdAt   DateTime @default(now())
+
+  @@index([partnerId])
+  @@index([couponId])
+  @@index([event])
+  @@index([sessionId])
+  @@index([createdAt])
+}
+
+// ── Auditoria de Cupons ──
+model CouponAuditLog {
+  id        String   @id @default(cuid())
+
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id])
+
+  userId    String?  // Quem fez a ação
+  action    String   // CREATED | UPDATED | ACTIVATED | PAUSED | CLOSED | BLOCKED | DUPLICATED | USED | CANCELLED
+
+  oldData   Json?    // Estado anterior
+  newData   Json?    // Estado novo
+
+  createdAt DateTime @default(now())
+
+  @@index([couponId])
+  @@index([action])
+  @@index([createdAt])
+}

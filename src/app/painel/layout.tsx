@@ -17,6 +17,7 @@ const sidebarLinks = [
    { href: "/painel/jornada", label: "Jornada do Cliente", icon: "🗺️" },
    { href: "/painel/analytics", label: "Analytics & Insights", icon: "📊" },
    { href: "/painel/comissoes", label: "Comissões", icon: "💰" },
+   { href: "/painel/cupons", label: "Cupons & Parceiros", icon: "🎟️" },
    { href: "/painel/margem", label: "Margem ETO", icon: "💹" },
    { href: "/painel/promocoes", label: "Promoções", icon: "🏷️" },
    { href: "/painel/extras", label: "Extras & Proteções", icon: "🛡️" },
