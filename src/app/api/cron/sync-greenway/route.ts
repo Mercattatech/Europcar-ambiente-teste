@@ -4,49 +4,43 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/cron/sync-greenway
  *
- * Endpoint para ser chamado por cron externo (Coolify, crontab, etc).
- * Dispara a sincronização de status das reservas com o Greenway/XRS.
+ * Endpoint chamado pelo Coolify Scheduled Task.
+ * Aceita chamadas de localhost sem secret (mesmo container).
+ * Para chamadas externas, exige ?secret=CRON_SECRET.
  *
- * Para ativar no Coolify, adicione um Scheduled Task (cron):
- *   Comando: curl -s -X GET "https://seudominio.com/api/cron/sync-greenway?secret=SEU_CRON_SECRET"
- *   Frequência: */15 * * * * (a cada 15 minutos)
- *
- * Ou via crontab do servidor:
- *   */15 * * * * curl -s "https://seudominio.com/api/cron/sync-greenway?secret=SEU_CRON_SECRET" > /dev/null 2>&1
- *
- * Defina CRON_SECRET nas variáveis de ambiente do Coolify.
+ * Coolify Command:
+ *   node -e "fetch('http://localhost:3000/api/cron/sync-greenway').then(r=>r.text()).then(console.log).catch(console.error)"
  */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const secret = searchParams.get('secret');
   const cronSecret = process.env.CRON_SECRET;
+  const host = req.headers.get('host') || '';
 
-  if (!cronSecret) {
-    return NextResponse.json({ error: 'CRON_SECRET não configurado nas variáveis de ambiente' }, { status: 500 });
-  }
+  // Aceitar chamadas internas (localhost) OU com secret válido
+  const isLocalhost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+  const hasValidSecret = cronSecret && secret === cronSecret;
 
-  if (secret !== cronSecret) {
+  if (!isLocalhost && !hasValidSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    // Chamar a API de sync internamente
-    const protocol = req.headers.get('x-forwarded-proto') || 'https';
-    const host = req.headers.get('host') || '';
+    const protocol = isLocalhost ? 'http' : (req.headers.get('x-forwarded-proto') || 'https');
     const syncUrl = `${protocol}://${host}/api/reservas/sync-greenway`;
 
     const res = await fetch(syncUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${cronSecret}`,
+        ...(cronSecret ? { 'Authorization': `Bearer ${cronSecret}` } : {}),
       },
       body: JSON.stringify({}),
     });
 
     const data = await res.json();
 
-    console.log(`[cron/sync-greenway] Resultado: ${data.synced} verificadas, ${data.changes} alterações`);
+    console.log(`[cron/sync-greenway] ${data.synced || 0} verificadas, ${data.changes || 0} alterações`);
 
     return NextResponse.json({
       ok: true,

@@ -74,14 +74,16 @@ function mapXRSStatusToLocal(xrsStatus: string, currentLocalStatus: string): str
  * Segurança: aceita bearer token do cron OU sessão admin
  */
 export async function POST(req: Request) {
-  // Autenticação: cron secret OU admin session
+  // Autenticação: localhost (Coolify cron) OU cron secret OU admin session
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
+  const host = req.headers.get('host') || '';
 
+  const isLocalhost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
   const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
   const isAdmin = await checkAdmin().catch(() => false);
 
-  if (!isCron && !isAdmin) {
+  if (!isLocalhost && !isCron && !isAdmin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
