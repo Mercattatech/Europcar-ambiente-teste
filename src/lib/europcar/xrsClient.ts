@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { parseStringPromise } from 'xml2js';
 import prisma from '@/lib/prisma';
+import { escapeXml } from '@/lib/europcar/xmlEscape';
 
 // ── CID Constants (Contract IDs) ──────────────────────────────
 // POA = tarifas públicas padrão
@@ -305,4 +306,101 @@ export async function getStation(stationCode: string, language: string = 'pt_BR'
     postalCode: s.$?.postalCode ?? s.postalCode,
     leadTime: s.$?.leadTime ?? s.leadTime,
   } as Station;
+}
+
+// =============================
+// readBooking — Consultar status de reserva no Greenway
+// =============================
+
+/**
+ * Códigos de status do XRS/Greenway:
+ * - S = Confirmed (Saved/Standby → confirmada)
+ * - R = Request (On Request → aguardando confirmação)
+ * - CF = Confirmed (Confirmed → confirmada pelo backoffice)
+ * - CC = Cancelled by Customer
+ * - CS = Cancelled by Station/System
+ * - CP = Cancelled due to Payment
+ * - CO = Closed Out (Check-out realizado)
+ * - NS = No Show
+ * - TD = To Deliver (em preparo para entrega)
+ */
+
+export interface ReadBookingResult {
+  found: boolean;
+  resNumber: string;
+  xrsStatusCode: string; // S, R, CF, CC, CS, CP, CO, NS, TD
+  xrsStatus: string;     // human-readable label
+  carCategory?: string;
+  pickupStation?: string;
+  pickupDate?: string;
+  returnDate?: string;
+  raw?: any;
+  error?: string;
+}
+
+const XRS_STATUS_MAP: Record<string, string> = {
+  S: 'Confirmada',
+  R: 'On Request',
+  CF: 'Confirmada (Backoffice)',
+  CC: 'Cancelada pelo Cliente',
+  CS: 'Cancelada pela Estação',
+  CP: 'Cancelada por Pagamento',
+  CO: 'Closed Out (Check-out)',
+  NS: 'No Show',
+  TD: 'Aguardando Entrega',
+};
+
+export async function readBooking(resNumber: string): Promise<ReadBookingResult> {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<message>
+  <serviceRequest serviceCode="readBooking">
+    <serviceParameters>
+      <reservation resNumber="${escapeXml(resNumber)}"/>
+    </serviceParameters>
+  </serviceRequest>
+</message>`;
+
+  try {
+    const response = await callXRS(xml, {
+      callerCode: process.env.XRS_CALLER_CODE || '',
+      password: process.env.XRS_PASSWORD || '',
+      action: 'readBooking',
+      sourceFile: 'xrsClient.ts',
+    });
+
+    const resNode = response?.message?.serviceResponse?.reservation;
+    if (!resNode) {
+      // Verificar se há erro (reserva não encontrada)
+      const errNode = response?.message?.serviceResponse?.errors?.error;
+      const errText = errNode?.$?.errorText || errNode?.errorText || 'Reserva não encontrada no Greenway';
+      return { found: false, resNumber, xrsStatusCode: '', xrsStatus: '', error: errText };
+    }
+
+    const attrs = resNode.$ || resNode;
+    const statusCode: string = attrs.statusCode || '';
+    const carCategory = attrs.carCategory || resNode.vehicleCategory?.$?.code || '';
+    const pickupStation = attrs.pickupStationCode || '';
+    const pickupDate = attrs.pickupDate || '';
+    const returnDate = attrs.returnDate || '';
+
+    return {
+      found: true,
+      resNumber,
+      xrsStatusCode: statusCode,
+      xrsStatus: XRS_STATUS_MAP[statusCode] || `Desconhecido (${statusCode})`,
+      carCategory,
+      pickupStation,
+      pickupDate,
+      returnDate,
+      raw: resNode,
+    };
+  } catch (err: any) {
+    return {
+      found: false,
+      resNumber,
+      xrsStatusCode: '',
+      xrsStatus: '',
+      error: err.message,
+    };
+  }
 }

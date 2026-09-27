@@ -11,6 +11,9 @@ const PAYMENT_STATUS_OPTIONS = [
    { value: "ON_REQUEST", label: "⏳ Sob Consulta", color: "bg-amber-500/20 text-amber-400" },
    { value: "ON_REQUEST_REJECTED", label: "❌ Recusada (OR)", color: "bg-orange-500/20 text-orange-400" },
    { value: "CANCELLED", label: "Cancelada", color: "bg-red-500/20 text-red-400" },
+   { value: "CANCELLED_GREENWAY", label: "Cancelada (Greenway)", color: "bg-red-600/20 text-red-300" },
+   { value: "NO_SHOW", label: "No Show", color: "bg-gray-500/20 text-gray-400" },
+   { value: "CHECKED_OUT", label: "Check-out", color: "bg-purple-500/20 text-purple-400" },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -20,6 +23,9 @@ const STATUS_COLORS: Record<string, string> = {
    "ON_REQUEST": "bg-amber-500/20 text-amber-400 border-amber-600/30",
    "ON_REQUEST_REJECTED": "bg-orange-500/20 text-orange-400 border-orange-600/30",
    "CANCELLED": "bg-red-500/20 text-red-400 border-red-600/30",
+   "CANCELLED_GREENWAY": "bg-red-600/20 text-red-300 border-red-500/30",
+   "NO_SHOW": "bg-gray-500/20 text-gray-400 border-gray-500/30",
+   "CHECKED_OUT": "bg-purple-500/20 text-purple-400 border-purple-500/30",
 };
 const STATUS_LABELS: Record<string, string> = {
    "CONFIRMED_PREPAID": "Pago Online (Cielo)",
@@ -28,6 +34,9 @@ const STATUS_LABELS: Record<string, string> = {
    "ON_REQUEST": "⏳ Sob Consulta",
    "ON_REQUEST_REJECTED": "❌ Recusada (OR)",
    "CANCELLED": "Cancelada / Erro",
+   "CANCELLED_GREENWAY": "Cancelada (Greenway)",
+   "NO_SHOW": "No Show",
+   "CHECKED_OUT": "Check-out Realizado",
 };
 
 // Status Operacionais (novos)
@@ -86,6 +95,8 @@ export default function PainelReservas() {
    const [loadingPreview, setLoadingPreview] = useState<string | null>(null);
    const [resendingCancelEmail, setResendingCancelEmail] = useState<string | null>(null);
    const [emailDropdown, setEmailDropdown] = useState<string | null>(null);
+   const [syncLoading, setSyncLoading] = useState(false);
+   const [syncResult, setSyncResult] = useState<any | null>(null);
 
    const showToast = (message: string, type: "success" | "error" = "success") => {
       setToast({ message, type });
@@ -607,10 +618,39 @@ export default function PainelReservas() {
             </div>
          )}
 
-         <div>
-            <h1 className="text-2xl font-black text-white">Gestão de Reservas</h1>
-            <p className="text-gray-400 text-sm mt-1">Todas as reservas do sistema — com controle de status operacional</p>
+         <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+               <h1 className="text-2xl font-black text-white">Gestão de Reservas</h1>
+               <p className="text-gray-400 text-sm mt-1">Todas as reservas do sistema — com controle de status operacional</p>
+            </div>
+            <button
+               onClick={async () => {
+                  setSyncLoading(true);
+                  setSyncResult(null);
+                  try {
+                     const res = await fetch('/api/reservas/sync-greenway', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+                     const data = await res.json();
+                     setSyncResult(data);
+                     if (data.changes > 0) fetchReservations();
+                  } catch (e: any) { setSyncResult({ error: e.message }); }
+                  setSyncLoading(false);
+               }}
+               disabled={syncLoading}
+               className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-colors shrink-0"
+            >
+               {syncLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+               ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+               )}
+               🔄 Sincronizar com Greenway
+            </button>
          </div>
+         {syncResult && (
+            <div className={`rounded-xl p-3 text-xs font-medium ${syncResult.error ? 'bg-red-900/20 text-red-400 border border-red-800' : 'bg-green-900/20 text-green-400 border border-green-800'}`}>
+               {syncResult.error ? `❌ Erro: ${syncResult.error}` : `✅ ${syncResult.synced} reservas verificadas, ${syncResult.changes} alterações. ${syncResult.results?.map((r: any) => `${r.resNumber}: ${r.oldStatus} → ${r.newStatus}`).join(' | ') || ''}`}
+            </div>
+         )}
 
          {/* STATUS OPERACIONAL Filter */}
          <div className="space-y-2">
