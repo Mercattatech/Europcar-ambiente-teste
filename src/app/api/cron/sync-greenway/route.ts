@@ -1,33 +1,31 @@
 import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60; // Permitir até 60s no Vercel
 
 /**
  * GET /api/cron/sync-greenway
  *
- * Endpoint para ser chamado pela Vercel Cron (vercel.json).
+ * Endpoint para ser chamado por cron externo (Coolify, crontab, etc).
  * Dispara a sincronização de status das reservas com o Greenway/XRS.
  *
- * Para ativar, adicione ao vercel.json:
- * {
- *   "crons": [{
- *     "path": "/api/cron/sync-greenway",
- *     "schedule": "*/15 * * * *"
- *   }]
- * }
+ * Para ativar no Coolify, adicione um Scheduled Task (cron):
+ *   Comando: curl -s -X GET "https://seudominio.com/api/cron/sync-greenway?secret=SEU_CRON_SECRET"
+ *   Frequência: */15 * * * * (a cada 15 minutos)
  *
- * E defina CRON_SECRET nas env vars da Vercel.
+ * Ou via crontab do servidor:
+ *   */15 * * * * curl -s "https://seudominio.com/api/cron/sync-greenway?secret=SEU_CRON_SECRET" > /dev/null 2>&1
+ *
+ * Defina CRON_SECRET nas variáveis de ambiente do Coolify.
  */
 export async function GET(req: Request) {
-  // Verificar authorization da Vercel Cron
-  const authHeader = req.headers.get('authorization');
+  const { searchParams } = new URL(req.url);
+  const secret = searchParams.get('secret');
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
-    return NextResponse.json({ error: 'CRON_SECRET não configurado' }, { status: 500 });
+    return NextResponse.json({ error: 'CRON_SECRET não configurado nas variáveis de ambiente' }, { status: 500 });
   }
 
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  if (secret !== cronSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
