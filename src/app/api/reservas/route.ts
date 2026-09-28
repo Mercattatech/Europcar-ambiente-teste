@@ -788,7 +788,7 @@ export async function POST(request: Request) {
               DATA_DEVOLUCAO: bookingData.returnDate || '',
               LOCAL_RETIRADA: bookingData.pickupStation || '',
               LOCAL_DEVOLUCAO: bookingData.returnStation || bookingData.pickupStation || '',
-              VALOR_TOTAL: _currencyVars.VALOR_TOTAL,
+              VALOR_TOTAL: paymentData.amountInCents ? `R$ ${(paymentData.amountInCents / 100).toFixed(2).replace('.', ',')}` : '',
               FORMA_PAGAMENTO: paymentData.method || '',
             },
             customerData.telefone || undefined,

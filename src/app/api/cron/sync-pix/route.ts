@@ -159,7 +159,7 @@ export async function GET() {
                   parsedData.telefone
                ) {
                   const retryLink = `${siteUrl}/pix-retry/${reserva.merchantOrderId}`;
-                  const totalBRL = `R$ ${(reserva.amountInCents / 100).toFixed(2).replace('.', ',')}`;
+                  const totalBRL = reserva.amountInCents ? `R$ ${(reserva.amountInCents / 100).toFixed(2).replace('.', ',')}` : 'R$ 0,00';
                   const booking = parsedData.booking || {};
 
                   try {

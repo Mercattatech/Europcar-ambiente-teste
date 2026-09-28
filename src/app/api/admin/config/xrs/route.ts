@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { checkAdmin } from "@/lib/checkAdmin";
 export const dynamic = 'force-dynamic';
 
-export const DEFAULT_XRS_CONFIG = {
+const DEFAULT_XRS_CONFIG = {
   poaCid: '57269673',
   etoZeroExcessCid: '56935495',
   etoZeroExcessBa: '73804373',

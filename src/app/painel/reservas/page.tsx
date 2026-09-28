@@ -97,10 +97,38 @@ export default function PainelReservas() {
    const [emailDropdown, setEmailDropdown] = useState<string | null>(null);
    const [syncLoading, setSyncLoading] = useState(false);
    const [syncResult, setSyncResult] = useState<any | null>(null);
+   const [syncingSingle, setSyncingSingle] = useState<string | null>(null);
 
    const showToast = (message: string, type: "success" | "error" = "success") => {
       setToast({ message, type });
       setTimeout(() => setToast(null), 3000);
+   };
+
+   const handleSyncSingleGreenway = async (resNumber: string) => {
+      setSyncingSingle(resNumber);
+      try {
+         showToast(`Consultando status da reserva ${resNumber} no GreenWay...`);
+         const res = await fetch('/api/reservas/sync-greenway', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ resNumber }),
+         });
+         const data = await res.json();
+         if (!res.ok || data.error) {
+            showToast(`Erro ao consultar GreenWay: ${data.error || 'Falha na resposta'}`, "error");
+         } else if (data.changes > 0) {
+            const item = data.results?.[0];
+            showToast(`✅ GreenWay atualizado! Status: ${item?.xrsStatus || item?.newOpStatus || 'Confirmado'}`, "success");
+            fetchReservations();
+         } else {
+            showToast(`Status no GreenWay já está em dia ou sem alteração.`, "success");
+            fetchReservations();
+         }
+      } catch (e: any) {
+         showToast(`Erro de conexão: ${e.message}`, "error");
+      } finally {
+         setSyncingSingle(null);
+      }
    };
 
    const handleViewReceipt = (resNumber: string) => {
@@ -847,6 +875,25 @@ export default function PainelReservas() {
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                        </svg>
                                     </button>
+                                    {/* Botão Sincronizar com GreenWay */}
+                                    {res.resNumber && (
+                                       <button
+                                          onClick={() => handleSyncSingleGreenway(res.resNumber)}
+                                          disabled={syncingSingle === res.resNumber}
+                                          className="p-1.5 rounded-lg bg-gray-800 hover:bg-sky-900/50 text-gray-400 hover:text-sky-400 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                                          title="Sincronizar status com GreenWay (XRS)"
+                                       >
+                                          {syncingSingle === res.resNumber ? (
+                                             <svg className="w-4 h-4 animate-spin text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                             </svg>
+                                          ) : (
+                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                             </svg>
+                                          )}
+                                       </button>
+                                    )}
                                     {/* Botão Reenviar E-mail Localizado */}
                                     <button
                                        onClick={() => handleOpenEmailPreview(res.resNumber || res.merchantOrderId)}

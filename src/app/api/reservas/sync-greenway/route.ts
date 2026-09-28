@@ -20,14 +20,14 @@ export const dynamic = 'force-dynamic';
  *   NS = No Show
  *   TD = To Deliver
  */
-function mapXRSStatusToLocal(xrsStatus: string, currentLocalStatus: string): string | null {
+function mapXRSStatusToLocal(xrsStatus: string, currentLocalStatus: string, isPrepaid: boolean): string | null {
   switch (xrsStatus) {
     case 'S':
     case 'CF':
     case 'TD':
-      // Confirmada no Greenway → se era ON_REQUEST, agora está confirmada
+      // Confirmada no Greenway → se era ON_REQUEST, agora está confirmada (prepaid vs balcão)
       if (currentLocalStatus === 'ON_REQUEST') {
-        return 'CONFIRMED_NON_PREPAID';
+        return isPrepaid ? 'CONFIRMED_PREPAID' : 'CONFIRMED_NON_PREPAID';
       }
       return null; // já era confirmada, sem mudança
     case 'CC':
@@ -63,15 +63,15 @@ function mapXRSStatusToLocal(xrsStatus: string, currentLocalStatus: string): str
  *
  * Sincroniza status de todas as reservas locais com o Greenway (XRS).
  * Processa:
- *   1. Todas as ON_REQUEST (que podem ter sido confirmadas ou canceladas)
+ *   1. Todas as ON_REQUEST / operationalStatus R (que podem ter sido confirmadas ou canceladas)
  *   2. Todas as CONFIRMED_* (que podem ter sido canceladas direto no Greenway)
  *   3. Todas as PENDING_PIX (que podem ter sido canceladas)
  *
  * Pode ser chamado:
- *   - Via cron (ex: a cada 15 minutos pela Vercel)
- *   - Manualmente pelo admin no painel
+ *   - Via cron (Coolify Scheduled Task)
+ *   - Manualmente pelo admin no painel (em lote ou para uma reserva específica)
  *
- * Segurança: aceita bearer token do cron OU sessão admin
+ * Segurança: aceita localhost OU bearer token do cron OU sessão admin
  */
 export async function POST(req: Request) {
   // Autenticação: localhost (Coolify cron) OU cron secret OU admin session
@@ -99,14 +99,18 @@ export async function POST(req: Request) {
     if (singleResNumber) {
       where.resNumber = singleResNumber;
     } else {
-      // Sincronizar: ON_REQUEST + CONFIRMED + PENDING_PIX (dos últimos 60 dias)
+      // Sincronizar: ON_REQUEST + operationalStatus R + CONFIRMED + PENDING_PIX (dos últimos 60 dias)
       const sixtyDaysAgo = new Date();
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-      where.status = {
-        in: ['ON_REQUEST', 'CONFIRMED_PREPAID', 'CONFIRMED_NON_PREPAID', 'PENDING_PIX'],
-      };
-      where.createdAt = { gte: sixtyDaysAgo };
+      where.OR = [
+        { operationalStatus: 'R' },
+        { status: 'ON_REQUEST' },
+        {
+          status: { in: ['CONFIRMED_PREPAID', 'CONFIRMED_NON_PREPAID', 'PENDING_PIX'] },
+          createdAt: { gte: sixtyDaysAgo },
+        },
+      ];
     }
 
     const reservations = await prisma.localReservation.findMany({
@@ -115,6 +119,7 @@ export async function POST(req: Request) {
         id: true,
         resNumber: true,
         status: true,
+        operationalStatus: true,
         customerData: true,
         amountInCents: true,
       },
@@ -126,6 +131,8 @@ export async function POST(req: Request) {
       resNumber: string;
       oldStatus: string;
       newStatus: string;
+      oldOpStatus: string;
+      newOpStatus: string;
       xrsStatus: string;
       action: string;
     }[] = [];
@@ -137,61 +144,98 @@ export async function POST(req: Request) {
         const xrs = await readBooking(res.resNumber);
 
         if (!xrs.found) {
-          // Reserva não encontrada no Greenway — possivelmente foi deletada
+          // Reserva não encontrada no Greenway — possivelmente foi deletada ou resNumber inválido
           console.warn(`[sync-greenway] Reserva ${res.resNumber} não encontrada no XRS: ${xrs.error}`);
           continue;
         }
 
-        const newStatus = mapXRSStatusToLocal(xrs.xrsStatusCode, res.status);
-
-        if (!newStatus) {
-          // Sem mudança de status
-          // Atualizar operationalStatus mesmo assim
-          await prisma.localReservation.update({
-            where: { id: res.id },
-            data: { operationalStatus: xrs.xrsStatusCode },
-          });
-          continue;
-        }
-
-        // ═══ STATUS MUDOU ═══
-        console.log(`[sync-greenway] ${res.resNumber}: ${res.status} → ${newStatus} (XRS: ${xrs.xrsStatusCode})`);
-
-        // Atualizar no banco
-        await prisma.localReservation.update({
-          where: { id: res.id },
-          data: {
-            status: newStatus,
-            operationalStatus: xrs.xrsStatusCode,
-          },
-        });
-
-        let action = 'status_updated';
-
-        // Extrair email do cliente
+        // Determinar se a reserva foi paga online (Cielo/PIX)
+        let isPrepaid = false;
         let customerEmail = '';
         let customerName = '';
+        let customerLastName = '';
+        let bookingData: any = {};
         try {
           const parsed = typeof res.customerData === 'string'
             ? JSON.parse(res.customerData)
             : (res.customerData || {});
           customerEmail = parsed.email || '';
           customerName = parsed.nome || '';
+          customerLastName = parsed.sobrenome || '';
+          bookingData = parsed.booking || {};
+          const pm = parsed.paymentMethod || '';
+          isPrepaid = pm === 'CREDIT' || pm === 'PIX' || !!parsed.cieloPaymentId || res.status === 'CONFIRMED_PREPAID';
         } catch { }
+
+        const newStatus = mapXRSStatusToLocal(xrs.xrsStatusCode, res.status, isPrepaid);
+        const oldOpStatus = res.operationalStatus || 'R';
+        const newOpStatus = xrs.xrsStatusCode;
+
+        const opStatusChanged = oldOpStatus !== newOpStatus;
+        const statusChanged = !!newStatus && newStatus !== res.status;
+
+        if (!opStatusChanged && !statusChanged) {
+          // Nenhuma alteração detectada
+          continue;
+        }
+
+        // ═══ STATUS OU STATUS OPERACIONAL MUDOU ═══
+        console.log(`[sync-greenway] ${res.resNumber}: status=${res.status}${statusChanged ? ` → ${newStatus}` : ''} | opStatus=${oldOpStatus} → ${newOpStatus} (XRS: ${xrs.xrsStatusCode})`);
+
+        // Atualizar no banco
+        await prisma.localReservation.update({
+          where: { id: res.id },
+          data: {
+            ...(statusChanged && newStatus ? { status: newStatus } : {}),
+            operationalStatus: newOpStatus,
+          },
+        });
+
+        let action = 'status_updated';
 
         // ── Ações específicas por tipo de mudança ──
 
-        // ON_REQUEST → CONFIRMADA: enviar email de confirmação
-        if (res.status === 'ON_REQUEST' && newStatus === 'CONFIRMED_NON_PREPAID') {
+        // ON_REQUEST → CONFIRMADA (CF ou S): enviar email de confirmação
+        const wasOnRequest = res.status === 'ON_REQUEST' || oldOpStatus === 'R';
+        const isNowConfirmed = newOpStatus === 'CF' || newOpStatus === 'S';
+
+        if (wasOnRequest && isNowConfirmed) {
           action = 'on_request_confirmed';
           if (customerEmail) {
             try {
-              await sendTransactionalEmail(customerEmail, 'confirmacao', {
-                nome: customerName,
-                resNumber: res.resNumber,
-                status: 'Confirmada',
-                mensagem: 'Sua reserva On Request foi CONFIRMADA pela Europcar! Sua locação está garantida.',
-              });
+              const car = bookingData.car || {};
+              const totalBRL = res.amountInCents ? res.amountInCents / 100 : 0;
+              const { buildEmailCurrencyVars } = await import('@/lib/receiptLocales');
+              const cv = buildEmailCurrencyVars(
+                totalBRL,
+                bookingData.pickupStation,
+                parseFloat(car.exchangeRate || '1'),
+                car.currency || 'BRL'
+              );
+              const fmtDate = (d: string) => (d && d.length >= 8 ? `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : d || '');
+
+              const emailVars: Record<string, string> = {
+                NOME: customerName,
+                SOBRENOME: customerLastName,
+                EMAIL: customerEmail,
+                NUMERO_RESERVA: res.resNumber || '',
+                CARRO: car.carCategoryName || car.name || '',
+                DATA_RETIRADA: fmtDate(bookingData.pickupDate || ''),
+                LOCAL_RETIRADA: bookingData.pickupStation || '',
+                DATA_DEVOLUCAO: fmtDate(bookingData.returnDate || ''),
+                LOCAL_DEVOLUCAO: bookingData.returnStation || bookingData.pickupStation || '',
+                VALOR_TOTAL: cv.VALOR_TOTAL,
+                VALOR_LOCAL: cv.VALOR_LOCAL,
+                VALOR_BRL: cv.VALOR_BRL,
+                MOEDA: cv.MOEDA,
+                FORMA_PAGAMENTO: isPrepaid ? 'Pago Online (Cielo)' : 'Pagar no Balcão',
+                STATUS: 'Confirmada',
+                MENSAGEM: 'Sua reserva On Request foi CONFIRMADA pela Europcar! Sua locação está garantida.',
+              };
+
+              await sendTransactionalEmail(customerEmail, 'RESERVA_CONFIRMADA', emailVars).catch(() =>
+                sendTransactionalEmail(customerEmail, 'RESERVA_SUCESSO', emailVars)
+              );
             } catch (emailErr: any) {
               console.error(`[sync-greenway] Erro ao enviar email de confirmação para ${res.resNumber}:`, emailErr.message);
             }
@@ -215,11 +259,11 @@ export async function POST(req: Request) {
           // Enviar email de cancelamento
           if (customerEmail) {
             try {
-              await sendTransactionalEmail(customerEmail, 'cancelamento', {
-                nome: customerName,
-                resNumber: res.resNumber,
-                status: 'Cancelada',
-                mensagem: 'Sua reserva foi cancelada pela operação Europcar. Caso tenha sido cobrado, o estorno será processado automaticamente.',
+              await sendTransactionalEmail(customerEmail, 'CANCELAMENTO', {
+                NOME: customerName,
+                NUMERO_RESERVA: res.resNumber || '',
+                STATUS: 'Cancelada',
+                MENSAGEM: 'Sua reserva foi cancelada pela operação Europcar. Caso tenha sido cobrado, o estorno será processado automaticamente.',
               });
             } catch (emailErr: any) {
               console.error(`[sync-greenway] Erro ao enviar email de cancelamento para ${res.resNumber}:`, emailErr.message);
@@ -227,17 +271,24 @@ export async function POST(req: Request) {
           }
         }
 
-        // ON_REQUEST → CANCELADA: informar que foi recusada
-        if (res.status === 'ON_REQUEST' && (newStatus === 'CANCELLED_GREENWAY' || newStatus === 'NO_SHOW')) {
+        // ON_REQUEST → CANCELADA / REJEITADA
+        if (wasOnRequest && (newStatus === 'CANCELLED_GREENWAY' || newOpStatus === 'CC' || newOpStatus === 'CS')) {
           action = 'on_request_rejected';
           if (customerEmail) {
             try {
-              await sendTransactionalEmail(customerEmail, 'cancelamento', {
-                nome: customerName,
-                resNumber: res.resNumber,
-                status: 'Recusada',
-                mensagem: 'Sua solicitação de reserva On Request não foi confirmada pela Europcar. Nenhuma cobrança foi realizada.',
-              });
+              await sendTransactionalEmail(customerEmail, 'RESERVA_REJEITADA', {
+                NOME: customerName,
+                NUMERO_RESERVA: res.resNumber || '',
+                STATUS: 'Recusada',
+                MENSAGEM: 'Sua solicitação de reserva On Request não foi confirmada pela Europcar. Nenhuma cobrança foi realizada.',
+              }).catch(() =>
+                sendTransactionalEmail(customerEmail, 'CANCELAMENTO', {
+                  NOME: customerName,
+                  NUMERO_RESERVA: res.resNumber || '',
+                  STATUS: 'Recusada',
+                  MENSAGEM: 'Sua solicitação de reserva On Request não foi confirmada pela Europcar.',
+                })
+              );
             } catch (emailErr: any) {
               console.error(`[sync-greenway] Erro ao enviar email de rejeição para ${res.resNumber}:`, emailErr.message);
             }
@@ -247,8 +298,10 @@ export async function POST(req: Request) {
         results.push({
           resNumber: res.resNumber,
           oldStatus: res.status,
-          newStatus,
-          xrsStatus: xrs.xrsStatusCode,
+          newStatus: newStatus || res.status,
+          oldOpStatus,
+          newOpStatus,
+          xrsStatus: xrs.xrsStatus,
           action,
         });
 

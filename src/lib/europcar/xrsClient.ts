@@ -353,39 +353,65 @@ const XRS_STATUS_MAP: Record<string, string> = {
 export async function readBooking(resNumber: string): Promise<ReadBookingResult> {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <message>
-  <serviceRequest serviceCode="readBooking">
+  <serviceRequest serviceCode="search.searchbyid">
     <serviceParameters>
-      <reservation resNumber="${escapeXml(resNumber)}"/>
+      <reservation resNumber="${escapeXml(resNumber)}" />
     </serviceParameters>
   </serviceRequest>
 </message>`;
 
   try {
+    let callerCode = process.env.XRS_CALLER_CODE || '';
+    let password = process.env.XRS_PASSWORD || '';
+
+    if (!callerCode || !password) {
+      try {
+        const dbConfig = await prisma.xRSConfig.findFirst();
+        if (dbConfig) {
+          callerCode = callerCode || dbConfig.callerCode || '';
+          password = password || dbConfig.password || '';
+        }
+      } catch (dbErr) {
+        console.warn('[readBooking] Falha ao carregar xRSConfig do banco:', dbErr);
+      }
+    }
+
     const response = await callXRS(xml, {
-      callerCode: process.env.XRS_CALLER_CODE || '',
-      password: process.env.XRS_PASSWORD || '',
-      action: 'readBooking',
+      callerCode: callerCode || 'DEMO',
+      password: password || 'DEMO',
+      action: 'search.searchbyid',
       sourceFile: 'xrsClient.ts',
     });
 
-    const resNode = response?.message?.serviceResponse?.reservation;
+    const resNode =
+      response?.message?.serviceResponse?.reservation ||
+      response?.serviceResponse?.reservation;
+
     if (!resNode) {
-      // Verificar se há erro (reserva não encontrada)
-      const errNode = response?.message?.serviceResponse?.errors?.error;
-      const errText = errNode?.$?.errorText || errNode?.errorText || 'Reserva não encontrada no Greenway';
+      // Verificar se há erro retornado pelo XRS
+      const errNode =
+        response?.message?.serviceResponse?.errors?.error ||
+        response?.serviceResponse?.errors?.error ||
+        response?.message?.errors?.error ||
+        response?.errors?.error;
+      const errText =
+        (Array.isArray(errNode)
+          ? errNode.map((e: any) => e.$?.errorText || e.errorText || e.$?.description || e.description || '').filter(Boolean).join(' | ')
+          : (errNode?.$?.errorText || errNode?.errorText || errNode?.$?.description || errNode?.description)) ||
+        'Reserva não encontrada no Greenway';
       return { found: false, resNumber, xrsStatusCode: '', xrsStatus: '', error: errText };
     }
 
     const attrs = resNode.$ || resNode;
-    const statusCode: string = attrs.statusCode || '';
+    const statusCode: string = (attrs.statusCode || '').toUpperCase();
     const carCategory = attrs.carCategory || resNode.vehicleCategory?.$?.code || '';
-    const pickupStation = attrs.pickupStationCode || '';
-    const pickupDate = attrs.pickupDate || '';
-    const returnDate = attrs.returnDate || '';
+    const pickupStation = attrs.pickupStationCode || resNode.checkout?.$?.stationID || attrs.pickupStation || '';
+    const pickupDate = attrs.pickupDate || resNode.checkout?.$?.date || '';
+    const returnDate = attrs.returnDate || resNode.checkin?.$?.date || '';
 
     return {
       found: true,
-      resNumber,
+      resNumber: attrs.resNumber || resNumber,
       xrsStatusCode: statusCode,
       xrsStatus: XRS_STATUS_MAP[statusCode] || `Desconhecido (${statusCode})`,
       carCategory,

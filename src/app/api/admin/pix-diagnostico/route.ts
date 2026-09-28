@@ -81,7 +81,7 @@ export async function GET() {
         resNumber: res.resNumber,
         status: res.status,
         amountInCents: res.amountInCents,
-        amountBRL: `R$ ${(res.amountInCents / 100).toFixed(2)}`,
+        amountBRL: res.amountInCents ? `R$ ${(res.amountInCents / 100).toFixed(2)}` : 'R$ 0,00',
         createdAt: res.createdAt,
         hasPaymentId,
         paymentId: paymentId ? `${paymentId.slice(0, 8)}...` : 'MISSING',

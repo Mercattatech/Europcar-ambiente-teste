@@ -27,7 +27,13 @@ export async function GET(req: Request) {
     const xrsConfig = await prisma.xRSConfig.findFirst();
     if (!xrsConfig) return NextResponse.json({ error: 'XRS config missing' }, { status: 500 });
     const pending = await prisma.localReservation.findMany({
-      where: { status: 'ON_REQUEST' }, orderBy: { createdAt: 'asc' },
+      where: {
+        OR: [
+          { status: 'ON_REQUEST' },
+          { operationalStatus: 'R' }
+        ]
+      },
+      orderBy: { createdAt: 'asc' },
     });
     console.log(`[sync-on-request] Verificando ${pending.length} reservas ON_REQUEST`);
     const results: any[] = [];
@@ -43,13 +49,17 @@ export async function GET(req: Request) {
         const warningList = resNode?.warningList?.warning ?? null;
         const warnings: any[] = Array.isArray(warningList) ? warningList.map((w: any) => w.$ || w) : warningList ? [warningList.$ || warningList] : [];
         const isRejected = statusCode === 'R' && warnings.some((w: any) => (w.warningDesc||'').toLowerCase().includes('onrequestitemfailed') || (w.warningDesc||'').toLowerCase().includes('nochangeallowed'));
-        const isConfirmed = statusCode === 'CF';
-        const parsedData = JSON.parse(reserva.customerData || '{}');
+        const isConfirmed = statusCode === 'CF' || statusCode === 'S';
+        const parsedData = typeof reserva.customerData === 'string'
+          ? JSON.parse(reserva.customerData)
+          : ((reserva.customerData as any) || {});
         const booking = parsedData.booking || {};
         const car = booking.car || {};
         const fmtDate = (d: string) => d && d.length >= 8 ? `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}` : d || '';
+        const isPrepaid = parsedData.paymentMethod === 'CREDIT' || parsedData.paymentMethod === 'PIX' || !!parsedData.cieloPaymentId || reserva.status === 'CONFIRMED_PREPAID';
+        const targetStatus = isPrepaid ? 'CONFIRMED_PREPAID' : 'CONFIRMED_NON_PREPAID';
         if (isConfirmed) {
-          await prisma.localReservation.update({ where: { id: reserva.id }, data: { status: 'CONFIRMED_NON_PREPAID', operationalStatus: 'CF' } });
+          await prisma.localReservation.update({ where: { id: reserva.id }, data: { status: targetStatus, operationalStatus: statusCode || 'CF' } });
           const totalBRL = reserva.amountInCents ? reserva.amountInCents / 100 : 0;
           const cv = buildEmailCurrencyVars(totalBRL, booking.pickupStation, parseFloat(car.exchangeRate||'1'), car.currency||'BRL');
           const { sendTransactionalEmail } = await import('@/lib/emailService');
@@ -59,10 +69,10 @@ export async function GET(req: Request) {
             DATA_RETIRADA: fmtDate(booking.pickupDate||''), LOCAL_RETIRADA: booking.pickupStation||'',
             DATA_DEVOLUCAO: fmtDate(booking.returnDate||''), LOCAL_DEVOLUCAO: booking.returnStation||booking.pickupStation||'',
             VALOR_TOTAL: cv.VALOR_TOTAL, VALOR_LOCAL: cv.VALOR_LOCAL, VALOR_BRL: cv.VALOR_BRL, MOEDA: cv.MOEDA,
-            FORMA_PAGAMENTO: parsedData.paymentMethod||'Pagar no Balcão',
+            FORMA_PAGAMENTO: isPrepaid ? 'Pago Online (Cielo)' : (parsedData.paymentMethod || 'Pagar no Balcão'),
           });
-          console.log(`[sync-on-request] CONFIRMADA: ${reserva.resNumber}`);
-          results.push({ resNumber: reserva.resNumber, status: 'CONFIRMED' });
+          console.log(`[sync-on-request] CONFIRMADA: ${reserva.resNumber} (${targetStatus})`);
+          results.push({ resNumber: reserva.resNumber, status: 'CONFIRMED', targetStatus, opStatus: statusCode || 'CF' });
         } else if (isRejected) {
           try {
             await callXRS(
