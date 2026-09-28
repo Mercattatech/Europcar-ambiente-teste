@@ -63,14 +63,35 @@ export async function GET(req: Request) {
           const totalBRL = reserva.amountInCents ? reserva.amountInCents / 100 : 0;
           const cv = buildEmailCurrencyVars(totalBRL, booking.pickupStation, parseFloat(car.exchangeRate||'1'), car.currency||'BRL');
           const { sendTransactionalEmail } = await import('@/lib/emailService');
-          await sendTransactionalEmail(parsedData.email, 'RESERVA_CONFIRMADA', {
+          const emailVars = {
             NOME: parsedData.nome||'', SOBRENOME: parsedData.sobrenome||'', EMAIL: parsedData.email||'',
             NUMERO_RESERVA: reserva.resNumber||'', CARRO: car.carCategoryName||car.name||'',
             DATA_RETIRADA: fmtDate(booking.pickupDate||''), LOCAL_RETIRADA: booking.pickupStation||'',
             DATA_DEVOLUCAO: fmtDate(booking.returnDate||''), LOCAL_DEVOLUCAO: booking.returnStation||booking.pickupStation||'',
             VALOR_TOTAL: cv.VALOR_TOTAL, VALOR_LOCAL: cv.VALOR_LOCAL, VALOR_BRL: cv.VALOR_BRL, MOEDA: cv.MOEDA,
             FORMA_PAGAMENTO: isPrepaid ? 'Pago Online (Cielo)' : (parsedData.paymentMethod || 'Pagar no Balcão'),
-          });
+          };
+          let sent = await sendTransactionalEmail(parsedData.email, 'RESERVA_CONFIRMADA', emailVars);
+          if (!sent.success) {
+            sent = await sendTransactionalEmail(parsedData.email, 'RESERVA_SUCESSO', emailVars);
+          }
+          if (!sent.success) {
+            console.log(`[sync-on-request] Template não encontrado no banco. Enviando via sendBookingConfirmation fallback...`);
+            const { sendBookingConfirmation } = await import('@/lib/email/sendBookingConfirmation');
+            await sendBookingConfirmation({
+              toEmail: parsedData.email,
+              customerName: `${parsedData.nome||''} ${parsedData.sobrenome||''}`.trim(),
+              resNumber: reserva.resNumber||'',
+              carName: car.carCategoryName || car.name || '',
+              pickupStation: booking.pickupStation || '',
+              returnStation: booking.returnStation || booking.pickupStation || '',
+              pickupDate: booking.pickupDate || '',
+              returnDate: booking.returnDate || '',
+              paymentMethod: isPrepaid ? 'CREDIT' : 'BALCAO',
+              totalBRL: totalBRL,
+              isOnRequest: false,
+            });
+          }
           console.log(`[sync-on-request] CONFIRMADA: ${reserva.resNumber} (${targetStatus})`);
           results.push({ resNumber: reserva.resNumber, status: 'CONFIRMED', targetStatus, opStatus: statusCode || 'CF' });
         } else if (isRejected) {

@@ -233,9 +233,27 @@ export async function POST(req: Request) {
                 MENSAGEM: 'Sua reserva On Request foi CONFIRMADA pela Europcar! Sua locação está garantida.',
               };
 
-              await sendTransactionalEmail(customerEmail, 'RESERVA_CONFIRMADA', emailVars).catch(() =>
-                sendTransactionalEmail(customerEmail, 'RESERVA_SUCESSO', emailVars)
-              );
+              let sent = await sendTransactionalEmail(customerEmail, 'RESERVA_CONFIRMADA', emailVars);
+              if (!sent.success) {
+                sent = await sendTransactionalEmail(customerEmail, 'RESERVA_SUCESSO', emailVars);
+              }
+              if (!sent.success) {
+                console.log(`[sync-greenway] Template não encontrado no banco. Enviando via sendBookingConfirmation fallback...`);
+                const { sendBookingConfirmation } = await import('@/lib/email/sendBookingConfirmation');
+                await sendBookingConfirmation({
+                  toEmail: customerEmail,
+                  customerName: `${customerName} ${customerLastName}`.trim(),
+                  resNumber: res.resNumber || '',
+                  carName: car.carCategoryName || car.name || '',
+                  pickupStation: bookingData.pickupStation || '',
+                  returnStation: bookingData.returnStation || bookingData.pickupStation || '',
+                  pickupDate: bookingData.pickupDate || '',
+                  returnDate: bookingData.returnDate || '',
+                  paymentMethod: isPrepaid ? 'CREDIT' : 'BALCAO',
+                  totalBRL: totalBRL,
+                  isOnRequest: false,
+                });
+              }
             } catch (emailErr: any) {
               console.error(`[sync-greenway] Erro ao enviar email de confirmação para ${res.resNumber}:`, emailErr.message);
             }
