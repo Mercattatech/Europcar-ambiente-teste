@@ -842,6 +842,8 @@ export default function CheckoutPage() {
               body: JSON.stringify({
                 sessionId,
                 step: 4,
+                status: "ABANDONED",
+                abandonedAt: `Etapa 4 - Falha no pagamento: ${errorMsg}`,
                 userId: customerName ? `${customerName} (${email})` : undefined,
                 paymentMethod,
                 selectedExtras: {
@@ -871,6 +873,8 @@ export default function CheckoutPage() {
             body: JSON.stringify({
               sessionId,
               step: 4,
+              status: "ABANDONED",
+              abandonedAt: "Etapa 4 - Falha de conexão / timeout",
               userId: customerName ? `${customerName} (${email})` : undefined,
               paymentMethod,
               selectedExtras: {

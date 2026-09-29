@@ -591,6 +591,11 @@ export default function JornadaPage() {
                           <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${statusInfo.color}`}>
                             {statusInfo.label}
                           </span>
+                          {j.status === "ABANDONED" && j.abandonedAt && (
+                            <p className="text-[9px] text-red-400/80 mt-1 font-mono truncate max-w-[120px]" title={j.abandonedAt}>
+                              {j.abandonedAt}
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {j.resNumber ? (
@@ -855,6 +860,18 @@ export default function JornadaPage() {
                                     <span className="text-gray-500">IP:</span>
                                     <span className="text-white font-mono text-[11px]">{j.ipAddress || "—"}</span>
                                   </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-gray-500">Status:</span>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusInfo.color}`}>
+                                      {statusInfo.label}
+                                    </span>
+                                  </div>
+                                  {j.status === "ABANDONED" && (
+                                    <div className="flex justify-between items-center bg-red-950/40 p-2 rounded-lg border border-red-900/50">
+                                      <span className="text-red-400 font-medium text-[11px]">Ponto de Abandono:</span>
+                                      <span className="text-red-200 font-bold text-[11px] font-mono">{j.abandonedAt || `Etapa ${j.currentStep}`}</span>
+                                    </div>
+                                  )}
                                   <div className="flex justify-between">
                                     <span className="text-gray-500">Criado:</span>
                                     <span className="text-white">{fmtDate(j.createdAt)}</span>

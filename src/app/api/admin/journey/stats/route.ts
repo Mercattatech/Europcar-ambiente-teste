@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { checkAdmin } from "@/lib/checkAdmin";
+import { markAbandonedJourneys } from "@/lib/journey/abandonment";
 
 export async function GET(req: NextRequest) {
   try {
     if (!(await checkAdmin())) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Auto-mark journeys inactive for > 30 minutes as ABANDONED
+    await markAbandonedJourneys(30);
+
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get("startDate") || "";
     const endDate = searchParams.get("endDate") || "";

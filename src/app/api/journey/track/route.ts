@@ -123,9 +123,13 @@ export async function POST(req: NextRequest) {
     // Update status
     if (status === "COMPLETED") {
       updateData.status = "COMPLETED";
+      updateData.abandonedAt = null;
     } else if (status === "ABANDONED") {
       updateData.status = "ABANDONED";
-      updateData.abandonedAt = `Etapa ${step}`;
+      updateData.abandonedAt = body.abandonedAt || `Etapa ${step}`;
+    } else if (existing?.status === "ABANDONED" && status !== "ABANDONED") {
+      updateData.status = "IN_PROGRESS";
+      updateData.abandonedAt = null;
     }
 
     let journey;
