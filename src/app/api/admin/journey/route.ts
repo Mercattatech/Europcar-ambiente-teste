@@ -51,6 +51,7 @@ export async function GET(req: NextRequest) {
         { selectedCarName: { contains: search, mode: "insensitive" } },
         { resNumber: { contains: search, mode: "insensitive" } },
         { sessionId: { contains: search, mode: "insensitive" } },
+        { userId: { contains: search, mode: "insensitive" } },
       ];
     }
 

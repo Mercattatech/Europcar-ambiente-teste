@@ -2009,11 +2009,37 @@ function VehiclesContent() {
                       try {
                         const sessionId = sessionStorage.getItem("europcar_journey_session");
                         if (sessionId) {
-                          const extraNames = [...xrsEquipmentPayload.map((e: any) => e.name), ...xrsInsurancesPayload.map((e: any) => e.name)];
+                          const baseCarPrice = parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || selectedCar?.totalRateEstimate || "0") || 0;
+                          const insTotal = xrsInsurancesPayload.reduce((sum: number, ins: any) => sum + (parseFloat(ins.priceBRL) || 0), 0);
+                          const eqTotal = xrsEquipmentPayload.reduce((sum: number, eq: any) => sum + (parseFloat(eq.totalBRL || (eq.priceBRL * eq.qty)) || 0), 0);
+                          const journeyExtrasPayload = {
+                            insurances: xrsInsurancesPayload.map((ins: any) => ({
+                              code: ins.code,
+                              name: ins.name,
+                              priceBRL: parseFloat(ins.priceBRL) || 0,
+                            })),
+                            equipment: xrsEquipmentPayload.map((eq: any) => ({
+                              code: eq.code,
+                              name: eq.name,
+                              qty: eq.qty || 1,
+                              priceBRL: parseFloat(eq.priceBRL) || 0,
+                              totalBRL: parseFloat(eq.totalBRL || (eq.priceBRL * eq.qty)) || 0,
+                            })),
+                            insurancesTotal: insTotal,
+                            equipmentTotal: eqTotal,
+                            extrasTotal: insTotal + eqTotal,
+                            carPrice: baseCarPrice,
+                            totalPrice: baseCarPrice + insTotal + eqTotal,
+                          };
                           fetch("/api/journey/track", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ sessionId, step: 3, selectedExtras: extraNames.length > 0 ? extraNames : null }),
+                            body: JSON.stringify({
+                              sessionId,
+                              step: 3,
+                              carPrice: baseCarPrice,
+                              selectedExtras: journeyExtrasPayload,
+                            }),
                           }).catch(() => {});
                         }
                       } catch {}
@@ -2058,14 +2084,36 @@ function VehiclesContent() {
                       try {
                         const sessionId = sessionStorage.getItem("europcar_journey_session");
                         if (sessionId) {
-                          const extraNames2 = [...xrsEquipmentPayload2.map((e: any) => e.name), ...xrsInsurancesPayload2.map((e: any) => e.name)];
+                          const baseCarPrice2 = parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || "0");
+                          const insTotal2 = xrsInsurancesPayload2.reduce((acc: number, cur: any) => acc + (parseFloat(cur.priceBRL) || 0), 0);
+                          const eqTotal2 = xrsEquipmentPayload2.reduce((acc: number, cur: any) => acc + (parseFloat(cur.totalBRL || (cur.priceBRL * cur.qty)) || 0), 0);
+                          const journeyExtrasPayload2 = {
+                            insurances: xrsInsurancesPayload2.map((ins: any) => ({
+                              code: ins.code,
+                              name: ins.name,
+                              priceBRL: parseFloat(ins.priceBRL) || 0,
+                            })),
+                            equipment: xrsEquipmentPayload2.map((eq: any) => ({
+                              code: eq.code,
+                              name: eq.name,
+                              qty: eq.qty || 1,
+                              priceBRL: parseFloat(eq.priceBRL) || 0,
+                              totalBRL: parseFloat(eq.totalBRL || (eq.priceBRL * eq.qty)) || 0,
+                            })),
+                            insurancesTotal: insTotal2,
+                            equipmentTotal: eqTotal2,
+                            extrasTotal: insTotal2 + eqTotal2,
+                            carPrice: baseCarPrice2,
+                            totalPrice: baseCarPrice2 + insTotal2 + eqTotal2,
+                          };
                           fetch("/api/journey/track", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
                               sessionId,
                               step: 3,
-                              selectedExtras: extraNames2.length > 0 ? extraNames2 : null,
+                              carPrice: baseCarPrice2,
+                              selectedExtras: journeyExtrasPayload2,
                             }),
                           }).catch(() => {});
                         }

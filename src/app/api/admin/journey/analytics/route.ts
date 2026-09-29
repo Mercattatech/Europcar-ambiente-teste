@@ -77,11 +77,27 @@ export async function GET(req: NextRequest) {
           : j.selectedExtras;
         
         if (typeof extras === "object" && extras !== null) {
-          // extras can be { CODE: qty, ... } or [{ code, name, qty }, ...]
-          if (Array.isArray(extras)) {
+          if (extras.insurances || extras.equipment) {
+            (extras.insurances || []).forEach((ins: any) => {
+              const code = ins.code || "unknown";
+              const name = ins.name || code;
+              if (!extraCounts[code]) {
+                extraCounts[code] = { name, code, count: 0 };
+              }
+              extraCounts[code].count++;
+            });
+            (extras.equipment || []).forEach((eq: any) => {
+              const code = eq.code || "unknown";
+              const name = eq.name || code;
+              if (!extraCounts[code]) {
+                extraCounts[code] = { name, code, count: 0 };
+              }
+              extraCounts[code].count += (eq.qty || 1);
+            });
+          } else if (Array.isArray(extras)) {
             extras.forEach((e: any) => {
-              const code = e.code || e.id || "unknown";
-              const name = e.name || code;
+              const code = typeof e === "string" ? e : (e.code || e.id || "unknown");
+              const name = typeof e === "string" ? e : (e.name || code);
               if (!extraCounts[code]) {
                 extraCounts[code] = { name, code, count: 0 };
               }

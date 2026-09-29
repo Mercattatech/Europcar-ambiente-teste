@@ -176,13 +176,43 @@ export default function CheckoutPage() {
       try {
         const sessionId = sessionStorage.getItem("europcar_journey_session");
         if (sessionId) {
+          const baseCarPrice = parseFloat(parsed.car?.totalRateEstimateInBookingCurrency || "0");
+          const insList = (parsed.xrsInsurances || []).map((ins: any) => ({
+            code: ins.code,
+            name: ins.name,
+            priceBRL: parseFloat(ins.priceBRL) || 0,
+          }));
+          const eqList = (parsed.xrsEquipment || []).map((eq: any) => ({
+            code: eq.code,
+            name: eq.name,
+            qty: eq.qty || 1,
+            priceBRL: parseFloat(eq.priceBRL) || 0,
+            totalBRL: parseFloat(eq.totalBRL || (eq.priceBRL * (eq.qty || 1))) || 0,
+          }));
+          const insTotal = insList.reduce((acc: number, c: any) => acc + c.priceBRL, 0);
+          const eqTotal = eqList.reduce((acc: number, c: any) => acc + c.totalBRL, 0);
+          const extrasTotal = insTotal + eqTotal;
+          const totalPrice = baseCarPrice + extrasTotal;
+
           fetch("/api/journey/track", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               sessionId,
               step: 4,
-              userId: undefined, // will be set once session loads
+              selectedCar: parsed.car?.carCategoryCode,
+              selectedCarName: parsed.car?.headline || parsed.car?.vehicleGroupDesc || parsed.car?.category,
+              carPrice: baseCarPrice,
+              selectedExtras: {
+                insurances: insList,
+                equipment: eqList,
+                insurancesTotal: insTotal,
+                equipmentTotal: eqTotal,
+                extrasTotal: extrasTotal,
+                carPrice: baseCarPrice,
+                totalPrice: totalPrice,
+              },
+              paymentMethod: parsed.tariffType === 'ETO' ? 'CREDIT' : paymentMethod,
             }),
           }).catch(() => { });
         }
@@ -523,12 +553,20 @@ export default function CheckoutPage() {
             try {
               const sessionId = sessionStorage.getItem("europcar_journey_session");
               if (sessionId) {
-                fetch("/api/journey/track", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ sessionId, step: 5, resNumber: d.resNumber, paymentMethod: "PIX", status: "COMPLETED" }),
-                }).catch(() => { });
-                sessionStorage.removeItem("europcar_journey_session");
+              const customerName = `${nome} ${sobrenome}`.trim();
+              fetch("/api/journey/track", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  sessionId,
+                  step: 5,
+                  resNumber: d.resNumber,
+                  paymentMethod: "PIX",
+                  status: "COMPLETED",
+                  userId: customerName ? `${customerName} (${email})` : (session?.user?.email || undefined),
+                }),
+              }).catch(() => { });
+              sessionStorage.removeItem("europcar_journey_session");
               }
             } catch { }
             // Redirect to thank you page
@@ -728,10 +766,18 @@ export default function CheckoutPage() {
           try {
             const sessionId = sessionStorage.getItem("europcar_journey_session");
             if (sessionId) {
+              const customerName = `${nome} ${sobrenome}`.trim();
               fetch("/api/journey/track", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ sessionId, step: 5, resNumber: json.resNumber, paymentMethod, status: "COMPLETED", userId: session?.user?.email || undefined }),
+                body: JSON.stringify({
+                  sessionId,
+                  step: 5,
+                  resNumber: json.resNumber,
+                  paymentMethod,
+                  status: "COMPLETED",
+                  userId: customerName ? `${customerName} (${email})` : (session?.user?.email || undefined),
+                }),
               }).catch(() => { });
               sessionStorage.removeItem("europcar_journey_session");
             }
@@ -756,10 +802,18 @@ export default function CheckoutPage() {
           try {
             const sessionId = sessionStorage.getItem("europcar_journey_session");
             if (sessionId) {
+              const customerName = `${nome} ${sobrenome}`.trim();
               fetch("/api/journey/track", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ sessionId, step: 5, resNumber: json.resNumber, paymentMethod, status: "COMPLETED", userId: session?.user?.email || undefined }),
+                body: JSON.stringify({
+                  sessionId,
+                  step: 5,
+                  resNumber: json.resNumber,
+                  paymentMethod,
+                  status: "COMPLETED",
+                  userId: customerName ? `${customerName} (${email})` : (session?.user?.email || undefined),
+                }),
               }).catch(() => { });
               sessionStorage.removeItem("europcar_journey_session");
             }
@@ -777,9 +831,62 @@ export default function CheckoutPage() {
             })();
         }
       } else {
-        alert("Erro ao finalizar reserva: " + (json.error || "Desconhecido"));
+        const errorMsg = json.error || "Desconhecido";
+        try {
+          const sessionId = sessionStorage.getItem("europcar_journey_session");
+          if (sessionId) {
+            const customerName = `${nome} ${sobrenome}`.trim();
+            fetch("/api/journey/track", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                sessionId,
+                step: 4,
+                userId: customerName ? `${customerName} (${email})` : undefined,
+                paymentMethod,
+                selectedExtras: {
+                  customer: {
+                    name: customerName,
+                    email,
+                    phone: telefone,
+                    cpf,
+                  },
+                  attemptError: errorMsg,
+                  lastAttemptAt: new Date().toISOString(),
+                },
+              }),
+            }).catch(() => { });
+          }
+        } catch { }
+        alert("Erro ao finalizar reserva: " + errorMsg);
       }
     } catch {
+      try {
+        const sessionId = sessionStorage.getItem("europcar_journey_session");
+        if (sessionId) {
+          const customerName = `${nome} ${sobrenome}`.trim();
+          fetch("/api/journey/track", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId,
+              step: 4,
+              userId: customerName ? `${customerName} (${email})` : undefined,
+              paymentMethod,
+              selectedExtras: {
+                customer: {
+                  name: customerName,
+                  email,
+                  phone: telefone,
+                  cpf,
+                },
+                attemptError: "Falha de conexão / timeout ao processar reserva",
+                lastAttemptAt: new Date().toISOString(),
+              },
+            }),
+          }).catch(() => { });
+        }
+      } catch { }
       alert("Falha de conexão.");
     } finally {
       setLoading(false);

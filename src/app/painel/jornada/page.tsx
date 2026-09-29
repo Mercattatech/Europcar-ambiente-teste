@@ -120,6 +120,96 @@ export default function JornadaPage() {
     return t;
   };
 
+  const fmtBRL = (v: number | null | undefined) => {
+    if (v === null || v === undefined || isNaN(v)) return "—";
+    return `R$ ${Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const parseJourneyData = (j: any) => {
+    let carPrice = typeof j.carPrice === "number" ? j.carPrice : parseFloat(j.carPrice || "0") || 0;
+    let insurances: Array<{ code: string; name: string; priceBRL: number }> = [];
+    let equipment: Array<{ code: string; name: string; qty: number; priceBRL: number; totalBRL: number }> = [];
+    let insurancesTotal = 0;
+    let equipmentTotal = 0;
+    let extrasTotal = 0;
+    let totalPrice = 0;
+    let customer: { name?: string; email?: string; phone?: string; cpf?: string } | undefined = undefined;
+    let attemptError: string | undefined = undefined;
+    let lastAttemptAt: string | undefined = undefined;
+    let legacyExtras: string[] = [];
+    let isStructured = false;
+
+    if (j.selectedExtras) {
+      try {
+        const raw = typeof j.selectedExtras === "string" ? JSON.parse(j.selectedExtras) : j.selectedExtras;
+        if (Array.isArray(raw)) {
+          legacyExtras = raw.map((item: any) => typeof item === "string" ? item : (item.name || item.code || JSON.stringify(item)));
+        } else if (raw && typeof raw === "object") {
+          isStructured = true;
+          if (Array.isArray(raw.insurances)) {
+            insurances = raw.insurances.map((i: any) => ({
+              code: i.code || "",
+              name: i.name || i.code || "Proteção",
+              priceBRL: parseFloat(i.priceBRL) || 0,
+            }));
+          }
+          if (Array.isArray(raw.equipment)) {
+            equipment = raw.equipment.map((e: any) => ({
+              code: e.code || "",
+              name: e.name || e.code || "Extra",
+              qty: parseInt(e.qty) || 1,
+              priceBRL: parseFloat(e.priceBRL) || 0,
+              totalBRL: parseFloat(e.totalBRL || (parseFloat(e.priceBRL || 0) * (parseInt(e.qty) || 1))) || 0,
+            }));
+          }
+
+          insurancesTotal = typeof raw.insurancesTotal === "number"
+            ? raw.insurancesTotal
+            : insurances.reduce((acc, cur) => acc + cur.priceBRL, 0);
+
+          equipmentTotal = typeof raw.equipmentTotal === "number"
+            ? raw.equipmentTotal
+            : equipment.reduce((acc, cur) => acc + cur.totalBRL, 0);
+
+          extrasTotal = typeof raw.extrasTotal === "number"
+            ? raw.extrasTotal
+            : (insurancesTotal + equipmentTotal);
+
+          if (raw.carPrice) {
+            carPrice = parseFloat(raw.carPrice) || carPrice;
+          }
+
+          totalPrice = typeof raw.totalPrice === "number"
+            ? raw.totalPrice
+            : (carPrice + extrasTotal);
+
+          if (raw.customer) customer = raw.customer;
+          if (raw.attemptError) attemptError = raw.attemptError;
+          if (raw.lastAttemptAt) lastAttemptAt = raw.lastAttemptAt;
+        }
+      } catch {}
+    }
+
+    if (!isStructured) {
+      totalPrice = carPrice;
+    }
+
+    return {
+      carPrice,
+      insurances,
+      equipment,
+      insurancesTotal,
+      equipmentTotal,
+      extrasTotal,
+      totalPrice,
+      customer,
+      attemptError,
+      lastAttemptAt,
+      legacyExtras,
+      isStructured,
+    };
+  };
+
   // Funnel bar widths
   const funnelMax = stats?.funnel?.step1 || 1;
   const funnelData = stats
@@ -382,7 +472,7 @@ export default function JornadaPage() {
                 <tr className="border-b border-gray-800 text-left">
                   <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase">Data</th>
                   <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase">Estação Retirada</th>
-                  <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase">Carro</th>
+                  <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase">Veículo & Valores Somados</th>
                   <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase text-center">Etapa</th>
                   <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase text-center">Status</th>
                   <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase">Reserva</th>
@@ -394,6 +484,7 @@ export default function JornadaPage() {
                   const stepInfo = STEP_LABELS[j.currentStep] || { label: "?", icon: "❓", color: "bg-gray-500" };
                   const statusInfo = STATUS_LABELS[j.status] || { label: j.status, color: "bg-gray-600/20 text-gray-400" };
                   const isExpanded = expandedId === j.id;
+                  const parsed = parseJourneyData(j);
 
                   return (
                     <>
@@ -411,9 +502,67 @@ export default function JornadaPage() {
                         </td>
                         <td className="px-4 py-3">
                           {j.selectedCarName ? (
-                            <div>
-                              <p className="text-white font-bold text-xs">{j.selectedCarName}</p>
-                              {j.carPrice && <p className="text-[10px] text-green-400 font-bold">R$ {j.carPrice.toFixed(2).replace(".", ",")}</p>}
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="text-white font-bold text-xs truncate max-w-[220px]" title={j.selectedCarName}>
+                                  {j.selectedCarName}
+                                </p>
+                                {j.selectedCar && (
+                                  <span className="text-[9px] bg-gray-800 text-gray-400 px-1 py-0.2 rounded font-mono">
+                                    {j.selectedCar}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Badges for Protections & Extras */}
+                              {(parsed.insurances.length > 0 || parsed.equipment.length > 0 || parsed.legacyExtras.length > 0) && (
+                                <div className="flex flex-wrap gap-1 text-[10px]">
+                                  {parsed.insurances.length > 0 && (
+                                    <span className="bg-blue-950/70 text-blue-300 border border-blue-800/80 px-1.5 py-0.5 rounded font-medium">
+                                      🛡️ {parsed.insurances.length} {parsed.insurances.length === 1 ? 'proteção' : 'proteções'} (+{fmtBRL(parsed.insurancesTotal)})
+                                    </span>
+                                  )}
+                                  {parsed.equipment.length > 0 && (
+                                    <span className="bg-orange-950/70 text-orange-300 border border-orange-800/80 px-1.5 py-0.5 rounded font-medium">
+                                      📦 {parsed.equipment.length} {parsed.equipment.length === 1 ? 'extra' : 'extras'} (+{fmtBRL(parsed.equipmentTotal)})
+                                    </span>
+                                  )}
+                                  {parsed.legacyExtras.length > 0 && (
+                                    <span className="bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded text-[10px]">
+                                      +{parsed.legacyExtras.length} extras
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Prominent Summed Total */}
+                              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                                {parsed.totalPrice > 0 ? (
+                                  <>
+                                    <span className="text-[10px] text-gray-400">Total Somado:</span>
+                                    <span className="text-xs font-black text-green-400 bg-green-950/70 border border-green-800 px-1.5 py-0.5 rounded font-mono shadow-sm">
+                                      {fmtBRL(parsed.totalPrice)}
+                                    </span>
+                                  </>
+                                ) : parsed.carPrice > 0 ? (
+                                  <>
+                                    <span className="text-[10px] text-gray-400">Carro:</span>
+                                    <span className="text-xs font-bold text-green-400">{fmtBRL(parsed.carPrice)}</span>
+                                  </>
+                                ) : null}
+                              </div>
+
+                              {/* Error or user info */}
+                              {parsed.attemptError && (
+                                <div className="text-[10px] text-red-400 flex items-center gap-1 font-medium bg-red-950/40 border border-red-800/50 px-1.5 py-0.5 rounded w-fit max-w-[240px] truncate" title={parsed.attemptError}>
+                                  <span>⚠️ {parsed.attemptError}</span>
+                                </div>
+                              )}
+                              {(parsed.customer?.name || j.userId) && (
+                                <p className="text-[10px] text-gray-400 truncate max-w-[240px]" title={parsed.customer?.name || j.userId}>
+                                  👤 {parsed.customer?.name || j.userId}
+                                </p>
+                              )}
                             </div>
                           ) : (
                             <span className="text-gray-600 text-xs">—</span>
@@ -463,14 +612,33 @@ export default function JornadaPage() {
                       {isExpanded && (
                         <tr key={`${j.id}-details`} className="bg-gray-800/20">
                           <td colSpan={7} className="px-6 py-5">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {/* Payment Attempt Warning if failed */}
+                            {parsed.attemptError && (
+                              <div className="mb-5 bg-red-950/60 border border-red-700/80 rounded-xl p-4 flex items-start gap-3 shadow-md">
+                                <div className="text-2xl mt-0.5">⚠️</div>
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <h5 className="text-red-400 font-bold text-sm">Tentativa de Pagamento Não Aprovada</h5>
+                                    {parsed.lastAttemptAt && (
+                                      <span className="text-red-400/80 text-[11px] font-mono">{fmtDate(parsed.lastAttemptAt)}</span>
+                                    )}
+                                  </div>
+                                  <p className="text-red-200 text-xs mt-1">
+                                    <span className="font-semibold text-white">Motivo retornado: </span>
+                                    <span className="font-mono bg-red-900/60 text-red-100 px-2 py-0.5 rounded font-bold">{parsed.attemptError}</span>
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                               {/* Column 1: Trip Details */}
                               <div className="space-y-3">
                                 <h4 className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1.5">
-                                  <span className="w-1 h-3 bg-blue-500 rounded-full"></span>
+                                  <span className="w-1.5 h-3.5 bg-blue-500 rounded-full"></span>
                                   Dados da Pesquisa
                                 </h4>
-                                <div className="bg-gray-900 rounded-lg p-3 space-y-2 text-xs">
+                                <div className="bg-gray-900 border border-gray-800 rounded-xl p-3.5 space-y-2 text-xs">
                                   <div className="flex justify-between">
                                     <span className="text-gray-500">Retirada:</span>
                                     <span className="text-white font-bold">{j.pickupStationName || j.pickupStation || "—"}</span>
@@ -493,75 +661,199 @@ export default function JornadaPage() {
                                   </div>
                                   {j.contractID && (
                                     <div className="flex justify-between">
-                                      <span className="text-gray-500">Contrato/Promo:</span>
+                                      <span className="text-gray-500">Contrato/Tarifa:</span>
                                       <span className="text-yellow-400 font-mono font-bold">{j.contractID}</span>
                                     </div>
                                   )}
                                 </div>
                               </div>
 
-                              {/* Column 2: Selection */}
+                              {/* Column 2: Proteções Selecionadas */}
                               <div className="space-y-3">
-                                <h4 className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1.5">
-                                  <span className="w-1 h-3 bg-yellow-500 rounded-full"></span>
-                                  Seleções
-                                </h4>
-                                <div className="bg-gray-900 rounded-lg p-3 space-y-2 text-xs">
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-500">Carro:</span>
-                                    <span className="text-white font-bold">{j.selectedCarName || "Não selecionou"}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-500">Código:</span>
-                                    <span className="text-white font-mono">{j.selectedCar || "—"}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-500">Preço:</span>
-                                    <span className="text-green-400 font-bold">{j.carPrice ? `R$ ${j.carPrice.toFixed(2).replace(".", ",")}` : "—"}</span>
-                                  </div>
-                                  {j.selectedExtras && Array.isArray(j.selectedExtras) && j.selectedExtras.length > 0 && (
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1.5">
+                                    <span className="w-1.5 h-3.5 bg-blue-400 rounded-full"></span>
+                                    🛡️ Proteções ({parsed.insurances.length})
+                                  </h4>
+                                  {parsed.insurancesTotal > 0 && (
+                                    <span className="text-[11px] font-bold text-blue-400 bg-blue-950/70 border border-blue-800/80 px-2 py-0.5 rounded font-mono">
+                                      {fmtBRL(parsed.insurancesTotal)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="bg-gray-900 border border-gray-800 rounded-xl p-3.5 space-y-2 text-xs">
+                                  {parsed.insurances.length > 0 ? (
+                                    <div className="space-y-2">
+                                      {parsed.insurances.map((ins, idx) => (
+                                        <div key={idx} className="flex items-start justify-between bg-gray-800/60 p-2 rounded-lg border border-gray-700/50">
+                                          <div className="min-w-0 pr-2">
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="text-[9px] bg-blue-900/60 text-blue-300 border border-blue-700/60 px-1.5 py-0.2 rounded font-mono font-bold">
+                                                {ins.code}
+                                              </span>
+                                              <span className="text-white font-medium text-xs leading-tight">{ins.name}</span>
+                                            </div>
+                                          </div>
+                                          <span className="text-blue-300 font-bold font-mono text-xs whitespace-nowrap">
+                                            {fmtBRL(ins.priceBRL)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                      <div className="pt-2 border-t border-gray-800 flex justify-between items-center text-xs">
+                                        <span className="text-gray-400 font-medium">Subtotal Proteções:</span>
+                                        <span className="text-white font-black font-mono">{fmtBRL(parsed.insurancesTotal)}</span>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className="text-gray-500 text-xs italic py-2 text-center">Nenhuma proteção adicional selecionada</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Column 3: Extras e Equipamentos */}
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1.5">
+                                    <span className="w-1.5 h-3.5 bg-orange-400 rounded-full"></span>
+                                    📦 Extras & Equipamentos ({parsed.equipment.length})
+                                  </h4>
+                                  {parsed.equipmentTotal > 0 && (
+                                    <span className="text-[11px] font-bold text-orange-400 bg-orange-950/70 border border-orange-800/80 px-2 py-0.5 rounded font-mono">
+                                      {fmtBRL(parsed.equipmentTotal)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="bg-gray-900 border border-gray-800 rounded-xl p-3.5 space-y-2 text-xs">
+                                  {parsed.equipment.length > 0 ? (
+                                    <div className="space-y-2">
+                                      {parsed.equipment.map((eq, idx) => (
+                                        <div key={idx} className="flex items-start justify-between bg-gray-800/60 p-2 rounded-lg border border-gray-700/50">
+                                          <div className="min-w-0 pr-2">
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="text-[9px] bg-orange-900/60 text-orange-300 border border-orange-700/60 px-1.5 py-0.2 rounded font-mono font-bold">
+                                                {eq.code}
+                                              </span>
+                                              <span className="text-white font-medium text-xs leading-tight">{eq.name}</span>
+                                              {eq.qty > 1 && (
+                                                <span className="text-[10px] bg-gray-700 text-gray-300 px-1 rounded">x{eq.qty}</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <span className="text-orange-300 font-bold font-mono text-xs whitespace-nowrap">
+                                            {fmtBRL(eq.totalBRL)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                      <div className="pt-2 border-t border-gray-800 flex justify-between items-center text-xs">
+                                        <span className="text-gray-400 font-medium">Subtotal Extras:</span>
+                                        <span className="text-white font-black font-mono">{fmtBRL(parsed.equipmentTotal)}</span>
+                                      </div>
+                                    </div>
+                                  ) : parsed.legacyExtras.length > 0 ? (
                                     <div>
-                                      <span className="text-gray-500 block mb-1">Extras:</span>
+                                      <span className="text-gray-500 block mb-1">Extras selecionados:</span>
                                       <div className="flex flex-wrap gap-1">
-                                        {j.selectedExtras.map((ex: string, idx: number) => (
-                                          <span key={idx} className="text-[10px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full">{ex}</span>
+                                        {parsed.legacyExtras.map((ex, idx) => (
+                                          <span key={idx} className="text-[10px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full border border-gray-700">{ex}</span>
                                         ))}
                                       </div>
                                     </div>
+                                  ) : (
+                                    <p className="text-gray-500 text-xs italic py-2 text-center">Nenhum extra ou equipamento adicionado</p>
                                   )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Row 2: Demonstrativo de Valores Somados + Dados do Cliente */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
+                              {/* Demonstrativo Financeiro */}
+                              <div className="space-y-3">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1.5">
+                                  <span className="w-1.5 h-3.5 bg-green-500 rounded-full"></span>
+                                  💰 Demonstrativo de Valores Somados
+                                </h4>
+                                <div className="bg-gradient-to-br from-gray-900 to-gray-950 border border-green-900/60 rounded-xl p-4 space-y-2.5 text-xs shadow-md">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-gray-400">🚗 Veículo ({j.selectedCarName || "Aluguel"}):</span>
+                                    <span className="text-white font-bold font-mono">
+                                      {fmtBRL(parsed.carPrice)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-gray-400">🛡️ Proteções ({parsed.insurances.length} itens):</span>
+                                    <span className="text-blue-300 font-bold font-mono">
+                                      + {fmtBRL(parsed.insurancesTotal)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-gray-400">📦 Extras & Equipamentos ({parsed.equipment.length} itens):</span>
+                                    <span className="text-orange-300 font-bold font-mono">
+                                      + {fmtBRL(parsed.equipmentTotal)}
+                                    </span>
+                                  </div>
+
+                                  <div className="border-t border-gray-700 pt-2.5 mt-2 flex justify-between items-center">
+                                    <div>
+                                      <span className="text-xs font-black text-white uppercase block">Total Geral Somado</span>
+                                      <span className="text-[10px] text-gray-500">Veículo + Proteções + Extras</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="text-xl font-black text-green-400 font-mono tracking-tight">
+                                        {fmtBRL(parsed.totalPrice)}
+                                      </span>
+                                    </div>
+                                  </div>
+
                                   {j.paymentMethod && (
-                                    <div className="flex justify-between">
-                                      <span className="text-gray-500">Pagamento:</span>
-                                      <span className="text-white font-bold">{j.paymentMethod}</span>
+                                    <div className="border-t border-gray-800/80 pt-2 flex justify-between items-center text-[11px]">
+                                      <span className="text-gray-500">Forma de Pagamento:</span>
+                                      <span className="text-purple-300 font-bold bg-purple-950/60 border border-purple-800/60 px-2 py-0.5 rounded">
+                                        {j.paymentMethod}
+                                      </span>
                                     </div>
                                   )}
                                 </div>
                               </div>
 
-                              {/* Column 3: Session Info */}
+                              {/* Dados do Cliente & Sessão */}
                               <div className="space-y-3">
                                 <h4 className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1.5">
-                                  <span className="w-1 h-3 bg-purple-500 rounded-full"></span>
-                                  Sessão
+                                  <span className="w-1.5 h-3.5 bg-purple-500 rounded-full"></span>
+                                  👤 Cliente & Sessão
                                 </h4>
-                                <div className="bg-gray-900 rounded-lg p-3 space-y-2 text-xs">
+                                <div className="bg-gray-900 border border-gray-800 rounded-xl p-3.5 space-y-2 text-xs">
                                   <div className="flex justify-between">
-                                    <span className="text-gray-500">Session ID:</span>
-                                    <span className="text-white font-mono text-[10px]">{j.sessionId?.slice(0, 12)}...</span>
+                                    <span className="text-gray-500">Cliente:</span>
+                                    <span className="text-white font-bold truncate max-w-[200px]" title={parsed.customer?.name || j.userId || "Visitante"}>
+                                      {parsed.customer?.name || j.userId || "Visitante anônimo"}
+                                    </span>
                                   </div>
-                                  {j.userId && (
+                                  {parsed.customer?.email && (
                                     <div className="flex justify-between">
-                                      <span className="text-gray-500">User ID:</span>
-                                      <span className="text-white font-mono text-[10px]">{j.userId}</span>
+                                      <span className="text-gray-500">E-mail:</span>
+                                      <span className="text-gray-300 font-mono text-[11px] truncate max-w-[200px]">{parsed.customer.email}</span>
+                                    </div>
+                                  )}
+                                  {parsed.customer?.phone && (
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-500">Telefone:</span>
+                                      <span className="text-gray-300 font-mono text-[11px]">{parsed.customer.phone}</span>
+                                    </div>
+                                  )}
+                                  {parsed.customer?.cpf && (
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-500">CPF:</span>
+                                      <span className="text-gray-300 font-mono text-[11px]">{parsed.customer.cpf}</span>
                                     </div>
                                   )}
                                   <div className="flex justify-between">
-                                    <span className="text-gray-500">IP:</span>
-                                    <span className="text-white font-mono">{j.ipAddress || "—"}</span>
+                                    <span className="text-gray-500">Session ID:</span>
+                                    <span className="text-white font-mono text-[10px]">{j.sessionId?.slice(0, 16)}...</span>
                                   </div>
-                                  <div>
-                                    <span className="text-gray-500 block mb-1">Navegador:</span>
-                                    <span className="text-[10px] text-gray-400 break-all">{j.userAgent?.slice(0, 80) || "—"}{j.userAgent?.length > 80 ? "..." : ""}</span>
+                                  <div className="flex justify-between">
+                                    <span className="text-gray-500">IP:</span>
+                                    <span className="text-white font-mono text-[11px]">{j.ipAddress || "—"}</span>
                                   </div>
                                   <div className="flex justify-between">
                                     <span className="text-gray-500">Criado:</span>
@@ -576,7 +868,7 @@ export default function JornadaPage() {
                             </div>
 
                             {/* Journey Timeline */}
-                            <div className="mt-4 pt-4 border-t border-gray-800">
+                            <div className="mt-5 pt-4 border-t border-gray-800">
                               <h4 className="text-xs font-bold text-gray-400 uppercase mb-3">Linha do Tempo</h4>
                               <div className="flex items-center gap-2">
                                 {[1, 2, 3, 4, 5].map((s) => {

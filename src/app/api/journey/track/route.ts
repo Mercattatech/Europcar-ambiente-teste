@@ -79,7 +79,30 @@ export async function POST(req: NextRequest) {
 
     // Step 3: Extras
     if (step >= 3) {
-      if (selectedExtras !== undefined) updateData.selectedExtras = selectedExtras;
+      if (selectedExtras !== undefined) {
+        if (
+          existing?.selectedExtras &&
+          typeof existing.selectedExtras === "object" &&
+          !Array.isArray(existing.selectedExtras) &&
+          typeof selectedExtras === "object" &&
+          !Array.isArray(selectedExtras)
+        ) {
+          updateData.selectedExtras = {
+            ...(existing.selectedExtras as any),
+            ...selectedExtras,
+          };
+        } else {
+          updateData.selectedExtras = selectedExtras;
+        }
+
+        // Auto-fill carPrice or userId if available in selectedExtras
+        if (updateData.carPrice === undefined && typeof selectedExtras === "object" && !Array.isArray(selectedExtras) && selectedExtras.carPrice) {
+          updateData.carPrice = Number(selectedExtras.carPrice);
+        }
+        if (!updateData.userId && !existing?.userId && typeof selectedExtras === "object" && !Array.isArray(selectedExtras) && selectedExtras.customer?.name) {
+          updateData.userId = `${selectedExtras.customer.name} (${selectedExtras.customer.email || ""})`.trim();
+        }
+      }
     }
 
     // Step 4: Checkout
