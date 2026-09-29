@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import LoginModal from "@/components/auth/LoginModal";
+import { calculateRentalDays, formatRentalDays } from "@/lib/europcar/rentalDuration";
 
 export default function CheckoutPage() {
   const { data: session, status } = useSession();
@@ -176,6 +177,15 @@ export default function CheckoutPage() {
       try {
         const sessionId = sessionStorage.getItem("europcar_journey_session");
         if (sessionId) {
+          const journeyDays = calculateRentalDays({
+            pickupDate: parsed.pickupDate,
+            pickupTime: parsed.pickupTime,
+            returnDate: parsed.returnDate,
+            returnTime: parsed.returnTime,
+            station: parsed.pickupStation,
+            country: parsed.stationCountry || parsed.driverCountry,
+            apiDuration: parsed.duration || parsed.car?.duration,
+          });
           const baseCarPrice = parseFloat(parsed.car?.totalRateEstimateInBookingCurrency || "0");
           const insList = (parsed.xrsInsurances || []).map((ins: any) => ({
             code: ins.code,
@@ -187,7 +197,7 @@ export default function CheckoutPage() {
             name: eq.name,
             qty: eq.qty || 1,
             priceBRL: parseFloat(eq.priceBRL) || 0,
-            totalBRL: parseFloat(eq.totalBRL || (eq.priceBRL * (eq.qty || 1))) || 0,
+            totalBRL: parseFloat(eq.totalBRL || (parseFloat(eq.priceBRL || 0) * journeyDays * (eq.qty || 1))) || 0,
           }));
           const insTotal = insList.reduce((acc: number, c: any) => acc + c.priceBRL, 0);
           const eqTotal = eqList.reduce((acc: number, c: any) => acc + c.totalBRL, 0);
@@ -608,6 +618,8 @@ export default function CheckoutPage() {
   const returnStation = booking.returnStation || booking.pickupStation || "";
   const pickupDate = booking.pickupDate || "";
   const returnDate = booking.returnDate || "";
+  const pickupTime = booking.pickupTime || "1000";
+  const returnTime = booking.returnTime || booking.pickupTime || "1000";
   const driverCountry = booking.driverCountry || "BR";
   const driverCountryName = booking.driverCountryName || "Brasil";
   const formatDate = (d: string) => d?.length === 8 ? `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : d;
@@ -634,22 +646,16 @@ export default function CheckoutPage() {
   const hasContract = contractID !== "";  // tag aparece SEMPRE quando há contrato
   const hasDiscountValue = discountXRS > 0.01; // valor exato só quando getQuote funcionou
 
-
-
-
-
-
-  // Calculate days
-  const calcDays = () => {
-    if (pickupDate?.length === 8 && returnDate?.length === 8) {
-      const co = new Date(parseInt(pickupDate.slice(0, 4)), parseInt(pickupDate.slice(4, 6)) - 1, parseInt(pickupDate.slice(6, 8)));
-      const ci = new Date(parseInt(returnDate.slice(0, 4)), parseInt(returnDate.slice(4, 6)) - 1, parseInt(returnDate.slice(6, 8)));
-      const diff = Math.round((ci.getTime() - co.getTime()) / 86400000);
-      return diff > 0 ? diff : 1;
-    }
-    return 1;
-  };
-  const days = calcDays();
+  // Calculate days (ciclos de 24h + tolerância do país + prioridade da API XRS)
+  const days = calculateRentalDays({
+    pickupDate,
+    pickupTime,
+    returnDate,
+    returnTime,
+    station: pickupStation,
+    country: stationCountry || driverCountry,
+    apiDuration: booking?.duration || car?.duration || booking?._duration,
+  });
 
   // Build car image URL
   const carImgUrl = car.imageUrl
@@ -1291,7 +1297,7 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex justify-between text-xs mt-1">
                   <span className="text-gray-500 font-bold">Duração</span>
-                  <span className="font-black text-gray-900">{days} {days === 1 ? "dia" : "dias"}</span>
+                  <span className="font-black text-gray-900">{formatRentalDays(days)}</span>
                 </div>
               </div>
 
@@ -1872,10 +1878,10 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Tarifa por X dias + preço */}
+              {/* Tarifa por X diárias + preço */}
               <div className="flex justify-between items-center text-sm text-gray-700 mb-1">
                 <span className="font-medium">
-                  {hasContract ? 'Tarifa contratada' : 'Tarifa'} (por {days} {days === 1 ? 'dia' : 'dias'})
+                  {hasContract ? 'Tarifa contratada' : 'Tarifa'} (por {formatRentalDays(days)})
                 </span>
                 <span className="font-bold">
                   {totalBRL > 0
@@ -2099,7 +2105,7 @@ export default function CheckoutPage() {
                             <span className="text-sm text-gray-900 font-medium flex-1 pr-2">{insNames[extra.id] || extra.id}</span>
                           </div>
                           <div className="flex justify-between items-center text-xs text-gray-500 mt-1">
-                            <span>{extra.isTotal ? 'Total do período' : `Por ${days} dia(s)`}</span>
+                            <span>{extra.isTotal ? 'Total do período' : `Por ${formatRentalDays(days)}`}</span>
                             <div className="flex items-center gap-4">
                               <span>{extra.qty}</span>
                               <span className="font-bold text-gray-900">R$ {totalExtra.toFixed(2).replace('.', ',')}</span>
@@ -2126,7 +2132,7 @@ export default function CheckoutPage() {
                             <span className="text-sm text-gray-900 font-medium flex-1 pr-2">{eq.icon || '📦'} {eq.name || eq.code}</span>
                           </div>
                           <div className="flex justify-between items-center text-xs text-gray-500 mt-1">
-                            <span>Por {days} dia(s)</span>
+                            <span>{eqTotalBRL > 0 ? 'Total do período' : `Por ${formatRentalDays(days)}`}</span>
                             <div className="flex items-center gap-4">
                               <span>{eq.qty || 1}</span>
                               <span className="font-bold text-gray-900">R$ {eqTotal.toFixed(2).replace('.', ',')}</span>

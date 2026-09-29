@@ -7,6 +7,7 @@ import { sendBookingConfirmation } from '@/lib/email/sendBookingConfirmation';
 import { sendWelcomeWithCredentials } from '@/lib/email/sendWelcomeWithCredentials';
 import { consultarBin, guessBrandByFirstDigit, mapBrandToCardIssuer, zeroAuthCard, voidCieloPayment } from '@/lib/cielo/cieloClient';
 import { buildReservationPaymentAttrs, buildCreateVoucherXml, CID_TO_BA } from '@/lib/europcar/paymentMapping';
+import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 import { getReservationErrorMessage } from '@/lib/cms/reservationErrors';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import bcrypt from 'bcryptjs';
@@ -344,6 +345,11 @@ export async function POST(request: Request) {
           carCategory,
           pickupDate,
           returnDate,
+          pickupTime: bookingData.pickupTime || '1000',
+          returnTime: bookingData.returnTime || '1000',
+          station: pickupStation,
+          country: bookingData.stationCountry || customerData.pais,
+          duration: bookingData.duration || bookingData.car?.duration,
           merchantOrderId,
         });
 
@@ -691,14 +697,15 @@ export async function POST(request: Request) {
           const _insBRL = (Array.isArray(xrsInsurances) ? xrsInsurances : [])
             .reduce((s: number, ins: any) => s + parseFloat(ins.priceBRL || 0), 0);
           // Equipamentos selecionados
-          const _bookingDays = (() => {
-            try {
-              const p = new Date(bookingData.pickupDate);
-              const r = new Date(bookingData.returnDate);
-              const diff = Math.ceil((r.getTime() - p.getTime()) / 86400000);
-              return diff > 0 ? diff : 1;
-            } catch { return 1; }
-          })();
+          const _bookingDays = calculateRentalDays({
+            pickupDate: bookingData.pickupDate,
+            pickupTime: bookingData.pickupTime || '1000',
+            returnDate: bookingData.returnDate,
+            returnTime: bookingData.returnTime || '1000',
+            station: bookingData.pickupStation,
+            country: bookingData.stationCountry || bookingData.driverCountry || customerData.pais,
+            apiDuration: bookingData.duration || bookingData.car?.duration,
+          });
           const _equipBRL = (Array.isArray(xrsEquipment) ? xrsEquipment : [])
             .reduce((s: number, eq: any) => {
               const t = parseFloat(eq.totalBRL || 0);

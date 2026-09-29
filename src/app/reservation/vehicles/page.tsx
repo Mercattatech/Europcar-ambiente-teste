@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import LoginModal from "@/components/auth/LoginModal";
 import { parsePayerList, type PayerSplit } from "@/lib/europcar/parsePayerList";
 import { DEFAULT_POA_CID, SECONDARY_POA_CID } from "@/lib/europcar/xrsClient";
+import { calculateRentalDays, formatRentalDays } from "@/lib/europcar/rentalDuration";
 
 function getVehicleType(car: any): string {
   const code = car.carCategoryCode || "";
@@ -68,11 +69,14 @@ function VehiclesContent() {
   const returnStation = searchParams.get("return") || pickupStation;
   const pickupDate = searchParams.get("date") || "";
   const pickupTime = (searchParams.get("time") || "1000").replace(":", "");
-  const returnTime = (searchParams.get("returnTime") || "1000").replace(":", "");
+  const returnTime = (searchParams.get("returnTime") || searchParams.get("time") || "1000").replace(":", "");
   const contractID = searchParams.get("contractID") || "";
   const driverCountry = searchParams.get("country") || "BR";
   const driverCountryName = searchParams.get("countryName") || "Brasil";
   const stationCountry = searchParams.get("stationCountry") || "";
+
+  // Duração oficial retornada pela API XRS (getMultipleRates / getQuote)
+  const [apiRentalDuration, setApiRentalDuration] = useState<number | null>(null);
 
   useEffect(() => {
     fetch('/api/cars/images')
@@ -111,16 +115,18 @@ function VehiclesContent() {
     return `${dt.getFullYear()}${String(dt.getMonth() + 1).padStart(2, "0")}${String(dt.getDate()).padStart(2, "0")}`;
   }, [searchParams, pickupDate]);
 
-  // Calculate duration in days
+  // Calculate duration in days (ciclos de 24h + tolerância do país + prioridade da API XRS)
   const bookingDurationDays = useMemo(() => {
-    if (!pickupDate || !returnDate || pickupDate.length < 8 || returnDate.length < 8) return 1;
-    const y1 = parseInt(pickupDate.slice(0, 4)), m1 = parseInt(pickupDate.slice(4, 6)) - 1, d1 = parseInt(pickupDate.slice(6, 8));
-    const y2 = parseInt(returnDate.slice(0, 4)), m2 = parseInt(returnDate.slice(4, 6)) - 1, d2 = parseInt(returnDate.slice(6, 8));
-    const dt1 = new Date(y1, m1, d1).getTime();
-    const dt2 = new Date(y2, m2, d2).getTime();
-    const diff = Math.ceil((dt2 - dt1) / (1000 * 3600 * 24));
-    return diff > 0 ? diff : 1;
-  }, [pickupDate, returnDate]);
+    return calculateRentalDays({
+      pickupDate,
+      pickupTime,
+      returnDate,
+      returnTime,
+      station: pickupStation,
+      country: stationCountry || driverCountry,
+      apiDuration: selectedCar?.duration || apiRentalDuration,
+    });
+  }, [pickupDate, pickupTime, returnDate, returnTime, pickupStation, stationCountry, driverCountry, selectedCar?.duration, apiRentalDuration]);
 
   // contractID from sessionStorage
   const [sessionContractID, setSessionContractID] = useState("");
@@ -370,10 +376,15 @@ function VehiclesContent() {
         if (!ratesData) return { rates: allRates, equipment: allEquipment };
         const chunks = Array.isArray(ratesData.results) ? ratesData.results : [ratesData];
         for (const chunk of chunks) {
-          // ── Extract equipmentList from serviceResponse.reservation node ──
+          // ── Extract equipmentList & duration from serviceResponse.reservation node ──
           const reservation =
             chunk?.message?.serviceResponse?.reservation ||
             chunk?.serviceResponse?.reservation;
+          const chunkDurationStr = reservation?.$?.duration || reservation?.duration;
+          const parsedChunkDuration = chunkDurationStr ? parseInt(String(chunkDurationStr), 10) : undefined;
+          if (parsedChunkDuration && parsedChunkDuration > 0) {
+            setApiRentalDuration(prev => prev || parsedChunkDuration);
+          }
           if (reservation?.equipmentList) {
             const eqRaw = reservation.equipmentList.equipment;
             const eqArr: any[] = Array.isArray(eqRaw) ? eqRaw : eqRaw ? [eqRaw] : [];
@@ -504,9 +515,11 @@ function VehiclesContent() {
             const specs = { ...specsMap[attrs.carCategoryCode] || {}, ...specsFromRate };
 
             const rateContractID = attrs.contractID || defaultCid || effectiveContractID || DEFAULT_POA_CID;
+            const rateDuration = parseInt(attrs.duration || String(parsedChunkDuration || '0'), 10) || undefined;
 
             allRates.push({ 
               ...attrs, 
+              duration: rateDuration,
               contractID: rateContractID,
               imageUrl, 
               optionalInsurances, 
@@ -833,10 +846,15 @@ function VehiclesContent() {
 
         for (const quoteData of quoteDataList) {
           if (!quoteData) continue;
-          const reservation = quoteData?.message?.serviceResponse?.reservation;
+          const reservation = quoteData?.message?.serviceResponse?.reservation || quoteData?.serviceResponse?.reservation;
           const quote       = reservation?.quote;
           const quoteAttrs  = quote?.$ || quote || {};
           const exchRate    = parseFloat(quoteAttrs.exchangeRate || '1');
+          const quoteDurationStr = quoteData?._duration || reservation?.$?.duration || reservation?.duration;
+          const parsedQuoteDuration = quoteDurationStr ? parseInt(String(quoteDurationStr), 10) : undefined;
+          if (parsedQuoteDuration && parsedQuoteDuration > 0) {
+            setApiRentalDuration(prev => prev || parsedQuoteDuration);
+          }
 
           // ── Insurance list from getQuote (same regardless of equipment chunk) ──
           // Known airport/station surcharge codes in the Europcar XRS API
@@ -2003,15 +2021,19 @@ function VehiclesContent() {
                       const cidForTariff = selectedTariffType === 'ETO'
                         ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
                         : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID);
-                      const enrichedCar = { ...selectedCar, ...quoteTotals };
-                      const payload = { car: enrichedCar, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit };
+                      const enrichedCar = { ...selectedCar, ...quoteTotals, duration: bookingDurationDays };
+                      const payload = { car: enrichedCar, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit };
                       sessionStorage.setItem("europcar_booking", JSON.stringify(payload));
                       try {
                         const sessionId = sessionStorage.getItem("europcar_journey_session");
                         if (sessionId) {
                           const baseCarPrice = parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || selectedCar?.totalRateEstimate || "0") || 0;
                           const insTotal = xrsInsurancesPayload.reduce((sum: number, ins: any) => sum + (parseFloat(ins.priceBRL) || 0), 0);
-                          const eqTotal = xrsEquipmentPayload.reduce((sum: number, eq: any) => sum + (parseFloat(eq.totalBRL || (eq.priceBRL * eq.qty)) || 0), 0);
+                          const eqTotal = xrsEquipmentPayload.reduce((sum: number, eq: any) => {
+                            const t = parseFloat(eq.totalBRL || 0);
+                            const d = parseFloat(eq.priceBRL || 0);
+                            return sum + (t > 0 ? t : d * bookingDurationDays) * (eq.qty || 1);
+                          }, 0);
                           const journeyExtrasPayload = {
                             insurances: xrsInsurancesPayload.map((ins: any) => ({
                               code: ins.code,
@@ -2023,7 +2045,7 @@ function VehiclesContent() {
                               name: eq.name,
                               qty: eq.qty || 1,
                               priceBRL: parseFloat(eq.priceBRL) || 0,
-                              totalBRL: parseFloat(eq.totalBRL || (eq.priceBRL * eq.qty)) || 0,
+                              totalBRL: parseFloat(eq.totalBRL || (parseFloat(eq.priceBRL || 0) * bookingDurationDays * (eq.qty || 1))) || 0,
                             })),
                             insurancesTotal: insTotal,
                             equipmentTotal: eqTotal,
@@ -2078,7 +2100,7 @@ function VehiclesContent() {
                       const cidForTariff = selectedTariffType === 'ETO'
                         ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
                         : (zeroExcessUpgrade ? '56935495' : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID));
-                      const payload = { car: selectedCar, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload2, xrsInsurances: xrsInsurancesPayload2, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage };
+                      const payload = { car: { ...selectedCar, duration: bookingDurationDays }, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload2, xrsInsurances: xrsInsurancesPayload2, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage };
                       sessionStorage.setItem("europcar_booking", JSON.stringify(payload));
                       // Journey tracking — Step 3: Extras selected (ETO path)
                       try {
@@ -2086,7 +2108,11 @@ function VehiclesContent() {
                         if (sessionId) {
                           const baseCarPrice2 = parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || "0");
                           const insTotal2 = xrsInsurancesPayload2.reduce((acc: number, cur: any) => acc + (parseFloat(cur.priceBRL) || 0), 0);
-                          const eqTotal2 = xrsEquipmentPayload2.reduce((acc: number, cur: any) => acc + (parseFloat(cur.totalBRL || (cur.priceBRL * cur.qty)) || 0), 0);
+                          const eqTotal2 = xrsEquipmentPayload2.reduce((acc: number, cur: any) => {
+                            const t = parseFloat(cur.totalBRL || 0);
+                            const d = parseFloat(cur.priceBRL || 0);
+                            return acc + (t > 0 ? t : d * bookingDurationDays) * (cur.qty || 1);
+                          }, 0);
                           const journeyExtrasPayload2 = {
                             insurances: xrsInsurancesPayload2.map((ins: any) => ({
                               code: ins.code,
@@ -2098,7 +2124,7 @@ function VehiclesContent() {
                               name: eq.name,
                               qty: eq.qty || 1,
                               priceBRL: parseFloat(eq.priceBRL) || 0,
-                              totalBRL: parseFloat(eq.totalBRL || (eq.priceBRL * eq.qty)) || 0,
+                              totalBRL: parseFloat(eq.totalBRL || (parseFloat(eq.priceBRL || 0) * bookingDurationDays * (eq.qty || 1))) || 0,
                             })),
                             insurancesTotal: insTotal2,
                             equipmentTotal: eqTotal2,

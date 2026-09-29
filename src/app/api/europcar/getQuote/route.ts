@@ -121,8 +121,16 @@ export async function POST(request: Request) {
       console.warn('[getQuote] ⚠️ payerList não retornado pelo XRS — checkout usará fallback por nome de cobrança');
     }
 
-    // Attach the resolved prepaidMode and payerSplit to the response
-    return NextResponse.json({ ...xrsResponse, _prepaidMode: resolvedPrepaidMode, _payerSplit: payerSplit ?? undefined });
+    const durationAttr = reservationNode?.$?.duration || reservationNode?.duration;
+    const apiDuration = durationAttr ? parseInt(String(durationAttr), 10) : undefined;
+
+    // Attach the resolved prepaidMode, payerSplit and duration to the response
+    return NextResponse.json({
+      ...xrsResponse,
+      _prepaidMode: resolvedPrepaidMode,
+      _payerSplit: payerSplit ?? undefined,
+      _duration: apiDuration,
+    });
 
   } catch (error: any) {
     return NextResponse.json(

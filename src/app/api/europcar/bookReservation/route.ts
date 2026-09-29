@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { callXRS, DEFAULT_POA_CID } from '@/lib/europcar/xrsClient';
 import { isValidXRSDate, isValidXRSTime } from '@/lib/europcar/validate';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
+import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 import prisma from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
@@ -42,9 +43,15 @@ export async function POST(request: Request) {
     
     if (voucherData && voucherData.type === 'ETO') {
       const ba = cidToBa[effectiveCID] || voucherData.businessAccount || '';
-      const d1 = new Date(parseInt(pickupDate.slice(0,4)), parseInt(pickupDate.slice(4,6))-1, parseInt(pickupDate.slice(6,8)));
-      const d2 = new Date(parseInt(returnDate.slice(0,4)), parseInt(returnDate.slice(4,6))-1, parseInt(returnDate.slice(6,8)));
-      const duration = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86400000));
+      const duration = calculateRentalDays({
+        pickupDate,
+        pickupTime: pickupTime || '1000',
+        returnDate,
+        returnTime: returnTime || '1000',
+        station: pickupStation,
+        country: driverData?.countryOfResidence || 'BR',
+        apiDuration: body.duration || body.car?.duration,
+      });
 
       // Antonio/Europcar: voucherID must be numeric, max 8 digits
       const numericVoucherID = (voucherData?.id && /^\d{1,8}$/.test(voucherData.id)) ? voucherData.id : Date.now().toString().slice(-8);

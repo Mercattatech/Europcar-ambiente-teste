@@ -5,6 +5,7 @@
 // (fluxo assíncrono: PIX confirmado).
 
 import { escapeXml } from '@/lib/europcar/xmlEscape';
+import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 
 export const CID_TO_BA: Record<string, string> = {
   '56935466': '73675595',  // ETO Líquido (Excesso)
@@ -36,25 +37,52 @@ export interface PaymentAttrsContext {
   carCategory?: string;
   pickupDate?: string;    // YYYYMMDD
   returnDate?: string;    // YYYYMMDD
+  pickupTime?: string;    // HHMM
+  returnTime?: string;    // HHMM
+  station?: string;
+  country?: string;
+  duration?: number;
   /** MerchantOrderId da cobrança Cielo — usado como voucherID do nó VCH/PP quando captured=true */
   merchantOrderId?: string;
 }
 
-function voucherDurationDays(pickupDate?: string, returnDate?: string): number {
-  if (!pickupDate || !returnDate) return 1;
-  const d1 = new Date(parseInt(pickupDate.slice(0, 4)), parseInt(pickupDate.slice(4, 6)) - 1, parseInt(pickupDate.slice(6, 8)));
-  const d2 = new Date(parseInt(returnDate.slice(0, 4)), parseInt(returnDate.slice(4, 6)) - 1, parseInt(returnDate.slice(6, 8)));
-  // Vouchers têm limite de 30 dias de locação — o chamador deve validar isso
-  // antes de reservar; aqui só calculamos a duração para o atributo do XRS.
-  return Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 86400000));
+function voucherDurationDays(
+  pickupDate?: string,
+  returnDate?: string,
+  pickupTime?: string,
+  returnTime?: string,
+  apiDuration?: number,
+  station?: string,
+  country?: string
+): number {
+  return calculateRentalDays({
+    pickupDate,
+    pickupTime,
+    returnDate,
+    returnTime,
+    station,
+    country,
+    apiDuration,
+  });
 }
 
 /** Constrói o fragmento <meanOfPayment typeCode="VCH" .../> para o bookReservation inicial.
  *  EXO não entra aqui: o voucher EXO é registrado depois via createVoucher (ver buildCreateVoucherXml). */
-function buildVoucherMeanOfPaymentXml(voucherData: VoucherContext, contractID?: string, carCategory?: string, pickupDate?: string, returnDate?: string): string {
+function buildVoucherMeanOfPaymentXml(
+  voucherData: VoucherContext,
+  contractID?: string,
+  carCategory?: string,
+  pickupDate?: string,
+  returnDate?: string,
+  pickupTime?: string,
+  returnTime?: string,
+  apiDuration?: number,
+  station?: string,
+  country?: string,
+): string {
   if (!voucherData || voucherData.type === 'EXO') return '';
   const ba = (contractID && CID_TO_BA[contractID]) || voucherData.businessAccount || '';
-  const duration = voucherDurationDays(pickupDate, returnDate);
+  const duration = voucherDurationDays(pickupDate, returnDate, pickupTime, returnTime, apiDuration, station, country);
   // Antonio/Europcar: voucherID must be numeric, max 8 digits
   const numericVoucherID = (voucherData.id && /^\d{1,8}$/.test(voucherData.id))
     ? voucherData.id
@@ -74,7 +102,18 @@ export function buildReservationPaymentAttrs(ctx: PaymentAttrsContext): PaymentA
   // Voucher: o próprio nó VCH substitui o prepaidMode (exceto EXO, que segue o
   // fluxo padrão prepaidMode="NP" + createVoucher em uma segunda chamada).
   if (ctx.method === 'VOUCHER' && ctx.voucherData) {
-    const meanOfPaymentXml = buildVoucherMeanOfPaymentXml(ctx.voucherData, ctx.contractID, ctx.carCategory, ctx.pickupDate, ctx.returnDate);
+    const meanOfPaymentXml = buildVoucherMeanOfPaymentXml(
+      ctx.voucherData,
+      ctx.contractID,
+      ctx.carCategory,
+      ctx.pickupDate,
+      ctx.returnDate,
+      ctx.pickupTime,
+      ctx.returnTime,
+      ctx.duration,
+      ctx.station,
+      ctx.country,
+    );
     const prepaidAttrs = ctx.voucherData.type === 'EXO' ? ' prepaidMode="NP"' : '';
     return { prepaidAttrs, meanOfPaymentXml };
   }
@@ -89,7 +128,15 @@ export function buildReservationPaymentAttrs(ctx: PaymentAttrsContext): PaymentA
       // O erro mop.invalidVoucherNumber era causado por voucherID com mais de 8 dígitos.
       // voucherID: numérico, máximo 8 dígitos.
       const ba = CID_TO_BA[ctx.contractID!] || '';
-      const duration = voucherDurationDays(ctx.pickupDate, ctx.returnDate);
+      const duration = voucherDurationDays(
+        ctx.pickupDate,
+        ctx.returnDate,
+        ctx.pickupTime,
+        ctx.returnTime,
+        ctx.duration,
+        ctx.station,
+        ctx.country,
+      );
       const voucherID = (ctx.merchantOrderId || '').replace(/\D/g, '').slice(0, 8)
                         || Date.now().toString().slice(-8);
       const meanOfPaymentXml = `\n        <meanOfPayment typeCode="VCH" voucherType="ETO" voucherID="${escapeXml(voucherID)}" businessAccount="${escapeXml(ba)}" voucherCarCategory="${escapeXml(ctx.carCategory || '')}" voucherRentalDuration="${escapeXml(duration)}"/>`;
@@ -128,11 +175,24 @@ export function buildCreateVoucherXml(
   carCategory?: string,
   pickupDate?: string,
   returnDate?: string,
+  pickupTime?: string,
+  returnTime?: string,
+  apiDuration?: number,
+  station?: string,
+  country?: string,
 ): string {
   const isETO = voucherData.type === 'ETO';
 
   if (isETO) {
-    const duration = voucherDurationDays(pickupDate, returnDate);
+    const duration = voucherDurationDays(
+      pickupDate,
+      returnDate,
+      pickupTime,
+      returnTime,
+      apiDuration,
+      station,
+      country,
+    );
     return `<?xml version="1.0" encoding="UTF-8"?>
 <message>
   <serviceRequest serviceCode="createVoucher">

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
+import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 export const dynamic = 'force-dynamic';
 
 /**
@@ -62,12 +63,15 @@ export async function POST(
   const _xrsEq   = cd?.xrsEquipment  || cd?.booking?.xrsEquipment  || [];
   const _pickupD = booking?.pickupDate || '';
   const _returnD = booking?.returnDate || '';
-  const _days = (() => {
-    try {
-      const diff = Math.ceil((new Date(_returnD).getTime() - new Date(_pickupD).getTime()) / 86400000);
-      return diff > 0 ? diff : 1;
-    } catch { return 1; }
-  })();
+  const _days = calculateRentalDays({
+    pickupDate: _pickupD,
+    pickupTime: booking?.pickupTime || '1000',
+    returnDate: _returnD,
+    returnTime: booking?.returnTime || '1000',
+    station: booking?.pickupStation,
+    country: booking?.stationCountry || booking?.driverCountry,
+    apiDuration: booking?.duration || car?.duration,
+  });
   const _vehicleBRL2 = parseFloat(car?.totalRateEstimateInBookingCurrency || car?.totalRateEstimate || '0');
   const _insBRL  = Array.isArray(_xrsIns) ? _xrsIns.reduce((s: number, ins: any) => s + parseFloat(ins.priceBRL || 0), 0) : 0;
   const _eqBRL   = Array.isArray(_xrsEq)  ? _xrsEq.reduce((s: number, eq: any) => {
