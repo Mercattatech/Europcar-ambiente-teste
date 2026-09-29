@@ -52,6 +52,30 @@ export async function getDynamicXRSContractConfig(): Promise<DynamicXRSContractC
   }
 }
 
+export async function getXRSCredentials(): Promise<{ callerCode: string; password: string; endpointUrl: string }> {
+  let callerCode = process.env.XRS_CALLER_CODE || '';
+  let password = process.env.XRS_PASSWORD || '';
+  let endpointUrl = process.env.XRS_ENDPOINT_URL || 'https://applications-ptn.europcar.com/xrs/resxml';
+
+  if (!callerCode || !password) {
+    try {
+      const dbConfig = await prisma.xRSConfig.findFirst();
+      if (dbConfig) {
+        callerCode = callerCode || dbConfig.callerCode || '';
+        password = password || dbConfig.password || '';
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Fallback defaults for Europcar XRS PTN
+  callerCode = callerCode || '1132581';
+  password = password || '27112025';
+
+  return { callerCode, password, endpointUrl };
+}
+
 export interface XRSConfig {
   callerCode: string;
   password: string;
@@ -68,13 +92,16 @@ export async function callXRS(
   xmlRequest: string,
   config: XRSConfig
 ): Promise<XRSResponse> {
-  const url = config.endpointUrl || process.env.XRS_ENDPOINT_URL || 'https://applications-ptn.europcar.com/xrs/resxml';
+  const creds = await getXRSCredentials();
+  const callerCode = (config.callerCode && config.callerCode !== 'DEMO') ? config.callerCode : creds.callerCode;
+  const password = (config.password && config.password !== 'DEMO') ? config.password : creds.password;
+  const url = config.endpointUrl || process.env.XRS_ENDPOINT_URL || creds.endpointUrl;
   const action = config.action || detectAction(xmlRequest);
   const sourceFile = config.sourceFile || 'unknown';
 
   const payload = new URLSearchParams();
-  payload.append('callerCode', config.callerCode);
-  payload.append('password', config.password);
+  payload.append('callerCode', callerCode);
+  payload.append('password', password);
   payload.append('XML-Request', xmlRequest);
 
   console.log(`[XRS] [${action}] → ${url}`);
@@ -187,6 +214,25 @@ function getXRSErrors(parsedData: any): any {
 // XRS Station lookup helpers
 // =============================
 
+export interface StationScheduleHour {
+  day: string;
+  dayNumber: number;
+  open: string;
+  close: string;
+  isClosed: boolean;
+}
+
+export interface StationFeatureDetails {
+  has247Return: boolean;
+  hasOutOfHours: boolean;
+  hasElectricVehicles: boolean;
+  hasShuttle?: boolean;
+  hasDelivery?: boolean;
+  hasCollection?: boolean;
+  hasMeetAndGreet?: boolean;
+  serviceCodes: string[];
+}
+
 export interface Station {
   prestige: string;
   stationCode: string;
@@ -211,7 +257,11 @@ export interface Station {
   phoneWithInternationalDialling?: string;
   postalCode?: string;
   leadTime?: string;
-  // ... add more as needed
+  hours?: StationScheduleHour[];
+  has247Return?: boolean;
+  hasOutOfHours?: boolean;
+  hasElectricVehicles?: boolean;
+  features?: StationFeatureDetails;
 }
 
 /**

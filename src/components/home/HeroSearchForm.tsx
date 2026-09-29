@@ -475,8 +475,13 @@ export default function HeroSearchForm() {
                             )}
                             {/* Station name */}
                             <span className="flex-1 font-medium text-gray-800 text-[13px] truncate">{station.name}</span>
-                            {/* Electric vehicles indicator */}
-                            <svg className="w-4 h-4 text-[#008d36] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z" /></svg>
+                            {/* Electric vehicles indicator — only shown when station has electric vehicles */}
+                            {Boolean(station.hasElectricVehicles || detailCacheRef.current[station.code]?.hasElectricVehicles || detailCacheRef.current[station.code]?.features?.hasElectricVehicles) && (
+                              <svg className="w-4 h-4 text-[#008d36] shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                                <title>Veículos elétricos disponíveis</title>
+                                <path d="M7 2v11h3v9l7-12h-4l4-8z" />
+                              </svg>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -497,48 +502,82 @@ export default function HeroSearchForm() {
                               {hoveredStation.country && <div className="uppercase font-medium text-gray-400">{hoveredStation.country}</div>}
                             </div>
 
-                            {/* Features */}
-                            <div className="mt-4 flex flex-col gap-2">
-                              <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4 text-[#008d36] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-                                <span className="text-xs font-bold text-gray-700">Devolução 24/7</span>
+                            {/* Features from XRS API */}
+                            {loadingDetail ? (
+                              <div className="mt-4 flex flex-col gap-2">
+                                <div className="h-3.5 bg-gray-100 rounded animate-pulse w-3/4"></div>
+                                <div className="h-3.5 bg-gray-100 rounded animate-pulse w-1/2"></div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-500 text-sm shrink-0">🕐</span>
-                                <span className="text-xs font-bold text-gray-700">Retirada fora do horário de funcionamento</span>
+                            ) : (
+                              <div className="mt-4 flex flex-col gap-2">
+                                {Boolean(stationDetail?.has247Return ?? stationDetail?.features?.has247Return) && (
+                                  <div className="flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-[#008d36] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                                    <span className="text-xs font-bold text-gray-700">Devolução 24/7</span>
+                                  </div>
+                                )}
+                                {Boolean(stationDetail?.hasOutOfHours ?? stationDetail?.features?.hasOutOfHours) && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-gray-500 text-sm shrink-0">🕐</span>
+                                    <span className="text-xs font-bold text-gray-700">Retirada fora do horário de funcionamento</span>
+                                  </div>
+                                )}
+                                {Boolean(stationDetail?.hasElectricVehicles ?? stationDetail?.features?.hasElectricVehicles) && (
+                                  <div className="flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-[#008d36] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z" /></svg>
+                                    <span className="text-xs font-bold text-gray-700">Veículos elétricos</span>
+                                  </div>
+                                )}
+                                {Boolean(stationDetail?.features?.hasMeetAndGreet) && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-gray-500 text-sm shrink-0">🤝</span>
+                                    <span className="text-xs font-bold text-gray-700">Meet & Greet</span>
+                                  </div>
+                                )}
+                                {Boolean(stationDetail?.features?.hasShuttle) && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-gray-500 text-sm shrink-0">🚐</span>
+                                    <span className="text-xs font-bold text-gray-700">Transfer / Shuttle</span>
+                                  </div>
+                                )}
                               </div>
-                              <div className="flex items-center gap-2">
-                                <svg className="w-4 h-4 text-[#008d36] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z" /></svg>
-                                <span className="text-xs font-bold text-gray-700">Veículos elétricos</span>
-                              </div>
-                            </div>
+                            )}
 
-                            {/* Hours */}
+                            {/* Operating Hours from XRS API */}
                             <div className="mt-4 flex-1">
+                              <div className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 text-[#008d36]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Horário de atendimento
+                              </div>
                               {loadingDetail ? (
-                                <div className="flex gap-1.5 items-center text-[11px] text-gray-400"><div className="w-3 h-3 border-2 border-[#008d36] border-t-transparent rounded-full animate-spin"></div>Consultando...</div>
+                                <div className="flex gap-1.5 items-center text-[11px] text-gray-400">
+                                  <div className="w-3 h-3 border-2 border-[#008d36] border-t-transparent rounded-full animate-spin"></div>
+                                  Consultando horários...
+                                </div>
                               ) : stationDetail?.hours?.length ? (
-                                <div className="flex flex-col gap-0">
+                                <div className="flex flex-col gap-0 max-h-[160px] overflow-y-auto pr-1">
                                   {stationDetail.hours.map((h: any, i: number) => {
-                                    const isClosed = !h.open || h.open === h.close || h.open === '00:00';
+                                    const isClosed = h.isClosed || !h.open || h.open === h.close || (h.open === '00:00' && h.close === '00:00');
                                     return (
-                                      <div key={i} className="flex text-[11px] py-1 border-b border-gray-50 last:border-0">
-                                        <span className="font-bold text-gray-700 w-10 shrink-0 uppercase">{h.day}:</span>
+                                      <div key={i} className="flex justify-between items-center text-[11px] py-1 border-b border-gray-50 last:border-0">
+                                        <span className="font-bold text-gray-700 w-12 shrink-0 uppercase">{h.day}:</span>
                                         {isClosed ? (
                                           <span className="text-red-500 font-bold">Fechado</span>
                                         ) : (
-                                          <span className="text-gray-600">{h.open} - {h.close}</span>
+                                          <span className="text-gray-700 font-medium">{h.open} - {h.close}</span>
                                         )}
                                       </div>
                                     );
                                   })}
                                 </div>
                               ) : hoveredStation.hours?.length ? (
-                                <div className="flex flex-col gap-0">
+                                <div className="flex flex-col gap-0 max-h-[160px] overflow-y-auto pr-1">
                                   {hoveredStation.hours.map((h: any, i: number) => (
-                                    <div key={i} className="flex text-[11px] py-1 border-b border-gray-50 last:border-0">
-                                      <span className="font-bold text-gray-700 w-10 shrink-0 uppercase">{h.day}:</span>
-                                      <span className="text-gray-600">{h.hours}</span>
+                                    <div key={i} className="flex justify-between items-center text-[11px] py-1 border-b border-gray-50 last:border-0">
+                                      <span className="font-bold text-gray-700 w-12 shrink-0 uppercase">{h.day}:</span>
+                                      <span className="text-gray-700 font-medium">{h.hours || (h.open ? `${h.open} - ${h.close}` : 'Consulte')}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -626,9 +665,56 @@ export default function HeroSearchForm() {
                               {returnStationDetail.email && (<div className="flex items-center gap-1.5 text-[11px] text-gray-600"><svg className="w-3.5 h-3.5 text-[#e67e00] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg><span>{returnStationDetail.email}</span></div>)}
                             </div>
                           )}
+
+                          {/* Dynamic Return Station Features from XRS */}
+                          {Boolean(returnStationDetail?.has247Return ?? returnStationDetail?.features?.has247Return) && (
+                            <div className="mt-3 flex items-center gap-1.5 text-xs text-[#008d36] font-bold">
+                              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                              <span>Devolução 24/7</span>
+                            </div>
+                          )}
+                          {Boolean(returnStationDetail?.hasOutOfHours ?? returnStationDetail?.features?.hasOutOfHours) && (
+                            <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-700 font-bold">
+                              <span className="text-sm shrink-0">🕐</span>
+                              <span>Devolução fora do horário de funcionamento</span>
+                            </div>
+                          )}
+
                           <div className="mt-4">
                             <div className="flex items-center gap-1.5 mb-2"><svg className="w-3.5 h-3.5 text-[#e67e00]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span className="text-[10px] font-black text-gray-700 uppercase tracking-wider">Horário de Funcionamento</span></div>
-                            {loadingReturnDetail ? (<div className="flex gap-1.5 items-center text-[11px] text-gray-400"><div className="w-3 h-3 border-2 border-[#e67e00] border-t-transparent rounded-full animate-spin"></div>Consultando API Europcar...</div>) : returnStationDetail?.hours?.length ? (<div className="flex flex-col gap-0.5">{returnStationDetail.hours.map((h: any, i: number) => { const isClosed = !h.open || h.open === h.close || h.open === '00:00'; return (<div key={i} className="flex text-xs w-full justify-between py-0.5 border-b border-gray-100 last:border-0"><span className="font-bold text-gray-800 w-8 shrink-0">{h.day}</span>{isClosed ? (<span className="text-red-500 font-bold">Fechado</span>) : (<span className="text-gray-600 font-medium">{h.open} – {h.close}</span>)}</div>); })}</div>) : hoveredReturnStation.hours?.length ? (<div className="flex flex-col gap-0.5">{hoveredReturnStation.hours.map((h: any, i: number) => (<div key={i} className="flex text-xs w-full justify-between py-0.5 border-b border-gray-100 last:border-0"><span className="font-bold text-gray-800 w-8 shrink-0">{h.day}</span><span className="text-gray-600 font-medium">{h.hours}</span></div>))}</div>) : (<p className="text-[11px] text-gray-400 italic">Consulte a loja para informações de horário.</p>)}
+                            {loadingReturnDetail ? (
+                              <div className="flex gap-1.5 items-center text-[11px] text-gray-400">
+                                <div className="w-3 h-3 border-2 border-[#e67e00] border-t-transparent rounded-full animate-spin"></div>
+                                Consultando horários...
+                              </div>
+                            ) : returnStationDetail?.hours?.length ? (
+                              <div className="flex flex-col gap-0.5 max-h-[160px] overflow-y-auto pr-1">
+                                {returnStationDetail.hours.map((h: any, i: number) => {
+                                  const isClosed = h.isClosed || !h.open || h.open === h.close || (h.open === '00:00' && h.close === '00:00');
+                                  return (
+                                    <div key={i} className="flex text-xs w-full justify-between py-0.5 border-b border-gray-100 last:border-0">
+                                      <span className="font-bold text-gray-800 w-10 shrink-0 uppercase">{h.day}</span>
+                                      {isClosed ? (
+                                        <span className="text-red-500 font-bold">Fechado</span>
+                                      ) : (
+                                        <span className="text-gray-600 font-medium">{h.open} – {h.close}</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : hoveredReturnStation.hours?.length ? (
+                              <div className="flex flex-col gap-0.5 max-h-[160px] overflow-y-auto pr-1">
+                                {hoveredReturnStation.hours.map((h: any, i: number) => (
+                                  <div key={i} className="flex text-xs w-full justify-between py-0.5 border-b border-gray-100 last:border-0">
+                                    <span className="font-bold text-gray-800 w-10 shrink-0 uppercase">{h.day}</span>
+                                    <span className="text-gray-600 font-medium">{h.hours || (h.open ? `${h.open} – ${h.close}` : 'Consulte')}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-gray-400 italic">Consulte a loja para informações de horário.</p>
+                            )}
                           </div>
                           <button onClick={() => { setReturnLocation(hoveredReturnStation.code); setReturnStationQuery(hoveredReturnStation.name); setShowReturnStationsList(false); }} className="mt-4 w-full bg-[#e67e00] hover:bg-[#cc6f00] text-white font-bold text-sm py-2.5 rounded transition-colors">Selecionar esta loja</button>
                         </div>

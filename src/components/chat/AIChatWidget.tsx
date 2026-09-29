@@ -22,7 +22,7 @@ export default function AIChatWidget() {
   });
   const { messages, sendMessage, status, error } = useChat({
     body: { sessionId },
-  });
+  } as any);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {

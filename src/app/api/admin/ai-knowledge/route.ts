@@ -171,7 +171,8 @@ function getFileType(mimeType: string, fileName: string): 'pdf' | 'txt' | 'image
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
    // Dynamic import to avoid issues with pdf-parse and Next.js edge runtime
-   const pdfParse = (await import('pdf-parse')).default;
+   const pdfModule: any = await import('pdf-parse');
+   const pdfParse = pdfModule.default || pdfModule;
    const data = await pdfParse(buffer);
    return data.text;
 }

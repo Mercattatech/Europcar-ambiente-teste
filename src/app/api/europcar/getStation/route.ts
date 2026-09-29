@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    const xmlStationRequest = `<?xml version="1.0" encoding="UTF-8"?>
 <message>
   <serviceRequest serviceCode="getStation">
     <serviceContext>
@@ -26,19 +26,43 @@ export async function GET(request: Request) {
   </serviceRequest>
 </message>`;
 
-    const config = {
-      callerCode: process.env.XRS_CALLER_CODE || '',
-      password: process.env.XRS_PASSWORD || '',
-      action: 'getStation',
-      sourceFile: 'getStation/route.ts',
-    };
+    const xmlScheduleRequest = `<?xml version="1.0" encoding="UTF-8"?>
+<message>
+  <serviceRequest serviceCode="getStationSchedule">
+    <serviceContext>
+      <localisation active="true">
+        <language code="pt_BR"/>
+      </localisation>
+    </serviceContext>
+    <serviceParameters>
+      <station stationCode="${escapeXml(stationCode)}"/>
+    </serviceParameters>
+  </serviceRequest>
+</message>`;
 
-    const xrsResponse = await callXRS(xmlRequest, config);
+    // Fetch station details and opening hours schedule in parallel
+    const [stationRes, scheduleRes] = await Promise.all([
+      callXRS(xmlStationRequest, {
+        callerCode: process.env.XRS_CALLER_CODE || '',
+        password: process.env.XRS_PASSWORD || '',
+        action: 'getStation',
+        sourceFile: 'getStation/route.ts',
+      }),
+      callXRS(xmlScheduleRequest, {
+        callerCode: process.env.XRS_CALLER_CODE || '',
+        password: process.env.XRS_PASSWORD || '',
+        action: 'getStationSchedule',
+        sourceFile: 'getStation/route.ts',
+      }).catch(err => {
+        console.warn(`[getStation] Falha ao consultar getStationSchedule para ${stationCode}:`, err.message);
+        return null;
+      }),
+    ]);
 
     // Navigate to station node — XRS may return different structures
     const raw =
-      xrsResponse?.message?.serviceResponse?.station ||
-      xrsResponse?.serviceResponse?.station ||
+      stationRes?.message?.serviceResponse?.station ||
+      stationRes?.serviceResponse?.station ||
       null;
 
     if (!raw) {
@@ -48,9 +72,79 @@ export async function GET(request: Request) {
     // Attributes may live in raw.$ or directly on raw
     const attrs = raw.$ || raw;
 
-    // Parse opening hours from <openingHoursList> / <openingHours> / <scheduleList>
-    // XRS schema varies — we try multiple known structures
-    const hours = parseOpeningHours(raw);
+    // ── Parse Services from <serviceList> ────────────────────────────────
+    let services = raw?.serviceList?.service || [];
+    if (!Array.isArray(services)) services = services ? [services] : [];
+    const serviceCodes = new Set<string>(
+      services
+        .map((s: any) => String(s?.$?.code ?? s?.code ?? '').trim().toUpperCase())
+        .filter(Boolean)
+    );
+
+    // ── Parse Schedule from <openHoursList> ──────────────────────────────
+    let schedItems =
+      scheduleRes?.message?.serviceResponse?.openHoursList?.stationDaySched ||
+      scheduleRes?.serviceResponse?.openHoursList?.stationDaySched ||
+      [];
+    if (!Array.isArray(schedItems)) schedItems = schedItems ? [schedItems] : [];
+
+    // Check after-hours flag from schedule
+    const hasAfterHoursSched = schedItems.some(
+      (s: any) => (s?.$?.afterHours ?? s?.afterHours) === 'Y'
+    );
+
+    // Dynamic Station Capabilities based on Europcar XRS API
+    let has247Return =
+      serviceCodes.has('KEYBOX') ||
+      serviceCodes.has('KEYDROP') ||
+      serviceCodes.has('DROPBOX');
+
+    const hasOutOfHours =
+      serviceCodes.has('CIOOH') ||
+      serviceCodes.has('OOH') ||
+      hasAfterHoursSched;
+
+    const hasElectricVehicles =
+      serviceCodes.has('ELECTRIC') ||
+      serviceCodes.has('GREENSTN') ||
+      serviceCodes.has('EV');
+
+    const hasShuttle =
+      serviceCodes.has('SHUTTLE') ||
+      serviceCodes.has('TRANSFER');
+
+    const hasDelivery =
+      serviceCodes.has('DELIVERY') ||
+      attrs.delivery === 'Y' ||
+      attrs.delivery === 'R';
+
+    const hasCollection =
+      serviceCodes.has('COLLECTION') ||
+      attrs.collection === 'Y' ||
+      attrs.collection === 'R';
+
+    const hasMeetAndGreet =
+      serviceCodes.has('M&G') ||
+      serviceCodes.has('MG') ||
+      serviceCodes.has('MEETANDGREET') ||
+      attrs.stationName?.toUpperCase().includes('MEET AND GREET') ||
+      attrs.stationName?.toUpperCase().includes('M AND G');
+
+    // ── Parse Opening Hours ──────────────────────────────────────────────
+    let hours = parseStationSchedule(schedItems);
+
+    // Fallback: If getStationSchedule returned nothing, try openingHours on getStation
+    if (!hours.length) {
+      hours = parseOpeningHours(raw);
+    }
+
+    // If station is open 24h every day, also flag has247Return
+    const isAlwaysOpen247 =
+      hours.length >= 7 &&
+      hours.every(h => !h.isClosed && h.open === '00:00' && (h.close === '24:00' || h.close === '23:59'));
+    if (isAlwaysOpen247) {
+      has247Return = true;
+    }
 
     const station = {
       code:         attrs.stationCode   ?? stationCode,
@@ -63,14 +157,28 @@ export async function GET(request: Request) {
       email:        sanitizeEmail(attrs.email ?? ''),
       latitude:     attrs.latitude      ?? '',
       longitude:    attrs.longitude     ?? '',
-      type:         attrs.prestige === 'Y' ? 'airport' : 'city',
+      type:         attrs.prestige === 'Y' || attrs.areaType === 'T' ? 'airport' : 'city',
       leadTime:     attrs.leadTime      ?? '',
       hours,
+      has247Return,
+      hasOutOfHours,
+      hasElectricVehicles,
+      features: {
+        has247Return,
+        hasOutOfHours,
+        hasElectricVehicles,
+        hasShuttle,
+        hasDelivery,
+        hasCollection,
+        hasMeetAndGreet,
+        serviceCodes: Array.from(serviceCodes),
+      },
     };
 
     return NextResponse.json({ station });
 
   } catch (error: any) {
+    console.error(`[getStation] Erro ao consultar ${stationCode}:`, error);
     return NextResponse.json(
       { error: error.message || 'Erro ao consultar XRS getStation' },
       { status: 500 }
@@ -87,18 +195,9 @@ function buildPhone(attrs: any): string {
   return parts.join(' ');
 }
 
-/**
- * Filters out internal / relay email addresses that are not customer-facing.
- * Returns the first valid public email found, or empty string.
- *
- * The XRS API often returns internal Microsoft Exchange relay addresses
- * like "nbe@msk.europcar.com.br;tymyllem.yrh@msk.europcar.com.br"
- * These should never be shown to end-users.
- */
 function sanitizeEmail(raw: string): string {
   if (!raw) return '';
 
-  // Internal patterns to block
   const BLOCKED_PATTERNS = [
     /msk\.europcar/i,          // MSK Exchange relay (most common)
     /exchange\./i,             // Generic Exchange relay
@@ -111,31 +210,81 @@ function sanitizeEmail(raw: string): string {
     /^\s*$/,                   // Empty or whitespace
   ];
 
-  // The field sometimes contains multiple addresses separated by ";" or ","
   const candidates = raw.split(/[;,]/).map(e => e.trim()).filter(Boolean);
 
   for (const email of candidates) {
-    // Basic email format check
     const isValidFormat = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (!isValidFormat) continue;
 
-    // Reject if it matches any blocked pattern
     const isBlocked = BLOCKED_PATTERNS.some(p => p.test(email));
     if (isBlocked) continue;
 
-    // First clean email wins
     return email;
   }
 
-  return ''; // No valid public email found — frontend will hide the field
+  return '';
+}
+
+// Order: Segunda a Domingo (standard Brazilian business week display)
+const DAY_ORDER = [
+  { dayNumber: 2, day: 'Seg' },
+  { dayNumber: 3, day: 'Ter' },
+  { dayNumber: 4, day: 'Qua' },
+  { dayNumber: 5, day: 'Qui' },
+  { dayNumber: 6, day: 'Sex' },
+  { dayNumber: 7, day: 'Sáb' },
+  { dayNumber: 1, day: 'Dom' },
+];
+
+/**
+ * Parses schedule from XRS getStationSchedule response (<stationDaySched> items).
+ */
+function parseStationSchedule(
+  schedItems: any[]
+): { day: string; dayNumber: number; open: string; close: string; isClosed: boolean }[] {
+  if (!schedItems || !schedItems.length) return [];
+
+  const generalScheds = schedItems.filter(s => {
+    const type = (s?.$?.schedType ?? s?.schedType ?? 'G').toUpperCase();
+    return type === 'G';
+  });
+
+  if (!generalScheds.length) return [];
+
+  return DAY_ORDER.map(({ dayNumber, day }) => {
+    const dayMatches = generalScheds.filter(s => {
+      const d = parseInt(s?.$?.dayNumber ?? s?.dayNumber ?? 0, 10);
+      return d === dayNumber;
+    });
+
+    // Prefer regular hours over after-hours item
+    const regular = dayMatches.find(s => (s?.$?.afterHours ?? s?.afterHours) !== 'Y');
+    const item = regular || dayMatches[0];
+
+    if (!item) {
+      return { day, dayNumber, open: '', close: '', isClosed: true };
+    }
+
+    const a = item.$ || item;
+    const isClosed = a.desc === 'CLOSED' || (!a.timeBegin && !a.timeEnd);
+    const open = formatTime(a.timeBegin || '');
+    const close = formatTime(a.timeEnd || '');
+
+    return {
+      day,
+      dayNumber,
+      open: isClosed ? '' : open,
+      close: isClosed ? '' : close,
+      isClosed,
+    };
+  });
 }
 
 /**
- * Tries several known XRS response structures for opening hours.
- * Returns an array of { day, open, close } objects.
+ * Fallback parser for older or alternative XRS opening hours structures.
  */
-function parseOpeningHours(raw: any): { day: string; open: string; close: string }[] {
-  const result: { day: string; open: string; close: string }[] = [];
+function parseOpeningHours(raw: any): { day: string; dayNumber: number; open: string; close: string; isClosed: boolean }[] {
+  const result: { day: string; dayNumber: number; open: string; close: string; isClosed: boolean }[] = [];
 
   // Structure A: <openingHoursList><openingHours day="MON" openTime="08:00" closeTime="20:00"/>
   const listA = raw?.openingHoursList?.openingHours;
@@ -144,10 +293,15 @@ function parseOpeningHours(raw: any): { day: string; open: string; close: string
     for (const h of arr) {
       const a = h.$ || h;
       if (a.day || a.openTime) {
+        const open = formatTime(a.openTime ?? a.open ?? '');
+        const close = formatTime(a.closeTime ?? a.close ?? '');
+        const isClosed = !open || open === close || open === '00:00' && close === '00:00';
         result.push({
-          day:   translateDay(a.day ?? a.dayOfWeek ?? ''),
-          open:  formatTime(a.openTime ?? a.open ?? ''),
-          close: formatTime(a.closeTime ?? a.close ?? ''),
+          day:       translateDay(a.day ?? a.dayOfWeek ?? ''),
+          dayNumber: getDayNumber(a.day ?? a.dayOfWeek ?? ''),
+          open:      isClosed ? '' : open,
+          close:     isClosed ? '' : close,
+          isClosed,
         });
       }
     }
@@ -160,22 +314,18 @@ function parseOpeningHours(raw: any): { day: string; open: string; close: string
     const arr = Array.isArray(listB) ? listB : [listB];
     for (const h of arr) {
       const a = h.$ || h;
+      const open = formatTime(a.openTime ?? a.open ?? '');
+      const close = formatTime(a.closeTime ?? a.close ?? '');
+      const isClosed = !open || open === close;
       result.push({
-        day:   translateDayNumber(String(a.dayOfWeek ?? a.day ?? '')),
-        open:  formatTime(a.openTime ?? a.open ?? ''),
-        close: formatTime(a.closeTime ?? a.close ?? ''),
+        day:       translateDayNumber(String(a.dayOfWeek ?? a.day ?? '')),
+        dayNumber: parseInt(a.dayOfWeek ?? a.day ?? 0, 10),
+        open:      isClosed ? '' : open,
+        close:     isClosed ? '' : close,
+        isClosed,
       });
     }
     if (result.length) return result;
-  }
-
-  // Structure C: hours array already normalised (mock / fallback)
-  if (Array.isArray(raw?.hours)) {
-    return raw.hours.map((h: any) => ({
-      day:   h.day ?? '',
-      open:  h.open ?? h.openTime ?? '',
-      close: h.close ?? h.closeTime ?? '',
-    }));
   }
 
   return result;
@@ -189,9 +339,8 @@ const DAY_MAP: Record<string, string> = {
 };
 
 const DAY_NUM_MAP: Record<string, string> = {
-  '1': 'Seg', '2': 'Ter', '3': 'Qua', '4': 'Qui',
-  '5': 'Sex', '6': 'Sáb', '7': 'Dom',
-  '0': 'Dom', // some APIs use 0 = Sunday
+  '1': 'Dom', '2': 'Seg', '3': 'Ter', '4': 'Qua',
+  '5': 'Qui', '6': 'Sex', '7': 'Sáb',
 };
 
 function translateDay(d: string): string {
@@ -202,9 +351,16 @@ function translateDayNumber(n: string): string {
   return DAY_NUM_MAP[n] ?? n;
 }
 
+function getDayNumber(d: string): number {
+  const map: Record<string, number> = {
+    MON: 2, TUE: 3, WED: 4, THU: 5, FRI: 6, SAT: 7, SUN: 1,
+    MONDAY: 2, TUESDAY: 3, WEDNESDAY: 4, THURSDAY: 5, FRIDAY: 6, SATURDAY: 7, SUNDAY: 1,
+  };
+  return map[d.toUpperCase()] ?? 0;
+}
+
 function formatTime(t: string): string {
   if (!t) return '';
-  // Normalize "0800" → "08:00", "08:00" stays, "8" → "08:00"
   const clean = t.replace(':', '');
   if (clean.length === 4) return `${clean.slice(0, 2)}:${clean.slice(2)}`;
   if (clean.length === 3) return `0${clean.slice(0, 1)}:${clean.slice(1)}`;
