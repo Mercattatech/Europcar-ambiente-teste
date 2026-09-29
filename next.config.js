@@ -8,6 +8,10 @@ const nextConfig = {
     cpus: 1,
     workerThreads: false,
   },
+  webpack: (config) => {
+    config.cache = false;
+    return config;
+  },
   eslint: {
     // Warning: This allows production builds to successfully complete even if
     // your project has ESLint errors.
