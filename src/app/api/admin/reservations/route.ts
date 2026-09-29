@@ -52,27 +52,43 @@ export async function GET(req: Request) {
 
          // Filtro por status
          if (statusFilter && statusFilter !== 'ALL') {
-            sql += ` AND "status" = $${paramIndex}`;
-            params.push(statusFilter);
-            paramIndex++;
+            if (statusFilter === 'CANCELLED') {
+               sql += ` AND ("status" = 'CANCELLED' OR "status" = 'CANCELLED_GREENWAY')`;
+            } else {
+               sql += ` AND "status" = $${paramIndex}`;
+               params.push(statusFilter);
+               paramIndex++;
+            }
          }
 
          // Filtro por status operacional
          if (opStatusFilter && opStatusFilter !== 'ALL') {
-            sql += ` AND "operationalStatus" = $${paramIndex}`;
-            params.push(opStatusFilter);
-            paramIndex++;
+            if (opStatusFilter === 'R') {
+               sql += ` AND ("operationalStatus" = 'R' OR "operationalStatus" IS NULL)`;
+            } else if (opStatusFilter === 'ACTIVE') {
+               sql += ` AND ("operationalStatus" IN ('R', 'S', 'CF') OR "operationalStatus" IS NULL)`;
+            } else if (opStatusFilter === 'DONE') {
+               sql += ` AND "operationalStatus" IN ('CC', 'CP', 'CO', 'TD', 'NS')`;
+            } else {
+               sql += ` AND "operationalStatus" = $${paramIndex}`;
+               params.push(opStatusFilter);
+               paramIndex++;
+            }
          }
 
-         // Filtro por data
+         // Filtro por data (com timezone BRT América/São Paulo UTC-3)
          if (startDate) {
+            const start = /^\d{4}-\d{2}-\d{2}$/.test(startDate)
+               ? new Date(`${startDate}T00:00:00-03:00`)
+               : new Date(startDate);
             sql += ` AND "createdAt" >= $${paramIndex}`;
-            params.push(new Date(startDate));
+            params.push(start);
             paramIndex++;
          }
          if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
+            const end = /^\d{4}-\d{2}-\d{2}$/.test(endDate)
+               ? new Date(`${endDate}T23:59:59.999-03:00`)
+               : new Date(endDate);
             sql += ` AND "createdAt" <= $${paramIndex}`;
             params.push(end);
             paramIndex++;
@@ -89,28 +105,57 @@ export async function GET(req: Request) {
          return NextResponse.json(reservations);
       }
 
-      // Sem busca de texto — usar Prisma padrão
-      const where: any = {};
+      // Sem busca de texto — usar Prisma com array de condições AND para evitar conflitos de OR
+      const andConditions: any[] = [];
 
       if (statusFilter && statusFilter !== 'ALL') {
-         where.status = statusFilter;
+         if (statusFilter === 'CANCELLED') {
+            andConditions.push({ status: { in: ['CANCELLED', 'CANCELLED_GREENWAY'] } });
+         } else {
+            andConditions.push({ status: statusFilter });
+         }
       }
 
       if (opStatusFilter && opStatusFilter !== 'ALL') {
-         where.operationalStatus = opStatusFilter;
+         if (opStatusFilter === 'R') {
+            andConditions.push({
+               OR: [
+                  { operationalStatus: 'R' },
+                  { operationalStatus: null }
+               ]
+            });
+         } else if (opStatusFilter === 'ACTIVE') {
+            andConditions.push({
+               OR: [
+                  { operationalStatus: { in: ['R', 'S', 'CF'] } },
+                  { operationalStatus: null }
+               ]
+            });
+         } else if (opStatusFilter === 'DONE') {
+            andConditions.push({
+               operationalStatus: { in: ['CC', 'CP', 'CO', 'TD', 'NS'] }
+            });
+         } else {
+            andConditions.push({ operationalStatus: opStatusFilter });
+         }
       }
 
       if (startDate || endDate) {
-         where.createdAt = {};
+         const dateClause: any = {};
          if (startDate) {
-            where.createdAt.gte = new Date(startDate);
+            dateClause.gte = /^\d{4}-\d{2}-\d{2}$/.test(startDate)
+               ? new Date(`${startDate}T00:00:00-03:00`)
+               : new Date(startDate);
          }
          if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            where.createdAt.lte = end;
+            dateClause.lte = /^\d{4}-\d{2}-\d{2}$/.test(endDate)
+               ? new Date(`${endDate}T23:59:59.999-03:00`)
+               : new Date(endDate);
          }
+         andConditions.push({ createdAt: dateClause });
       }
+
+      const where = andConditions.length > 0 ? { AND: andConditions } : {};
 
       const reservations = await prisma.localReservation.findMany({
          where,

@@ -406,8 +406,33 @@ export default function PainelReservas() {
       }
    };
 
+   const getResBRL = (r: any) => {
+      if (r.amountInCents && Number(r.amountInCents) > 0) return Number(r.amountInCents) / 100;
+      let parsed: any = {};
+      try { parsed = typeof r.customerData === 'string' ? JSON.parse(r.customerData) : r.customerData; } catch(e){}
+      const car = parsed?.booking?.car || {};
+      if (car?.totalRateInBookingCurrency && !isNaN(parseFloat(car.totalRateInBookingCurrency))) {
+         return parseFloat(car.totalRateInBookingCurrency);
+      }
+      if (car?.totalRateEstimate && car?.exchangeRate && !isNaN(parseFloat(car.totalRateEstimate)) && !isNaN(parseFloat(car.exchangeRate))) {
+         return parseFloat(car.totalRateEstimate) * parseFloat(car.exchangeRate);
+      }
+      return 0;
+   };
+
+   const isResCancelled = (r: any) => {
+      const op = r.operationalStatus || "R";
+      return ["CANCELLED", "CANCELLED_GREENWAY", "ON_REQUEST_REJECTED"].includes(r.status) || ["CC", "CP", "TD"].includes(op);
+   };
+
    const counts: Record<string, number> = { ALL: reservations.length };
-   reservations.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1; });
+   reservations.forEach(r => {
+      counts[r.status] = (counts[r.status] || 0) + 1;
+      if (r.status === 'CANCELLED_GREENWAY') {
+         counts.CANCELLED = (counts.CANCELLED || 0) + 1;
+      }
+   });
+
    const opCounts: Record<string, number> = { ALL: reservations.length, ACTIVE: 0, DONE: 0 };
    reservations.forEach(r => {
       const op = r.operationalStatus || "R";
@@ -415,6 +440,11 @@ export default function PainelReservas() {
       if (["R", "S", "CF"].includes(op)) opCounts.ACTIVE++;
       else opCounts.DONE++;
    });
+
+   const activeList = reservations.filter(r => !isResCancelled(r));
+   const cancelledList = reservations.filter(r => isResCancelled(r));
+   const totalActiveBRL = activeList.reduce((sum, r) => sum + getResBRL(r), 0);
+   const totalCancelledBRL = cancelledList.reduce((sum, r) => sum + getResBRL(r), 0);
 
    return (
       <div className="space-y-6">
@@ -732,6 +762,32 @@ export default function PainelReservas() {
             </div>
             <button type="submit" className="bg-green-600 hover:bg-green-700 text-white font-bold px-5 py-2.5 rounded-lg text-sm transition-colors">Buscar</button>
          </form>
+
+         {/* Summary Bar */}
+         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-3.5">
+               <p className="text-[10px] font-bold text-gray-400 uppercase">Reservas Filtradas</p>
+               <p className="text-xl font-black text-white mt-0.5">{reservations.length}</p>
+               <p className="text-[10px] text-gray-500 mt-0.5">{activeList.length} ativas · {cancelledList.length} canceladas</p>
+            </div>
+            <div className="bg-gray-900 border border-emerald-900/30 rounded-xl p-3.5">
+               <p className="text-[10px] font-bold text-emerald-400 uppercase">Receita Ativa (BRL)</p>
+               <p className="text-xl font-black text-emerald-400 mt-0.5">
+                  R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+               </p>
+               <p className="text-[10px] text-gray-500 mt-0.5">Exclui canceladas</p>
+            </div>
+            <div className="bg-gray-900 border border-cyan-900/30 rounded-xl p-3.5">
+               <p className="text-[10px] font-bold text-cyan-400 uppercase">Em Andamento (R/S/CF)</p>
+               <p className="text-xl font-black text-cyan-400 mt-0.5">{opCounts.ACTIVE || 0}</p>
+               <p className="text-[10px] text-gray-500 mt-0.5">{(opCounts.CO || 0)} Checked Out</p>
+            </div>
+            <div className="bg-gray-900 border border-red-900/30 rounded-xl p-3.5">
+               <p className="text-[10px] font-bold text-red-400 uppercase">Canceladas</p>
+               <p className="text-xl font-black text-red-400 mt-0.5">{cancelledList.length}</p>
+               <p className="text-[10px] text-red-400/80 mt-0.5">R$ {totalCancelledBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} não somado</p>
+            </div>
+         </div>
 
          {/* Reservations Table */}
          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
@@ -1082,6 +1138,42 @@ export default function PainelReservas() {
                         );
                      })}
                   </tbody>
+                  {!loading && reservations.length > 0 && (
+                     <tfoot className="bg-gray-800/80 border-t-2 border-gray-700 text-white font-bold">
+                        <tr>
+                           <td className="px-4 py-3.5 text-xs uppercase text-gray-300">
+                              Total ({reservations.length})
+                           </td>
+                           <td className="px-4 py-3.5 text-xs text-gray-400" colSpan={2}>
+                              <span className="text-emerald-400">{activeList.length} ativas</span>
+                              {cancelledList.length > 0 && (
+                                 <span className="text-red-400 ml-2">· {cancelledList.length} canceladas</span>
+                              )}
+                           </td>
+                           <td className="px-4 py-3.5 text-xs font-black">
+                              <div className="text-emerald-400">
+                                 R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                              </div>
+                              {cancelledList.length > 0 && (
+                                 <div className="text-[10px] text-red-400 font-normal">
+                                    (Canc: R$ {totalCancelledBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})
+                                 </div>
+                              )}
+                           </td>
+                           <td className="px-4 py-3.5 text-xs text-gray-400" colSpan={4}>
+                              {cancelledList.length > 0 ? (
+                                 <span className="text-red-400 text-[11px] font-normal">
+                                    * Reservas canceladas foram excluídas do total de receita ativa.
+                                 </span>
+                              ) : (
+                                 <span className="text-emerald-400 text-[11px] font-normal">
+                                    * Todas as reservas filtradas são ativas e válidas.
+                                 </span>
+                              )}
+                           </td>
+                        </tr>
+                     </tfoot>
+                  )}
                </table>
             </div>
          </div>

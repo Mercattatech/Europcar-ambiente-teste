@@ -20,10 +20,40 @@ export async function GET() {
 
   try {
     // Busca todas as reservas não-canceladas com valor
-    const reservations = await prisma.localReservation.findMany({
-      where: { status: { not: 'CANCELLED' } },
-      select: { amountInCents: true, createdAt: true },
+    const rawReservations = await prisma.localReservation.findMany({
+      where: {
+        AND: [
+          { status: { notIn: ['CANCELLED', 'CANCELLED_GREENWAY', 'ON_REQUEST_REJECTED'] } },
+          {
+            OR: [
+              { operationalStatus: { notIn: ['CC', 'CP', 'TD'] } },
+              { operationalStatus: null }
+            ]
+          }
+        ]
+      },
+      select: { amountInCents: true, customerData: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
+    });
+
+    const reservations = rawReservations.map(r => {
+      let parsed: any = {};
+      try {
+        parsed = typeof r.customerData === 'string' ? JSON.parse(r.customerData) : r.customerData;
+      } catch (e) {}
+      const car = parsed?.booking?.car || {};
+      let amountBRL = 0;
+      if (r.amountInCents && Number(r.amountInCents) > 0) {
+        amountBRL = Number(r.amountInCents) / 100;
+      } else if (car?.totalRateInBookingCurrency && !isNaN(parseFloat(car.totalRateInBookingCurrency))) {
+        amountBRL = parseFloat(car.totalRateInBookingCurrency);
+      } else if (car?.totalRateEstimate && car?.exchangeRate && !isNaN(parseFloat(car.totalRateEstimate)) && !isNaN(parseFloat(car.exchangeRate))) {
+        amountBRL = parseFloat(car.totalRateEstimate) * parseFloat(car.exchangeRate);
+      }
+      return {
+        amountBRL,
+        createdAt: r.createdAt,
+      };
     });
 
     const now = new Date();
@@ -41,7 +71,7 @@ export async function GET() {
       });
       monthly.push({
         label,
-        vendas: items.reduce((s, r) => s + (r.amountInCents || 0) / 100, 0),
+        vendas: items.reduce((s, r) => s + r.amountBRL, 0),
         count:  items.length,
       });
     }
@@ -61,7 +91,7 @@ export async function GET() {
       });
       quarterly.push({
         label,
-        vendas: items.reduce((s, r) => s + (r.amountInCents || 0) / 100, 0),
+        vendas: items.reduce((s, r) => s + r.amountBRL, 0),
         count:  items.length,
       });
     }
@@ -73,7 +103,7 @@ export async function GET() {
       const items = reservations.filter(r => new Date(r.createdAt).getFullYear() === year);
       yearly.push({
         label:  String(year),
-        vendas: items.reduce((s, r) => s + (r.amountInCents || 0) / 100, 0),
+        vendas: items.reduce((s, r) => s + r.amountBRL, 0),
         count:  items.length,
       });
     }

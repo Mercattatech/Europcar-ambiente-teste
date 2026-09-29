@@ -32,6 +32,46 @@ function formatTimeBR(timeStr?: string): string {
 
 type ReportTab = "operational" | "financial";
 
+function getReservationMetrics(res: any, parsed: any) {
+   const booking = parsed?.booking || {};
+   const car = booking?.car || {};
+   const opStatus = res.operationalStatus || "R";
+
+   const isCancelled =
+      ["CANCELLED", "CANCELLED_GREENWAY", "ON_REQUEST_REJECTED"].includes(res.status) ||
+      ["CC", "CP", "TD"].includes(opStatus);
+
+   let amountBRL = 0;
+   if (res.amountInCents && Number(res.amountInCents) > 0) {
+      amountBRL = Number(res.amountInCents) / 100;
+   } else if (car?.totalRateInBookingCurrency && !isNaN(parseFloat(car.totalRateInBookingCurrency))) {
+      amountBRL = parseFloat(car.totalRateInBookingCurrency);
+   } else if (car?.totalRateEstimate && car?.exchangeRate && !isNaN(parseFloat(car.totalRateEstimate)) && !isNaN(parseFloat(car.exchangeRate))) {
+      amountBRL = parseFloat(car.totalRateEstimate) * parseFloat(car.exchangeRate);
+   }
+
+   let amountEUR = 0;
+   if (car?.totalRateEstimate && !isNaN(parseFloat(car.totalRateEstimate))) {
+      amountEUR = parseFloat(car.totalRateEstimate);
+   } else if (amountBRL > 0 && car?.exchangeRate && parseFloat(car.exchangeRate) > 0) {
+      amountEUR = amountBRL / parseFloat(car.exchangeRate);
+   }
+
+   const days = booking?.days ? parseInt(booking.days, 10) : 0;
+   const isPrepaid = res.status === "CONFIRMED_PREPAID";
+   const isCounter = res.status === "CONFIRMED_NON_PREPAID";
+
+   return {
+      amountBRL,
+      amountEUR,
+      isCancelled,
+      isPrepaid,
+      isCounter,
+      days,
+      opStatus,
+   };
+}
+
 export default function PainelRelatorios() {
    const [activeTab, setActiveTab] = useState<ReportTab>("operational");
    const [reservations, setReservations] = useState<any[]>([]);
@@ -98,22 +138,68 @@ export default function PainelRelatorios() {
       }
    };
 
-   // Parsed data for preview
+   // Quick Date Presets
+   const setDatePreset = (preset: "today" | "7d" | "thisMonth" | "lastMonth" | "all") => {
+      const now = new Date();
+      if (preset === "today") {
+         const d = now.toISOString().slice(0, 10);
+         setStartDate(d);
+         setEndDate(d);
+      } else if (preset === "7d") {
+         const past = new Date();
+         past.setDate(past.getDate() - 7);
+         setStartDate(past.toISOString().slice(0, 10));
+         setEndDate(now.toISOString().slice(0, 10));
+      } else if (preset === "thisMonth") {
+         const first = new Date(now.getFullYear(), now.getMonth(), 1);
+         const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+         setStartDate(first.toISOString().slice(0, 10));
+         setEndDate(last.toISOString().slice(0, 10));
+      } else if (preset === "lastMonth") {
+         const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+         const last = new Date(now.getFullYear(), now.getMonth(), 0);
+         setStartDate(first.toISOString().slice(0, 10));
+         setEndDate(last.toISOString().slice(0, 10));
+      } else if (preset === "all") {
+         setStartDate("");
+         setEndDate("");
+      }
+   };
+
+   // Parsed data & metrics for preview
    const parsedReservations = reservations.map(res => {
       let parsed: any = {};
       try {
          parsed = typeof res.customerData === "string" ? JSON.parse(res.customerData) : res.customerData;
       } catch (e) {}
-      return { ...res, parsed };
+      const metrics = getReservationMetrics(res, parsed);
+      return { ...res, parsed, metrics };
    });
+
+   // Totals calculated strictly from filtered reservations
+   const totalFiltered = parsedReservations.length;
+   const activeReservations = parsedReservations.filter(r => !r.metrics.isCancelled);
+   const cancelledReservations = parsedReservations.filter(r => r.metrics.isCancelled);
+
+   const totalActiveBRL = activeReservations.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+   const totalActiveEUR = activeReservations.reduce((sum, r) => sum + r.metrics.amountEUR, 0);
+   const totalActivePrepaidBRL = activeReservations.filter(r => r.metrics.isPrepaid).reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+   const totalActiveCounterBRL = activeReservations.filter(r => r.metrics.isCounter).reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+   const totalActiveDays = activeReservations.reduce((sum, r) => sum + r.metrics.days, 0);
+
+   const totalCancelledBRL = cancelledReservations.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+   const totalCancelledEUR = cancelledReservations.reduce((sum, r) => sum + r.metrics.amountEUR, 0);
+
+   const countMomentary = activeReservations.filter(r => ["R", "S", "CF"].includes(r.metrics.opStatus)).length;
+   const countCheckedOut = activeReservations.filter(r => r.metrics.opStatus === "CO").length;
 
    return (
       <div className="space-y-6">
          {/* Header */}
          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-               <h1 className="text-2xl font-black text-white">Relatórios</h1>
-               <p className="text-gray-400 text-sm mt-1">Exporte dados operacionais e financeiros das reservas</p>
+               <h1 className="text-2xl font-black text-white">Relatórios & Exportação</h1>
+               <p className="text-gray-400 text-sm mt-1">Exporte dados operacionais e financeiros das reservas com totais em tempo real</p>
             </div>
             <button
                onClick={handleExportCSV}
@@ -162,7 +248,19 @@ export default function PainelRelatorios() {
 
          {/* Filters */}
          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Filtros</p>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-800/80 pb-3">
+               <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Filtros Dinâmicos</p>
+               {/* Quick Presets */}
+               <div className="flex flex-wrap gap-1.5">
+                  <span className="text-[10px] text-gray-500 self-center mr-1">Atalhos de Data:</span>
+                  <button onClick={() => setDatePreset("today")} className="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-[11px] text-gray-300 font-medium transition-colors">Hoje</button>
+                  <button onClick={() => setDatePreset("7d")} className="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-[11px] text-gray-300 font-medium transition-colors">Últimos 7 dias</button>
+                  <button onClick={() => setDatePreset("thisMonth")} className="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-[11px] text-gray-300 font-medium transition-colors">Mês Atual</button>
+                  <button onClick={() => setDatePreset("lastMonth")} className="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-[11px] text-gray-300 font-medium transition-colors">Mês Anterior</button>
+                  <button onClick={() => setDatePreset("all")} className="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-[11px] text-gray-300 font-medium transition-colors">Todas</button>
+               </div>
+            </div>
+
             <div className="flex flex-wrap gap-4">
                {/* Date range */}
                <div>
@@ -191,7 +289,11 @@ export default function PainelRelatorios() {
                      onChange={e => setOpStatusFilter(e.target.value)}
                      className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-600 transition-colors appearance-none min-w-[180px]"
                   >
-                     <option value="ALL">Todos</option>
+                     <option value="ALL">Todos os Status Op.</option>
+                     <optgroup label="Agrupados">
+                        <option value="ACTIVE">Momentâneos (R, S, CF)</option>
+                        <option value="DONE">Concluídos (CC, CP, CO, TD, NS)</option>
+                     </optgroup>
                      <optgroup label="Momentâneos">
                         <option value="R">R — On Request</option>
                         <option value="S">S — Sold</option>
@@ -214,11 +316,11 @@ export default function PainelRelatorios() {
                      onChange={e => setPaymentStatusFilter(e.target.value)}
                      className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-600 transition-colors appearance-none min-w-[180px]"
                   >
-                     <option value="ALL">Todos</option>
-                     <option value="CONFIRMED_PREPAID">Pago Online</option>
+                     <option value="ALL">Todos os Pagamentos</option>
+                     <option value="CONFIRMED_PREPAID">Pago Online (Cielo/Pix)</option>
                      <option value="PENDING_PIX">PIX Pendente</option>
                      <option value="CONFIRMED_NON_PREPAID">Pagar no Balcão</option>
-                     <option value="CANCELLED">Cancelada</option>
+                     <option value="CANCELLED">Cancelada (Online ou GW)</option>
                   </select>
                </div>
                {/* Clear */}
@@ -236,45 +338,90 @@ export default function PainelRelatorios() {
             </div>
          </div>
 
-         {/* Stats Summary */}
-         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+         {/* Stats Summary - 5 KPI Cards updating dynamically */}
+         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {/* Card 1: Total Reservas */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-               <p className="text-[10px] font-bold text-gray-500 uppercase">Total Reservas</p>
-               <p className="text-2xl font-black text-white mt-1">{reservations.length}</p>
-            </div>
-            <div className="bg-gray-900 border border-green-900/30 rounded-xl p-4">
-               <p className="text-[10px] font-bold text-green-500 uppercase">Valor Total (BRL)</p>
-               <p className="text-2xl font-black text-green-400 mt-1">
-                  R$ {(reservations.reduce((sum, r) => sum + (r.amountInCents || 0), 0) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Total Filtradas</p>
+               <p className="text-2xl font-black text-white mt-1">{totalFiltered}</p>
+               <p className="text-[11px] text-gray-500 mt-1">
+                  <span className="text-emerald-400 font-bold">{activeReservations.length}</span> ativas · <span className="text-red-400 font-bold">{cancelledReservations.length}</span> canceladas
                </p>
             </div>
-            <div className="bg-gray-900 border border-emerald-900/30 rounded-xl p-4">
-               <p className="text-[10px] font-bold text-emerald-500 uppercase">Ativas (R/S/CF)</p>
+
+            {/* Card 2: Receita Ativa (BRL) - EXCLUI CANCELADAS */}
+            <div className="bg-gray-900 border border-emerald-900/40 rounded-xl p-4 relative overflow-hidden">
+               <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Receita Ativa (BRL)</p>
+                  <span className="text-[9px] font-semibold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">Ativas</span>
+               </div>
                <p className="text-2xl font-black text-emerald-400 mt-1">
-                  {reservations.filter(r => ["R", "S", "CF"].includes(r.operationalStatus || "R")).length}
+                  R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+               </p>
+               <p className="text-[10px] text-gray-400 mt-1 truncate" title={`Online: R$ ${totalActivePrepaidBRL.toFixed(2)} | Balcão: R$ ${totalActiveCounterBRL.toFixed(2)}`}>
+                  Online: R$ {totalActivePrepaidBRL.toFixed(2)} · Balcão: R$ {totalActiveCounterBRL.toFixed(2)}
                </p>
             </div>
-            <div className="bg-gray-900 border border-purple-900/30 rounded-xl p-4">
-               <p className="text-[10px] font-bold text-purple-500 uppercase">Checked Out (CO)</p>
-               <p className="text-2xl font-black text-purple-400 mt-1">
-                  {reservations.filter(r => r.operationalStatus === "CO").length}
+
+            {/* Card 3: Receita Estimada (EUR) */}
+            <div className="bg-gray-900 border border-blue-900/40 rounded-xl p-4">
+               <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wide">Net Ativo (EUR)</p>
+                  <span className="text-[9px] font-semibold bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded">Estimado</span>
+               </div>
+               <p className="text-2xl font-black text-blue-400 mt-1">
+                  € {totalActiveEUR.toFixed(2)}
+               </p>
+               <p className="text-[10px] text-gray-500 mt-1">
+                  Ticket Médio: € {activeReservations.length > 0 ? (totalActiveEUR / activeReservations.length).toFixed(2) : "0.00"}
+               </p>
+            </div>
+
+            {/* Card 4: Operacional Ativas & CO */}
+            <div className="bg-gray-900 border border-purple-900/40 rounded-xl p-4">
+               <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wide">Operacional</p>
+               <div className="flex items-baseline gap-2 mt-1">
+                  <p className="text-2xl font-black text-white">{countMomentary}</p>
+                  <span className="text-xs text-yellow-400 font-bold">em andamento</span>
+               </div>
+               <p className="text-[11px] text-gray-400 mt-1">
+                  <span className="text-purple-400 font-bold">{countCheckedOut}</span> Checked Out (CO)
+               </p>
+            </div>
+
+            {/* Card 5: Canceladas com Valor Separado */}
+            <div className="bg-gray-900 border border-red-900/40 rounded-xl p-4">
+               <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-bold text-red-400 uppercase tracking-wide">Canceladas</p>
+                  <span className="text-[9px] font-semibold bg-red-500/20 text-red-300 px-1.5 py-0.5 rounded">Excluídas</span>
+               </div>
+               <p className="text-2xl font-black text-red-400 mt-1">{cancelledReservations.length}</p>
+               <p className="text-[10px] text-red-400/80 mt-1 font-medium">
+                  R$ {totalCancelledBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} não somado
                </p>
             </div>
          </div>
 
          {/* Data Preview Table */}
-         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
-               <p className="text-xs font-bold text-gray-400">
-                  {activeTab === "operational" ? "📋 Preview — Relatório Operacional" : "💰 Preview — Relatório Financeiro"}
-               </p>
-               <p className="text-[10px] text-gray-600">{reservations.length} registros</p>
+         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-xl">
+            <div className="px-5 py-3 border-b border-gray-800 flex items-center justify-between bg-gray-850">
+               <div>
+                  <p className="text-xs font-bold text-gray-200">
+                     {activeTab === "operational" ? "📋 Relatório Operacional" : "💰 Relatório Financeiro"}
+                  </p>
+                  <p className="text-[10px] text-gray-500">
+                     Mostrando {parsedReservations.length} reservas filtradas ({activeReservations.length} ativas, {cancelledReservations.length} canceladas)
+                  </p>
+               </div>
+               <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                  Soma Ativa: R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+               </span>
             </div>
             <div className="overflow-x-auto">
                {activeTab === "operational" ? (
                   /* OPERATIONAL TABLE */
-                  <table className="w-full text-sm text-left min-w-[900px]">
-                     <thead className="bg-gray-800/50 border-b border-gray-700">
+                  <table className="w-full text-sm text-left min-w-[950px]">
+                     <thead className="bg-gray-800/60 border-b border-gray-700">
                         <tr>
                            <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Código</th>
                            <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Status Op.</th>
@@ -284,31 +431,38 @@ export default function PainelRelatorios() {
                            <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Devolução</th>
                            <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Cliente</th>
                            <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Veículo</th>
-                           <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase">Valor</th>
+                           <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase text-right">Valor (BRL)</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-gray-800/50">
                         {loading && (
-                           <tr><td colSpan={9} className="text-center py-10">
-                              <div className="w-6 h-6 border-3 border-green-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                           <tr><td colSpan={9} className="text-center py-12">
+                              <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                              <p className="text-xs text-gray-500 mt-2">Carregando relatório...</p>
                            </td></tr>
                         )}
                         {!loading && parsedReservations.length === 0 && (
-                           <tr><td colSpan={9} className="text-center py-10 text-gray-500">Nenhum registro encontrado.</td></tr>
+                           <tr><td colSpan={9} className="text-center py-12 text-gray-500">
+                              Nenhum registro encontrado para os filtros selecionados.
+                           </td></tr>
                         )}
-                        {!loading && parsedReservations.map(({ parsed, ...res }) => {
-                           const opStatus = res.operationalStatus || "R";
-                           const opConfig = OP_STATUS_CONFIG[opStatus] || OP_STATUS_CONFIG.R;
+                        {!loading && parsedReservations.map(({ parsed, metrics, ...res }) => {
+                           const opConfig = OP_STATUS_CONFIG[metrics.opStatus] || OP_STATUS_CONFIG.R;
                            const booking = parsed?.booking || {};
                            return (
-                              <tr key={res.id} className="hover:bg-gray-800/30 transition-colors">
-                                 <td className="px-4 py-3 font-mono font-bold text-white text-xs">{res.resNumber || "—"}</td>
+                              <tr key={res.id} className={`hover:bg-gray-800/40 transition-colors ${metrics.isCancelled ? "bg-red-950/10 opacity-70" : ""}`}>
+                                 <td className="px-4 py-3 font-mono font-bold text-white text-xs">
+                                    {res.resNumber || "—"}
+                                    {metrics.isCancelled && <span className="ml-1 text-[9px] text-red-400 font-sans font-bold">🚫</span>}
+                                 </td>
                                  <td className="px-4 py-3">
-                                    <span className={`text-[10px] font-bold px-2 py-1 rounded border ${opConfig.color}`}>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${opConfig.color}`}>
                                        {opConfig.label} — {opConfig.description}
                                     </span>
                                  </td>
-                                 <td className="px-4 py-3 text-[10px] font-bold text-gray-400">{STATUS_LABELS[res.status] || res.status}</td>
+                                 <td className="px-4 py-3 text-[10px] font-bold text-gray-400">
+                                    {STATUS_LABELS[res.status] || res.status}
+                                 </td>
                                  <td className="px-4 py-3 text-xs text-gray-400">
                                     {new Date(res.createdAt).toLocaleDateString("pt-BR")}{" "}
                                     <span className="text-gray-600">{new Date(res.createdAt).toLocaleTimeString("pt-BR")}</span>
@@ -326,27 +480,75 @@ export default function PainelRelatorios() {
                                  <td className="px-4 py-3 text-xs text-gray-400">
                                     {booking?.car?.carCategorySample || booking?.car?.carCategoryName || "—"}
                                  </td>
-                                 <td className="px-4 py-3 text-xs font-bold text-green-400">
-                                    {res.amountInCents
-                                       ? `R$ ${(res.amountInCents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
-                                       : "—"}
+                                 <td className="px-4 py-3 text-xs font-bold text-right">
+                                    {metrics.isCancelled ? (
+                                       <div>
+                                          <span className="text-red-400 line-through">
+                                             R$ {metrics.amountBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                          </span>
+                                          <span className="block text-[9px] text-red-500 font-normal">Cancelada</span>
+                                       </div>
+                                    ) : metrics.amountBRL > 0 ? (
+                                       <span className="text-green-400">
+                                          R$ {metrics.amountBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                       </span>
+                                    ) : (
+                                       <span className="text-gray-500">—</span>
+                                    )}
                                  </td>
                               </tr>
                            );
                         })}
                      </tbody>
+
+                     {/* FOOTER TOTALIZADOR - OPERACIONAL */}
+                     {!loading && parsedReservations.length > 0 && (
+                        <tfoot className="bg-gray-800/90 border-t-2 border-gray-700 text-white font-bold">
+                           <tr>
+                              <td className="px-4 py-3 text-xs uppercase text-gray-300">
+                                 Total ({totalFiltered})
+                              </td>
+                              <td className="px-4 py-3 text-xs text-gray-300" colSpan={2}>
+                                 <span className="text-emerald-400">{activeReservations.length} ativas</span>
+                                 {cancelledReservations.length > 0 && (
+                                    <span className="text-red-400 ml-2">· {cancelledReservations.length} canceladas</span>
+                                 )}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-gray-400" colSpan={3}>
+                                 Total Diárias Ativas: <span className="text-white font-bold">{totalActiveDays} dias</span>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-gray-400" colSpan={2}>
+                                 {cancelledReservations.length > 0 ? (
+                                    <span className="text-red-400 text-[11px] font-normal">
+                                       * Canceladas excluídas da receita
+                                    </span>
+                                 ) : null}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-right font-black">
+                                 <div className="text-emerald-400">
+                                    R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                 </div>
+                                 {cancelledReservations.length > 0 && (
+                                    <div className="text-[10px] text-red-400 font-normal mt-0.5">
+                                       (Canc: R$ {totalCancelledBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})
+                                    </div>
+                                 )}
+                              </td>
+                           </tr>
+                        </tfoot>
+                     )}
                   </table>
                ) : (
                   /* FINANCIAL TABLE */
-                  <table className="w-full text-sm text-left min-w-[1400px]">
-                     <thead className="bg-gray-800/50 border-b border-gray-700">
+                  <table className="w-full text-sm text-left min-w-[1450px]">
+                     <thead className="bg-gray-800/60 border-b border-gray-700">
                         <tr>
                            <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase">Código</th>
                            <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase">Reserva</th>
                            <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase">Retirada</th>
                            <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase">Devolução</th>
-                           <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase">Net (EUR)</th>
-                           <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase">Total (BRL)</th>
+                           <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase text-right">Net (EUR)</th>
+                           <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase text-right">Total (BRL)</th>
                            <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase">Pagamento</th>
                            <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase">Câmbio</th>
                            <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase">Estação Ret.</th>
@@ -354,26 +556,31 @@ export default function PainelRelatorios() {
                            <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase">Veículo</th>
                            <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase">Cliente</th>
                            <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase">Desconto/CID</th>
-                           <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase">Status Op.</th>
+                           <th className="px-3 py-3 text-[10px] font-bold text-gray-400 uppercase text-center">Status Op.</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-gray-800/50">
                         {loading && (
-                           <tr><td colSpan={14} className="text-center py-10">
-                              <div className="w-6 h-6 border-3 border-green-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                           <tr><td colSpan={14} className="text-center py-12">
+                              <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                              <p className="text-xs text-gray-500 mt-2">Carregando relatório financeiro...</p>
                            </td></tr>
                         )}
                         {!loading && parsedReservations.length === 0 && (
-                           <tr><td colSpan={14} className="text-center py-10 text-gray-500">Nenhum registro encontrado.</td></tr>
+                           <tr><td colSpan={14} className="text-center py-12 text-gray-500">
+                              Nenhum registro encontrado para os filtros selecionados.
+                           </td></tr>
                         )}
-                        {!loading && parsedReservations.map(({ parsed, ...res }) => {
-                           const opStatus = res.operationalStatus || "R";
-                           const opConfig = OP_STATUS_CONFIG[opStatus] || OP_STATUS_CONFIG.R;
+                        {!loading && parsedReservations.map(({ parsed, metrics, ...res }) => {
+                           const opConfig = OP_STATUS_CONFIG[metrics.opStatus] || OP_STATUS_CONFIG.R;
                            const booking = parsed?.booking || {};
                            const car = booking?.car || {};
                            return (
-                              <tr key={res.id} className="hover:bg-gray-800/30 transition-colors">
-                                 <td className="px-3 py-3 font-mono font-bold text-white text-[11px]">{res.resNumber || "—"}</td>
+                              <tr key={res.id} className={`hover:bg-gray-800/40 transition-colors ${metrics.isCancelled ? "bg-red-950/10 opacity-70" : ""}`}>
+                                 <td className="px-3 py-3 font-mono font-bold text-white text-[11px]">
+                                    {res.resNumber || "—"}
+                                    {metrics.isCancelled && <span className="ml-1 text-[9px] text-red-400 font-sans font-bold">🚫</span>}
+                                 </td>
                                  <td className="px-3 py-3 text-[10px] text-gray-400">
                                     {new Date(res.createdAt).toLocaleDateString("pt-BR")}{" "}
                                     <span className="text-gray-600">{new Date(res.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
@@ -384,17 +591,34 @@ export default function PainelRelatorios() {
                                  <td className="px-3 py-3 text-[10px] text-gray-400">
                                     {formatDateBR(booking?.returnDate)} {formatTimeBR(booking?.returnTime)}
                                  </td>
-                                 <td className="px-3 py-3 text-[10px] font-bold text-blue-400">
-                                    {car?.totalRateEstimate ? `€ ${parseFloat(car.totalRateEstimate).toFixed(2)}` : "—"}
+                                 <td className="px-3 py-3 text-[10px] font-bold text-right">
+                                    {metrics.isCancelled ? (
+                                       <span className="text-red-400 line-through">€ {metrics.amountEUR.toFixed(2)}</span>
+                                    ) : metrics.amountEUR > 0 ? (
+                                       <span className="text-blue-400">€ {metrics.amountEUR.toFixed(2)}</span>
+                                    ) : (
+                                       <span className="text-gray-600">—</span>
+                                    )}
                                  </td>
-                                 <td className="px-3 py-3 text-[10px] font-bold text-green-400">
-                                    {res.amountInCents
-                                       ? `R$ ${(res.amountInCents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
-                                       : car?.totalRateInBookingCurrency
-                                       ? `R$ ${parseFloat(car.totalRateInBookingCurrency).toFixed(2)}`
-                                       : "—"}
+                                 <td className="px-3 py-3 text-[10px] font-bold text-right">
+                                    {metrics.isCancelled ? (
+                                       <div>
+                                          <span className="text-red-400 line-through">
+                                             R$ {metrics.amountBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                          </span>
+                                          <span className="block text-[8px] text-red-500 font-normal">Cancelada</span>
+                                       </div>
+                                    ) : metrics.amountBRL > 0 ? (
+                                       <span className="text-green-400">
+                                          R$ {metrics.amountBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                       </span>
+                                    ) : (
+                                       <span className="text-gray-600">—</span>
+                                    )}
                                  </td>
-                                 <td className="px-3 py-3 text-[10px] font-bold text-gray-400">{STATUS_LABELS[res.status] || res.status}</td>
+                                 <td className="px-3 py-3 text-[10px] font-bold text-gray-400">
+                                    {STATUS_LABELS[res.status] || res.status}
+                                 </td>
                                  <td className="px-3 py-3 text-[10px] text-gray-500 font-mono">
                                     {car?.exchangeRate ? parseFloat(car.exchangeRate).toFixed(4) : "—"}
                                  </td>
@@ -412,8 +636,8 @@ export default function PainelRelatorios() {
                                  <td className="px-3 py-3 text-[10px] text-orange-400 font-mono">
                                     {parsed?.contractID || booking?.contractID || "—"}
                                  </td>
-                                 <td className="px-3 py-3">
-                                    <span className={`text-[9px] font-bold px-1.5 py-1 rounded border ${opConfig.color}`}>
+                                 <td className="px-3 py-3 text-center">
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${opConfig.color}`}>
                                        {opConfig.label}
                                     </span>
                                  </td>
@@ -421,6 +645,44 @@ export default function PainelRelatorios() {
                            );
                         })}
                      </tbody>
+
+                     {/* FOOTER TOTALIZADOR - FINANCEIRO */}
+                     {!loading && parsedReservations.length > 0 && (
+                        <tfoot className="bg-gray-800/90 border-t-2 border-gray-700 text-white font-bold">
+                           <tr>
+                              <td className="px-3 py-3 text-xs uppercase text-gray-300" colSpan={4}>
+                                 TOTAL ATIVO / CONFIRMADO ({activeReservations.length} reservas)
+                              </td>
+                              <td className="px-3 py-3 text-xs text-right font-black text-blue-400">
+                                 € {totalActiveEUR.toFixed(2)}
+                              </td>
+                              <td className="px-3 py-3 text-xs text-right font-black">
+                                 <div className="text-emerald-400">
+                                    R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                 </div>
+                                 <div className="text-[9px] text-gray-400 font-normal mt-0.5">
+                                    Online: R$ {totalActivePrepaidBRL.toFixed(2)} | Balcão: R$ {totalActiveCounterBRL.toFixed(2)}
+                                 </div>
+                                 {cancelledReservations.length > 0 && (
+                                    <div className="text-[9px] text-red-400 font-normal mt-0.5">
+                                       (Canc: R$ {totalCancelledBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})
+                                    </div>
+                                 )}
+                              </td>
+                              <td className="px-3 py-3 text-[10px] text-gray-400" colSpan={8}>
+                                 {cancelledReservations.length > 0 ? (
+                                    <span className="text-red-400">
+                                       * {cancelledReservations.length} reserva(s) cancelada(s) (total R$ {totalCancelledBRL.toFixed(2)}) excluídas da receita ativa.
+                                    </span>
+                                 ) : (
+                                    <span className="text-emerald-400">
+                                       * Todas as {totalFiltered} reservas exibidas são válidas.
+                                    </span>
+                                 )}
+                              </td>
+                           </tr>
+                        </tfoot>
+                     )}
                   </table>
                )}
             </div>

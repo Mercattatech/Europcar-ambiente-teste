@@ -66,24 +66,57 @@ export async function GET(req: Request) {
       const startDate = searchParams.get('startDate');
       const endDate = searchParams.get('endDate');
 
-      // Build where clause
-      const where: any = {};
+      // Build where clause with AND conditions to prevent OR collisions
+      const andConditions: any[] = [];
 
       if (statusFilter && statusFilter !== 'ALL') {
-         where.status = statusFilter;
-      }
-      if (opStatusFilter && opStatusFilter !== 'ALL') {
-         where.operationalStatus = opStatusFilter;
-      }
-      if (startDate || endDate) {
-         where.createdAt = {};
-         if (startDate) where.createdAt.gte = new Date(startDate);
-         if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            where.createdAt.lte = end;
+         if (statusFilter === 'CANCELLED') {
+            andConditions.push({ status: { in: ['CANCELLED', 'CANCELLED_GREENWAY'] } });
+         } else {
+            andConditions.push({ status: statusFilter });
          }
       }
+
+      if (opStatusFilter && opStatusFilter !== 'ALL') {
+         if (opStatusFilter === 'R') {
+            andConditions.push({
+               OR: [
+                  { operationalStatus: 'R' },
+                  { operationalStatus: null }
+               ]
+            });
+         } else if (opStatusFilter === 'ACTIVE') {
+            andConditions.push({
+               OR: [
+                  { operationalStatus: { in: ['R', 'S', 'CF'] } },
+                  { operationalStatus: null }
+               ]
+            });
+         } else if (opStatusFilter === 'DONE') {
+            andConditions.push({
+               operationalStatus: { in: ['CC', 'CP', 'CO', 'TD', 'NS'] }
+            });
+         } else {
+            andConditions.push({ operationalStatus: opStatusFilter });
+         }
+      }
+
+      if (startDate || endDate) {
+         const dateClause: any = {};
+         if (startDate) {
+            dateClause.gte = /^\d{4}-\d{2}-\d{2}$/.test(startDate)
+               ? new Date(`${startDate}T00:00:00-03:00`)
+               : new Date(startDate);
+         }
+         if (endDate) {
+            dateClause.lte = /^\d{4}-\d{2}-\d{2}$/.test(endDate)
+               ? new Date(`${endDate}T23:59:59.999-03:00`)
+               : new Date(endDate);
+         }
+         andConditions.push({ createdAt: dateClause });
+      }
+
+      const where = andConditions.length > 0 ? { AND: andConditions } : {};
 
       const reservations = await prisma.localReservation.findMany({
          where,
@@ -129,6 +162,16 @@ export async function GET(req: Request) {
 
          csv = headers.join(",") + "\n";
 
+         let activeTotalEUR = 0;
+         let activeTotalBRL = 0;
+         let activePrepaidBRL = 0;
+         let activeCounterBRL = 0;
+         let activeCount = 0;
+
+         let cancelledTotalEUR = 0;
+         let cancelledTotalBRL = 0;
+         let cancelledCount = 0;
+
          for (const res of reservations) {
             let parsed: any = {};
             try {
@@ -138,14 +181,41 @@ export async function GET(req: Request) {
             const booking = parsed?.booking || {};
             const car = booking?.car || {};
             const isPrepaid = res.status === "CONFIRMED_PREPAID";
-            const totalBRL = res.amountInCents
-               ? (res.amountInCents / 100).toFixed(2)
-               : car?.totalRateInBookingCurrency
-               ? parseFloat(car.totalRateInBookingCurrency).toFixed(2)
-               : "";
-            const totalEUR = car?.totalRateEstimate
-               ? parseFloat(car.totalRateEstimate).toFixed(2)
-               : "";
+            const opStatus = (res as any).operationalStatus || "R";
+            const isCancelled =
+               ["CANCELLED", "CANCELLED_GREENWAY", "ON_REQUEST_REJECTED"].includes(res.status) ||
+               ["CC", "CP", "TD"].includes(opStatus);
+
+            let totalBRLNum = 0;
+            if (res.amountInCents && Number(res.amountInCents) > 0) {
+               totalBRLNum = Number(res.amountInCents) / 100;
+            } else if (car?.totalRateInBookingCurrency && !isNaN(parseFloat(car.totalRateInBookingCurrency))) {
+               totalBRLNum = parseFloat(car.totalRateInBookingCurrency);
+            } else if (car?.totalRateEstimate && car?.exchangeRate && !isNaN(parseFloat(car.totalRateEstimate)) && !isNaN(parseFloat(car.exchangeRate))) {
+               totalBRLNum = parseFloat(car.totalRateEstimate) * parseFloat(car.exchangeRate);
+            }
+
+            let totalEURNum = 0;
+            if (car?.totalRateEstimate && !isNaN(parseFloat(car.totalRateEstimate))) {
+               totalEURNum = parseFloat(car.totalRateEstimate);
+            } else if (totalBRLNum > 0 && car?.exchangeRate && parseFloat(car.exchangeRate) > 0) {
+               totalEURNum = totalBRLNum / parseFloat(car.exchangeRate);
+            }
+
+            if (isCancelled) {
+               cancelledCount++;
+               cancelledTotalEUR += totalEURNum;
+               cancelledTotalBRL += totalBRLNum;
+            } else {
+               activeCount++;
+               activeTotalEUR += totalEURNum;
+               activeTotalBRL += totalBRLNum;
+               if (isPrepaid) activePrepaidBRL += totalBRLNum;
+               else activeCounterBRL += totalBRLNum;
+            }
+
+            const totalBRLStr = totalBRLNum > 0 ? totalBRLNum.toFixed(2) : "";
+            const totalEURStr = totalEURNum > 0 ? totalEURNum.toFixed(2) : "";
 
             const row = [
                res.resNumber || "",
@@ -155,11 +225,11 @@ export async function GET(req: Request) {
                formatTimeBR(booking?.pickupTime),
                formatDateBR(booking?.returnDate),
                formatTimeBR(booking?.returnTime),
-               totalEUR,
+               totalEURStr,
                "", // Comissão - a ser preenchido manualmente se necessário
-               totalBRL,
-               isPrepaid ? totalBRL : "",
-               !isPrepaid && res.status !== "CANCELLED" ? totalBRL : "",
+               totalBRLStr,
+               isPrepaid && !isCancelled ? totalBRLStr : "",
+               !isPrepaid && !isCancelled ? totalBRLStr : "",
                STATUS_LABELS[res.status] || res.status,
                car?.exchangeRate ? parseFloat(car.exchangeRate).toFixed(4) : "",
                car?.exchangeRate ? "EUR/BRL" : "",
@@ -176,12 +246,46 @@ export async function GET(req: Request) {
                parsed?.cpf || "",
                parsed?.contractID || booking?.contractID || "",
                parsed?.customer?.loyaltyProgramId || parsed?.loyaltyProgramId || "",
-               OP_STATUS_LABELS[(res as any).operationalStatus] || (res as any).operationalStatus || "R",
+               OP_STATUS_LABELS[opStatus] || opStatus,
                STATUS_LABELS[res.status] || res.status,
             ];
 
             csv += row.map(escapeCSV).join(",") + "\n";
          }
+
+         // Footer / Totais
+         csv += "\n";
+         csv += [
+            escapeCSV(`TOTAL ATIVO / CONFIRMADO (${activeCount} reservas)`),
+            "", "", "", "", "", "",
+            escapeCSV(activeTotalEUR.toFixed(2)),
+            "",
+            escapeCSV(activeTotalBRL.toFixed(2)),
+            escapeCSV(activePrepaidBRL.toFixed(2)),
+            escapeCSV(activeCounterBRL.toFixed(2)),
+            escapeCSV("Exclui canceladas"),
+         ].join(",") + "\n";
+
+         if (cancelledCount > 0) {
+            csv += [
+               escapeCSV(`TOTAL CANCELADO (${cancelledCount} reservas)`),
+               "", "", "", "", "", "",
+               escapeCSV(cancelledTotalEUR.toFixed(2)),
+               "",
+               escapeCSV(cancelledTotalBRL.toFixed(2)),
+               "", "",
+               escapeCSV("Canceladas (não somado na receita)"),
+            ].join(",") + "\n";
+         }
+
+         csv += [
+            escapeCSV(`TOTAL GERAL FILTRADO (${reservations.length} registros)`),
+            "", "", "", "", "", "",
+            escapeCSV((activeTotalEUR + cancelledTotalEUR).toFixed(2)),
+            "",
+            escapeCSV((activeTotalBRL + cancelledTotalBRL).toFixed(2)),
+         ].join(",") + "\n";
+
       } else {
          // RELATÓRIO OPERACIONAL
          const headers = [
@@ -206,6 +310,12 @@ export async function GET(req: Request) {
 
          csv = headers.join(",") + "\n";
 
+         let activeTotalBRL = 0;
+         let activeTotalDays = 0;
+         let activeCount = 0;
+         let cancelledTotalBRL = 0;
+         let cancelledCount = 0;
+
          for (const res of reservations) {
             let parsed: any = {};
             try {
@@ -215,6 +325,29 @@ export async function GET(req: Request) {
             const booking = parsed?.booking || {};
             const car = booking?.car || {};
             const opStatus = (res as any).operationalStatus || "R";
+            const isCancelled =
+               ["CANCELLED", "CANCELLED_GREENWAY", "ON_REQUEST_REJECTED"].includes(res.status) ||
+               ["CC", "CP", "TD"].includes(opStatus);
+
+            let totalBRLNum = 0;
+            if (res.amountInCents && Number(res.amountInCents) > 0) {
+               totalBRLNum = Number(res.amountInCents) / 100;
+            } else if (car?.totalRateInBookingCurrency && !isNaN(parseFloat(car.totalRateInBookingCurrency))) {
+               totalBRLNum = parseFloat(car.totalRateInBookingCurrency);
+            } else if (car?.totalRateEstimate && car?.exchangeRate && !isNaN(parseFloat(car.totalRateEstimate)) && !isNaN(parseFloat(car.exchangeRate))) {
+               totalBRLNum = parseFloat(car.totalRateEstimate) * parseFloat(car.exchangeRate);
+            }
+
+            const daysNum = booking?.days ? parseInt(booking.days, 10) : 0;
+
+            if (isCancelled) {
+               cancelledCount++;
+               cancelledTotalBRL += totalBRLNum;
+            } else {
+               activeCount++;
+               activeTotalBRL += totalBRLNum;
+               activeTotalDays += daysNum;
+            }
 
             const row = [
                res.resNumber || "",
@@ -233,13 +366,33 @@ export async function GET(req: Request) {
                car?.carCategoryCode || "",
                booking?.pickupStation || "",
                booking?.returnStation || booking?.pickupStation || "",
-               res.amountInCents
-                  ? (res.amountInCents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })
-                  : "",
+               totalBRLNum > 0 ? totalBRLNum.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "",
             ];
 
             csv += row.map(escapeCSV).join(",") + "\n";
          }
+
+         // Footer / Totais Operacionais
+         csv += "\n";
+         csv += [
+            escapeCSV(`TOTAL ATIVO / CONFIRMADO (${activeCount} reservas)`),
+            "", "", "", "", "", "",
+            escapeCSV(`${activeTotalDays} dias`),
+            "", "", "", "", "", "", "", "",
+            escapeCSV(`R$ ${activeTotalBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`),
+         ].join(",") + "\n";
+
+         if (cancelledCount > 0) {
+            csv += [
+               escapeCSV(`TOTAL CANCELADO (${cancelledCount} reservas)`),
+               "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+               escapeCSV(`R$ ${cancelledTotalBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`),
+            ].join(",") + "\n";
+         }
+
+         csv += [
+            escapeCSV(`TOTAL GERAL FILTRADO (${reservations.length} registros)`),
+         ].join(",") + "\n";
       }
 
       // BOM for Excel compatibility with UTF-8
