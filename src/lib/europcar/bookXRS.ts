@@ -263,5 +263,5 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
     }
   }
 
-  return { resNumber, isOnRequest, onRequestItems };
+  return { resNumber, isOnRequest, onRequestItems, xrsStatusCode };
 }

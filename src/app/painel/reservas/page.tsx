@@ -121,7 +121,11 @@ export default function PainelReservas() {
             showToast(`✅ GreenWay atualizado! Status: ${item?.xrsStatus || item?.newOpStatus || 'Confirmado'}`, "success");
             fetchReservations();
          } else {
-            showToast(`Status no GreenWay já está em dia ou sem alteração.`, "success");
+            const item = data.results?.[0];
+            const statusMsg = item?.xrsStatus
+               ? `GreenWay: ${item.xrsStatus} (${item.newOpStatus}) — sem alteração necessária.`
+               : `Status no GreenWay já está em dia ou sem alteração.`;
+            showToast(statusMsg, "success");
             fetchReservations();
          }
       } catch (e: any) {

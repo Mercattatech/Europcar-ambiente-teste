@@ -313,6 +313,7 @@ export async function POST(request: Request) {
       let resNumber: string | null = null;
       let isOnRequest = false;
       let onRequestItems: any[] = [];
+      let xrsStatusCode: string = 'S';
       if (paymentApproved) {
         const car = bookingData.car || {};
         const pickupDate = bookingData.pickupDate;
@@ -450,7 +451,7 @@ export async function POST(request: Request) {
           throw new Error(`Europcar não retornou número de reserva.${detail ? ' Motivo: ' + detail : ' Verifique os logs XRS.'}`);
         }
 
-        const xrsStatusCode: string = bookResNode?.$?.statusCode || 'S';
+        xrsStatusCode = bookResNode?.$?.statusCode || 'S';
         isOnRequest = xrsStatusCode === 'R';
         if (isOnRequest) {
           const raw = bookResNode?.onRequestItemList?.onRequestItem;
@@ -603,6 +604,7 @@ export async function POST(request: Request) {
               merchantOrderId,
               amountInCents: paymentData.amountInCents || 0,
               status: paymentData.method === 'PIX' ? 'PENDING_PIX' : (isOnRequest ? 'ON_REQUEST' : (paymentData.method === 'BALCAO' ? 'CONFIRMED_NON_PREPAID' : 'CONFIRMED_PREPAID')),
+              operationalStatus: xrsStatusCode || (isOnRequest ? 'R' : 'S'),
               customerData: JSON.stringify({
                 ...safeCustomerData,      // sem creditCard, cvv, cardNumber
                 booking: bookingData,

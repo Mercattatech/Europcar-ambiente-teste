@@ -20,7 +20,17 @@ export const dynamic = 'force-dynamic';
  *   NS = No Show
  *   TD = To Deliver
  */
-function mapXRSStatusToLocal(xrsStatus: string, currentLocalStatus: string, isPrepaid: boolean): string | null {
+function mapXRSStatusToLocal(
+  xrsStatus: string,
+  currentLocalStatus: string,
+  isPrepaid: boolean,
+  isRejected?: boolean
+): string | null {
+  // Se XRS indicou rejeição explícita de On-Request (via warnings ou status CC/CS/CP)
+  if (isRejected && currentLocalStatus === 'ON_REQUEST') {
+    return 'ON_REQUEST_REJECTED';
+  }
+
   switch (xrsStatus) {
     case 'S':
     case 'CF':
@@ -33,8 +43,11 @@ function mapXRSStatusToLocal(xrsStatus: string, currentLocalStatus: string, isPr
     case 'CC':
     case 'CS':
     case 'CP':
-      // Cancelada no Greenway → marcar como cancelada localmente
-      if (!currentLocalStatus.startsWith('CANCELLED')) {
+      // Cancelada no Greenway → se era ON_REQUEST, marcar como recusada; se confirmada, CANCELLED_GREENWAY
+      if (currentLocalStatus === 'ON_REQUEST') {
+        return 'ON_REQUEST_REJECTED';
+      }
+      if (!currentLocalStatus.startsWith('CANCELLED') && currentLocalStatus !== 'ON_REQUEST_REJECTED') {
         return 'CANCELLED_GREENWAY';
       }
       return null;
@@ -51,7 +64,7 @@ function mapXRSStatusToLocal(xrsStatus: string, currentLocalStatus: string, isPr
       }
       return null;
     case 'R':
-      // Ainda On Request → sem mudança
+      // Ainda On Request e sem aviso de rejeição → sem mudança
       return null;
     default:
       return null;
@@ -71,16 +84,18 @@ function mapXRSStatusToLocal(xrsStatus: string, currentLocalStatus: string, isPr
  *   - Via cron (Coolify Scheduled Task)
  *   - Manualmente pelo admin no painel (em lote ou para uma reserva específica)
  *
- * Segurança: aceita localhost OU bearer token do cron OU sessão admin
+ * Segurança: aceita localhost OU bearer token do cron OU query ?secret= OU sessão admin
  */
 export async function POST(req: Request) {
   // Autenticação: localhost (Coolify cron) OU cron secret OU admin session
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
   const host = req.headers.get('host') || '';
+  const url = new URL(req.url);
+  const secretParam = url.searchParams.get('secret');
 
   const isLocalhost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
-  const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  const isCron = !!cronSecret && (authHeader === `Bearer ${cronSecret}` || secretParam === cronSecret);
   const isAdmin = await checkAdmin().catch(() => false);
 
   if (!isLocalhost && !isCron && !isAdmin) {
@@ -159,23 +174,33 @@ export async function POST(req: Request) {
           const parsed = typeof res.customerData === 'string'
             ? JSON.parse(res.customerData)
             : (res.customerData || {});
-          customerEmail = parsed.email || '';
-          customerName = parsed.nome || '';
-          customerLastName = parsed.sobrenome || '';
-          bookingData = parsed.booking || {};
-          const pm = parsed.paymentMethod || '';
+          customerEmail = parsed.email || parsed.driverData?.email || parsed.customerData?.email || '';
+          customerName = parsed.nome || parsed.firstName || parsed.driverData?.firstName || '';
+          customerLastName = parsed.sobrenome || parsed.lastName || parsed.driverData?.lastName || '';
+          bookingData = parsed.booking || parsed.bookingData || {};
+          const pm = parsed.paymentMethod || parsed.paymentData?.method || '';
           isPrepaid = pm === 'CREDIT' || pm === 'PIX' || !!parsed.cieloPaymentId || res.status === 'CONFIRMED_PREPAID';
         } catch { }
 
-        const newStatus = mapXRSStatusToLocal(xrs.xrsStatusCode, res.status, isPrepaid);
-        const oldOpStatus = res.operationalStatus || 'R';
+        const newStatus = mapXRSStatusToLocal(xrs.xrsStatusCode, res.status, isPrepaid, xrs.isRejected);
+        const oldOpStatus = res.operationalStatus || (res.status === 'ON_REQUEST' ? 'R' : 'S');
         const newOpStatus = xrs.xrsStatusCode;
 
         const opStatusChanged = oldOpStatus !== newOpStatus;
         const statusChanged = !!newStatus && newStatus !== res.status;
 
         if (!opStatusChanged && !statusChanged) {
-          // Nenhuma alteração detectada
+          if (singleResNumber) {
+            results.push({
+              resNumber: res.resNumber,
+              oldStatus: res.status,
+              newStatus: res.status,
+              oldOpStatus,
+              newOpStatus,
+              xrsStatus: xrs.xrsStatus,
+              action: 'no_change',
+            });
+          }
           continue;
         }
 
@@ -195,9 +220,9 @@ export async function POST(req: Request) {
 
         // ── Ações específicas por tipo de mudança ──
 
-        // ON_REQUEST → CONFIRMADA (CF ou S): enviar email de confirmação
-        const wasOnRequest = res.status === 'ON_REQUEST' || oldOpStatus === 'R';
-        const isNowConfirmed = newOpStatus === 'CF' || newOpStatus === 'S';
+        // 1. ON_REQUEST → CONFIRMADA (CF, S ou TD): enviar email de confirmação
+        const wasOnRequest = res.status === 'ON_REQUEST';
+        const isNowConfirmed = newOpStatus === 'CF' || newOpStatus === 'S' || newOpStatus === 'TD';
 
         if (wasOnRequest && isNowConfirmed) {
           action = 'on_request_confirmed';
@@ -208,7 +233,7 @@ export async function POST(req: Request) {
               const { buildEmailCurrencyVars } = await import('@/lib/receiptLocales');
               const cv = buildEmailCurrencyVars(
                 totalBRL,
-                bookingData.pickupStation,
+                bookingData.pickupStation || xrs.pickupStation || '',
                 parseFloat(car.exchangeRate || '1'),
                 car.currency || 'BRL'
               );
@@ -219,11 +244,11 @@ export async function POST(req: Request) {
                 SOBRENOME: customerLastName,
                 EMAIL: customerEmail,
                 NUMERO_RESERVA: res.resNumber || '',
-                CARRO: car.carCategoryName || car.name || '',
-                DATA_RETIRADA: fmtDate(bookingData.pickupDate || ''),
-                LOCAL_RETIRADA: bookingData.pickupStation || '',
-                DATA_DEVOLUCAO: fmtDate(bookingData.returnDate || ''),
-                LOCAL_DEVOLUCAO: bookingData.returnStation || bookingData.pickupStation || '',
+                CARRO: car.carCategoryName || car.name || xrs.carCategory || '',
+                DATA_RETIRADA: fmtDate(bookingData.pickupDate || xrs.pickupDate || ''),
+                LOCAL_RETIRADA: bookingData.pickupStation || xrs.pickupStation || '',
+                DATA_DEVOLUCAO: fmtDate(bookingData.returnDate || xrs.returnDate || ''),
+                LOCAL_DEVOLUCAO: bookingData.returnStation || bookingData.pickupStation || xrs.pickupStation || '',
                 VALOR_TOTAL: cv.VALOR_TOTAL,
                 VALOR_LOCAL: cv.VALOR_LOCAL,
                 VALOR_BRL: cv.VALOR_BRL,
@@ -238,17 +263,17 @@ export async function POST(req: Request) {
                 sent = await sendTransactionalEmail(customerEmail, 'RESERVA_SUCESSO', emailVars);
               }
               if (!sent.success) {
-                console.log(`[sync-greenway] Template não encontrado no banco. Enviando via sendBookingConfirmation fallback...`);
+                console.log(`[sync-greenway] Template não encontrado no banco ou falhou. Enviando via sendBookingConfirmation fallback...`);
                 const { sendBookingConfirmation } = await import('@/lib/email/sendBookingConfirmation');
                 await sendBookingConfirmation({
                   toEmail: customerEmail,
                   customerName: `${customerName} ${customerLastName}`.trim(),
                   resNumber: res.resNumber || '',
-                  carName: car.carCategoryName || car.name || '',
-                  pickupStation: bookingData.pickupStation || '',
-                  returnStation: bookingData.returnStation || bookingData.pickupStation || '',
-                  pickupDate: bookingData.pickupDate || '',
-                  returnDate: bookingData.returnDate || '',
+                  carName: car.carCategoryName || car.name || xrs.carCategory || '',
+                  pickupStation: bookingData.pickupStation || xrs.pickupStation || '',
+                  returnStation: bookingData.returnStation || bookingData.pickupStation || xrs.pickupStation || '',
+                  pickupDate: bookingData.pickupDate || xrs.pickupDate || '',
+                  returnDate: bookingData.returnDate || xrs.returnDate || '',
                   paymentMethod: isPrepaid ? 'CREDIT' : 'BALCAO',
                   totalBRL: totalBRL,
                   isOnRequest: false,
@@ -260,11 +285,62 @@ export async function POST(req: Request) {
           }
         }
 
-        // CANCELAMENTO detectado: estornar pagamento + enviar email
-        if (newStatus === 'CANCELLED_GREENWAY') {
+        // 2. ON_REQUEST → REJEITADA / CANCELADA (estorno se pré-pago + email de recusa)
+        else if (newStatus === 'ON_REQUEST_REJECTED') {
+          action = 'on_request_rejected';
+
+          // Estornar pagamento Cielo (se houver cobrança online prévia)
+          try {
+            const voidResult = await voidCieloPaymentForLocalReservation(res.id);
+            if (voidResult.attempted) {
+              console.log(`[sync-greenway] Estorno Cielo para On-Request rejeitada ${res.resNumber}: ${voidResult.success ? 'OK' : 'FALHOU'}`);
+            }
+          } catch (voidErr: any) {
+            console.error(`[sync-greenway] Erro ao estornar ${res.resNumber}:`, voidErr.message);
+          }
+
+          if (customerEmail) {
+            try {
+              let sent = await sendTransactionalEmail(customerEmail, 'RESERVA_REJEITADA', {
+                NOME: customerName,
+                NUMERO_RESERVA: res.resNumber || '',
+                STATUS: 'Recusada',
+                MENSAGEM: 'Sua solicitação de reserva On Request não pôde ser confirmada pela Europcar para a categoria solicitada. Nenhuma cobrança foi realizada.',
+              });
+              if (!sent.success) {
+                sent = await sendTransactionalEmail(customerEmail, 'CANCELAMENTO', {
+                  NOME: customerName,
+                  NUMERO_RESERVA: res.resNumber || '',
+                  STATUS: 'Recusada',
+                  MENSAGEM: 'Sua solicitação de reserva On Request não pôde ser confirmada pela Europcar.',
+                });
+              }
+              if (!sent.success) {
+                const { sendCancellationEmail } = await import('@/lib/email/sendCancellationEmail');
+                await sendCancellationEmail({
+                  toEmail: customerEmail,
+                  customerName: `${customerName} ${customerLastName}`.trim(),
+                  resNumber: res.resNumber || '',
+                  carName: bookingData?.car?.carCategoryName || bookingData?.car?.name || xrs.carCategory || '',
+                  pickupStation: bookingData?.pickupStation || xrs.pickupStation || '',
+                  returnStation: bookingData?.returnStation || bookingData?.pickupStation || xrs.pickupStation || '',
+                  pickupDate: bookingData?.pickupDate || xrs.pickupDate || '',
+                  returnDate: bookingData?.returnDate || xrs.returnDate || '',
+                  paymentMethod: isPrepaid ? 'CREDIT' : 'BALCAO',
+                  totalBRL: res.amountInCents ? res.amountInCents / 100 : 0,
+                });
+              }
+            } catch (emailErr: any) {
+              console.error(`[sync-greenway] Erro ao enviar email de rejeição para ${res.resNumber}:`, emailErr.message);
+            }
+          }
+        }
+
+        // 3. CANCELAMENTO direto no Greenway para reservas confirmadas: estornar Cielo + email de cancelamento
+        else if (newStatus === 'CANCELLED_GREENWAY') {
           action = 'cancelled_by_greenway';
 
-          // Estornar pagamento Cielo (se houver)
+          // Estornar pagamento Cielo (se houver cobrança online)
           try {
             const voidResult = await voidCieloPaymentForLocalReservation(res.id);
             if (voidResult.attempted) {
@@ -277,38 +353,29 @@ export async function POST(req: Request) {
           // Enviar email de cancelamento
           if (customerEmail) {
             try {
-              await sendTransactionalEmail(customerEmail, 'CANCELAMENTO', {
+              let sent = await sendTransactionalEmail(customerEmail, 'CANCELAMENTO', {
                 NOME: customerName,
                 NUMERO_RESERVA: res.resNumber || '',
                 STATUS: 'Cancelada',
-                MENSAGEM: 'Sua reserva foi cancelada pela operação Europcar. Caso tenha sido cobrado, o estorno será processado automaticamente.',
+                MENSAGEM: 'Sua reserva foi cancelada pela operação Europcar. Caso tenha sido cobrado online, o estorno será processado automaticamente.',
               });
+              if (!sent.success) {
+                const { sendCancellationEmail } = await import('@/lib/email/sendCancellationEmail');
+                await sendCancellationEmail({
+                  toEmail: customerEmail,
+                  customerName: `${customerName} ${customerLastName}`.trim(),
+                  resNumber: res.resNumber || '',
+                  carName: bookingData?.car?.carCategoryName || bookingData?.car?.name || xrs.carCategory || '',
+                  pickupStation: bookingData?.pickupStation || xrs.pickupStation || '',
+                  returnStation: bookingData?.returnStation || bookingData?.pickupStation || xrs.pickupStation || '',
+                  pickupDate: bookingData?.pickupDate || xrs.pickupDate || '',
+                  returnDate: bookingData?.returnDate || xrs.returnDate || '',
+                  paymentMethod: isPrepaid ? 'CREDIT' : 'BALCAO',
+                  totalBRL: res.amountInCents ? res.amountInCents / 100 : 0,
+                });
+              }
             } catch (emailErr: any) {
               console.error(`[sync-greenway] Erro ao enviar email de cancelamento para ${res.resNumber}:`, emailErr.message);
-            }
-          }
-        }
-
-        // ON_REQUEST → CANCELADA / REJEITADA
-        if (wasOnRequest && (newStatus === 'CANCELLED_GREENWAY' || newOpStatus === 'CC' || newOpStatus === 'CS')) {
-          action = 'on_request_rejected';
-          if (customerEmail) {
-            try {
-              await sendTransactionalEmail(customerEmail, 'RESERVA_REJEITADA', {
-                NOME: customerName,
-                NUMERO_RESERVA: res.resNumber || '',
-                STATUS: 'Recusada',
-                MENSAGEM: 'Sua solicitação de reserva On Request não foi confirmada pela Europcar. Nenhuma cobrança foi realizada.',
-              }).catch(() =>
-                sendTransactionalEmail(customerEmail, 'CANCELAMENTO', {
-                  NOME: customerName,
-                  NUMERO_RESERVA: res.resNumber || '',
-                  STATUS: 'Recusada',
-                  MENSAGEM: 'Sua solicitação de reserva On Request não foi confirmada pela Europcar.',
-                })
-              );
-            } catch (emailErr: any) {
-              console.error(`[sync-greenway] Erro ao enviar email de rejeição para ${res.resNumber}:`, emailErr.message);
             }
           }
         }

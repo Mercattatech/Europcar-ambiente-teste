@@ -228,6 +228,12 @@ export async function POST(request: Request) {
 
     // Save local reservation record
     if (paymentData) {
+      const resNode =
+        xrsResponse?.message?.serviceResponse?.reservation ||
+        xrsResponse?.serviceResponse?.reservation;
+      const xrsStatusCode = resNode?.$?.statusCode || 'S';
+      const isOnRequest = xrsStatusCode === 'R';
+
       await prisma.localReservation.create({
         data: {
           resNumber: resNumber || `LOCAL_${Date.now()}`,
@@ -237,7 +243,8 @@ export async function POST(request: Request) {
             contractID: contractID || null,
             carCategory,
           }),
-          status: paymentData.paid ? 'CONFIRMED_PREPAID' : 'CONFIRMED_NON_PREPAID'
+          status: paymentData.paid ? 'CONFIRMED_PREPAID' : (isOnRequest ? 'ON_REQUEST' : 'CONFIRMED_NON_PREPAID'),
+          operationalStatus: xrsStatusCode,
         }
       });
     }

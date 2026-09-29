@@ -108,16 +108,20 @@ export async function GET(request: Request) {
      console.log(`[pix-status] ✅ PIX PAGO! Processando reserva XRS para ${orderId}...`);
 
      let resNumber = reservaLocal.merchantOrderId;
+     let isBookingOnRequest = false;
+     let xrsStatus = 'S';
      try {
-         const { resNumber: europcarResNumber } = await executeXRSBooking({
+         const xrsRes = await executeXRSBooking({
              bookingData: parsedData.booking,
              customerData: parsedData,
              paymentData: { method: 'PIX', amountInCents: reservaLocal.amountInCents, merchantOrderId: reservaLocal.merchantOrderId },
              xrsEquipment: parsedData.booking?.xrsEquipment || [],
          });
-         if (europcarResNumber) {
-            resNumber = europcarResNumber;
-            console.log(`[pix-status] ✅ Reserva XRS criada: ${resNumber}`);
+         if (xrsRes.resNumber) {
+            resNumber = xrsRes.resNumber;
+            isBookingOnRequest = !!xrsRes.isOnRequest;
+            xrsStatus = xrsRes.xrsStatusCode || (isBookingOnRequest ? 'R' : 'S');
+            console.log(`[pix-status] ✅ Reserva XRS criada: ${resNumber} (OnRequest: ${isBookingOnRequest}, opStatus: ${xrsStatus})`);
          }
      } catch (e: any) {
          console.error(`[pix-status] ❌ Erro XRS Booking para ${orderId}:`, e.message);
@@ -133,16 +137,20 @@ export async function GET(request: Request) {
        };
      } catch (_) { }
 
+     const finalStatus = isBookingOnRequest ? 'ON_REQUEST' : 'CONFIRMED_PREPAID';
+     const finalOpStatus = xrsStatus;
+
      await prisma.localReservation.update({
          where: { id: reservaLocal.id },
          data: {
              resNumber,
-             status: 'CONFIRMED_PREPAID',
+             status: finalStatus,
+             operationalStatus: finalOpStatus,
              customerData: JSON.stringify(updatedCustomerData),
          }
      });
 
-     console.log(`[pix-status] ✅ Reserva ${resNumber} atualizada para CONFIRMED_PREPAID`);
+     console.log(`[pix-status] ✅ Reserva ${resNumber} atualizada para ${finalStatus} (opStatus: ${finalOpStatus})`);
 
      // Trigger Email PIX Sucesso
      try {

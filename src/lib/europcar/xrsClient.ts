@@ -384,6 +384,8 @@ export interface ReadBookingResult {
   pickupStation?: string;
   pickupDate?: string;
   returnDate?: string;
+  warnings?: any[];
+  isRejected?: boolean;
   raw?: any;
   error?: string;
 }
@@ -459,6 +461,16 @@ export async function readBooking(resNumber: string): Promise<ReadBookingResult>
     const pickupDate = attrs.pickupDate || resNode.checkout?.$?.date || '';
     const returnDate = attrs.returnDate || resNode.checkin?.$?.date || '';
 
+    // Extrair warningList retornado pelo XRS (ex: On-Request recusado pelo backoffice/estação)
+    const warningList = resNode?.warningList?.warning ?? null;
+    const warnings: any[] = Array.isArray(warningList)
+      ? warningList.map((w: any) => w.$ || w)
+      : warningList ? [warningList.$ || warningList] : [];
+    const isRejected = (statusCode === 'R' && warnings.some((w: any) =>
+      (w.warningDesc || '').toLowerCase().includes('onrequestitemfailed') ||
+      (w.warningDesc || '').toLowerCase().includes('nochangeallowed')
+    )) || statusCode === 'CC' || statusCode === 'CS' || statusCode === 'CP';
+
     return {
       found: true,
       resNumber: attrs.resNumber || resNumber,
@@ -468,6 +480,8 @@ export async function readBooking(resNumber: string): Promise<ReadBookingResult>
       pickupStation,
       pickupDate,
       returnDate,
+      warnings,
+      isRejected,
       raw: resNode,
     };
   } catch (err: any) {
