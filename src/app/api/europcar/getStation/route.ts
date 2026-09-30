@@ -109,9 +109,15 @@ export async function GET(request: Request) {
       serviceCodes.has('GREENSTN') ||
       serviceCodes.has('EV');
 
+    // hasShuttle: only true for off-terminal stations (areaType='O') that actually have shuttle.
+    // TRANSFER is a generic service code most airports have — it does NOT mean shuttle bus.
+    // The station is considered to need a shuttle only if it's outside the terminal building.
+    const rawAreaType = attrs.areaType || (stationCode.length >= 4 ? (stationCode[3] === 'O' ? 'O' : '') : '');
     const hasShuttle =
-      serviceCodes.has('SHUTTLE') ||
-      serviceCodes.has('TRANSFER');
+      rawAreaType === 'O' && (
+        serviceCodes.has('SHUTTLE') ||
+        serviceCodes.has('TRANSFER')
+      );
 
     const hasDelivery =
       serviceCodes.has('DELIVERY') ||
