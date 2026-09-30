@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       equipmentList,  // Array of { code, qty } — optional
       insuranceList,  // Array of { code } — optional
       driverAge,      // Driver age for young/senior driver validation
+      xrsLanguage,    // XRS language code (EN, PT, FR, DE, etc.)
     } = body;
 
     if (!carCategory) {

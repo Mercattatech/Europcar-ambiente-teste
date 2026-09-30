@@ -117,7 +117,7 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
 <message>
 <serviceRequest serviceCode="bookReservation">
 <serviceParameters>
-  <reservation carCategory="${escapeXml(carCategory)}" rateId="${escapeXml(rateId)}"${paymentAttrs.prepaidAttrs}${contractAttr}${productDataAttr} chargesDetail="TRE" preferredLanguage="pt_BR" email="${escapeXml(customerData.email.trim())}"${flightAttr}>
+  <reservation carCategory="${escapeXml(carCategory)}" rateId="${escapeXml(rateId)}"${paymentAttrs.prepaidAttrs}${contractAttr}${productDataAttr} chargesDetail="TRE" preferredLanguage="${escapeXml(bookingData.xrsLanguage || 'pt_BR')}" email="${escapeXml(customerData.email.trim())}"${flightAttr}>
     <checkout stationID="${escapeXml(pickupStation)}" date="${escapeXml(pickupDate)}" time="${escapeXml(bookingData.pickupTime || '1000')}"/>
     <checkin stationID="${escapeXml(returnStation)}" date="${escapeXml(returnDate)}" time="${escapeXml(bookingData.returnTime || '1000')}"/>
     <equipmentList>${equipmentXml}</equipmentList>${insuranceXml ? `\n        <insuranceList>${insuranceXml}\n        </insuranceList>` : ''}${paymentAttrs.meanOfPaymentXml}${loyaltyXml}
@@ -196,7 +196,7 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
 <serviceRequest serviceCode="createDriver">
 <serviceParameters>
   <reservation resNumber="${escapeXml(resNumber)}"/>
-  <driver isoLanguage="pt_BR" firstName="${escapeXml(dFirstName)}" lastName="${escapeXml(dLastName)}" title="MR">
+  <driver isoLanguage="${escapeXml(bookingData.xrsLanguage || 'pt_BR')}" firstName="${escapeXml(dFirstName)}" lastName="${escapeXml(dLastName)}" title="MR">
     <addressList>
       <address addressType="P" addressKind="D" addressCountry="${escapeXml(dCountry)}">
         <emails>

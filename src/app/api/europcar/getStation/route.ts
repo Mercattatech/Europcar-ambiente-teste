@@ -146,6 +146,16 @@ export async function GET(request: Request) {
       has247Return = true;
     }
 
+    // Station type detection: areaType 'T' = Terminal (in-airport), 'O' = Off-terminal
+    // Fallback: 4th character of station code (per XRS spec)
+    const areaType = attrs.areaType || (stationCode.length >= 4 ? (stationCode[3] === 'T' ? 'T' : stationCode[3] === 'O' ? 'O' : '') : '');
+    const isTerminal = areaType === 'T';
+    const isOffTerminal = areaType === 'O';
+
+    // Delivery/Collection mode: 'Y' = available, 'R' = on request
+    const deliveryMode = attrs.delivery || '';  // '', 'Y', 'R'
+    const collectionMode = attrs.collection || ''; // '', 'Y', 'R'
+
     const station = {
       code:         attrs.stationCode   ?? stationCode,
       name:         attrs.stationName   ?? '',
@@ -157,7 +167,7 @@ export async function GET(request: Request) {
       email:        sanitizeEmail(attrs.email ?? ''),
       latitude:     attrs.latitude      ?? '',
       longitude:    attrs.longitude     ?? '',
-      type:         attrs.prestige === 'Y' || attrs.areaType === 'T' ? 'airport' : 'city',
+      type:         attrs.prestige === 'Y' || areaType === 'T' ? 'airport' : 'city',
       leadTime:     attrs.leadTime      ?? '',
       hours,
       has247Return,
@@ -172,6 +182,11 @@ export async function GET(request: Request) {
         hasCollection,
         hasMeetAndGreet,
         serviceCodes: Array.from(serviceCodes),
+        areaType,
+        isTerminal,
+        isOffTerminal,
+        deliveryMode,
+        collectionMode,
       },
     };
 

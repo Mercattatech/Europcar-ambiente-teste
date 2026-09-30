@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, acrissCodes, contractID, driverAge } = body;
+    const { pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, acrissCodes, contractID, driverAge, xrsLanguage } = body;
 
     if (!acrissCodes || !Array.isArray(acrissCodes)) {
       return NextResponse.json({ error: 'acrissCodes precisa ser um array' }, { status: 400 });
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
 <message>
   <serviceRequest serviceCode="getMultipleRates">
-    <serviceContext language="pt_PT"/>
+    <serviceContext language="${escapeXml(xrsLanguage || 'PT')}"/>
     <serviceParameters>
       <reservation carCategoryPattern="${escapeXml(carCategoryPattern)}" rateDetails="Y" chargesDetail="TRE"${contractAttr}>
         <checkout stationID="${escapeXml(pickupStation)}" date="${escapeXml(pickupDate)}" time="${escapeXml(pickupTime || '1000')}"/>

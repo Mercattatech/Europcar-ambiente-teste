@@ -80,6 +80,31 @@ function VehiclesContent() {
   const rawAge = searchParams.get("age") || "26+";
   const driverAge: number = rawAge === "26+" ? 30 : parseInt(rawAge, 10) || 30;
 
+  // I18N: Map stationCountry to XRS language code for preferredLanguage
+  const COUNTRY_TO_XRS_LANG: Record<string, string> = {
+    US: 'EN', GB: 'EN', AU: 'EN', CA: 'EN', IE: 'EN',
+    BR: 'PT', PT: 'PT',
+    ES: 'ES', AR: 'ES', CL: 'ES', MX: 'ES', CO: 'ES',
+    FR: 'FR', BE: 'FR', CH: 'FR',
+    DE: 'DE', AT: 'DE',
+    IT: 'IT',
+    NL: 'NL',
+    PL: 'PL',
+    CZ: 'CS',
+    HU: 'HU',
+    RO: 'RO',
+    SE: 'SV',
+    DK: 'DA',
+    FI: 'FI',
+    NO: 'NO',
+    GR: 'EL',
+    BG: 'BG',
+    HR: 'HR',
+    SK: 'SK',
+    UA: 'UK',
+  };
+  const xrsLanguage = COUNTRY_TO_XRS_LANG[stationCountry?.toUpperCase() || ''] || 'PT';
+
   // Duração oficial retornada pela API XRS (getMultipleRates / getQuote)
   const [apiRentalDuration, setApiRentalDuration] = useState<number | null>(null);
 
@@ -164,6 +189,17 @@ function VehiclesContent() {
         if (s) setReturnStationName(s.name);
       }).catch(() => { });
   }, [returnStation, isOneWay]);
+
+  // Station features (shuttle, delivery, terminal type)
+  const [pickupStationInfo, setPickupStationInfo] = useState<any>(null);
+  useEffect(() => {
+    if (!pickupStation) return;
+    fetch(`/api/europcar/getStation?stationCode=${pickupStation}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.station) setPickupStationInfo(d.station);
+      }).catch(() => { });
+  }, [pickupStation]);
 
   // XRS cars state
   const [cars, setCars] = useState<any[]>([]);
@@ -341,6 +377,7 @@ function VehiclesContent() {
         acrissCodes,
         contractID: cid,
         driverAge,
+        xrsLanguage,
       });
 
       // Skip ETO fetches for Brazilian stations (Brazil = POA only)
@@ -791,6 +828,7 @@ function VehiclesContent() {
             rateId:      rateIdForQuote,
             prepaidMode,           // ← dynamic NP or PP
             driverAge,
+            xrsLanguage,
             equipmentList: [],     // ← empty — prices come from getMultipleRates
           }),
         })
@@ -1523,6 +1561,31 @@ function VehiclesContent() {
                   <div className="text-gray-500">{formatDate(returnDate)}</div>
                 </div>
               </div>
+              {/* Shuttle / Delivery badges */}
+              {pickupStationInfo?.features && (
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {pickupStationInfo.features.hasShuttle && (
+                    <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                      🚌 Shuttle Bus
+                    </span>
+                  )}
+                  {pickupStationInfo.type === 'airport' && (
+                    <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                      ✈️ Aeroporto
+                    </span>
+                  )}
+                  {pickupStationInfo.features.hasDelivery && (
+                    <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                      🚗 Delivery disponível
+                    </span>
+                  )}
+                  {pickupStationInfo.features.has247Return && (
+                    <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                      🔑 Devolução 24h
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             {/* Step 2 */}
             <div className={`flex-1 bg-white border-2 ${currentStep === 2 ? "border-[#008d36]" : "border-gray-200"} rounded p-4 relative`}>
@@ -2098,7 +2161,7 @@ function VehiclesContent() {
                         ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
                         : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID);
                       const enrichedCar = { ...selectedCar, ...quoteTotals, duration: bookingDurationDays };
-                      const payload = { car: enrichedCar, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit, driverAge };
+                      const payload = { car: enrichedCar, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
                       sessionStorage.setItem("europcar_booking", JSON.stringify(payload));
                       try {
                         const sessionId = sessionStorage.getItem("europcar_journey_session");
@@ -2176,7 +2239,7 @@ function VehiclesContent() {
                       const cidForTariff = selectedTariffType === 'ETO'
                         ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
                         : (zeroExcessUpgrade ? '56935495' : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID));
-                      const payload = { car: { ...selectedCar, duration: bookingDurationDays }, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload2, xrsInsurances: xrsInsurancesPayload2, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage, driverAge };
+                      const payload = { car: { ...selectedCar, duration: bookingDurationDays }, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload2, xrsInsurances: xrsInsurancesPayload2, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
                       sessionStorage.setItem("europcar_booking", JSON.stringify(payload));
                       // Journey tracking — Step 3: Extras selected (ETO path)
                       try {

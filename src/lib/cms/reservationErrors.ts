@@ -13,11 +13,21 @@ import prisma from '@/lib/prisma';
  * Estes fallbacks garantem que, mesmo sem cadastro no CMS (ContentBlock),
  * o usuário veja uma mensagem compreensível e não o código técnico do XRS.
  */
-const AGE_ERROR_FALLBACKS: Record<string, string> = {
+const XRS_ERROR_FALLBACKS: Record<string, string> = {
+  // Erros de idade do condutor
   'rental.drivertooyoungforcategory': 'O condutor não possui a idade mínima exigida para alugar esta categoria de veículo.',
   'rental.drivertooyoungforcountry': 'A idade do condutor é inferior ao limite mínimo permitido no país de retirada.',
   'rental.drivertoooldforcountry': 'A idade do condutor ultrapassa o limite máximo permitido para locação neste país.',
   'xrs.driver.notlegal.age': 'É necessário ter no mínimo 18 anos de idade para realizar a reserva.',
+  // Erros de Delivery/Collection (Transfer)
+  'delcol.nodeliveryatthisstation': 'Esta estação de aluguel não realiza entregas de veículos no endereço indicado.',
+  'delcol.nocollectionatthisstation': 'Esta estação não realiza recolhimento de veículos no endereço indicado.',
+  'delcol.delcolfeemayapply': 'Atenção: taxa de entrega/recolhimento pode ser aplicada.',
+  // Erros Cielo (pagamento)
+  '129': 'Ocorreu um problema ao processar seu pagamento. Entre em contato com o suporte.',
+  '605': 'Erro interno na autenticação do cartão. Tente novamente ou use outro cartão.',
+  '606': 'Erro interno na autenticação do cartão. Tente novamente ou use outro cartão.',
+  '607': 'Erro interno na autenticação do cartão. Tente novamente ou use outro cartão.',
 };
 
 export async function getReservationErrorMessage(code: string | number | undefined | null, fallback: string): Promise<string> {
@@ -32,6 +42,6 @@ export async function getReservationErrorMessage(code: string | number | undefin
     console.warn('[CMS] Falha ao buscar reservation.error:', (err as Error).message);
   }
   // Fallback estático para erros de idade do XRS
-  return AGE_ERROR_FALLBACKS[codeStr] || fallback;
+  return XRS_ERROR_FALLBACKS[codeStr] || fallback;
 }
 
