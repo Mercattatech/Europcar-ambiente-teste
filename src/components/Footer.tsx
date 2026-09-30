@@ -58,44 +58,42 @@ export default function Footer() {
             <div className="mb-6 md:mb-0 text-center md:text-left">
               <img src="/logo.jpg" alt="Europcar" className="h-8 object-contain mb-4 brightness-200 mx-auto md:mx-0" />
               <p className="text-xs leading-relaxed">
-                Europcar Brasil — Plataforma oficial de aluguel de veículos.
-                Presente em mais de 140 países com uma frota diversificada
-                para atender suas necessidades.
+                {t('footer.description')}
               </p>
             </div>
 
             {/* Col 2 - Europcar Internacional */}
-            <FooterAccordion id="international" title="Europcar Internacional">
-              <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Informações legais</p>
+            <FooterAccordion id="international" title={t('footer.intlTitle')}>
+              <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">{t('footer.legalInfo')}</p>
               <ul className="space-y-2 text-xs">
-                <li><a href="https://www.europcar.com/en-us/p/legal-information" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Informações Legais</a></li>
-                <li><a href="https://www.europcar.com/en-us/legal-pages/termsAndConditions" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Termos e Condições</a></li>
-                <li><a href="https://www.europcar.com/en-us/p/legal-information/deposit-policy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">Política de Depósito</a></li>
+                <li><a href="https://www.europcar.com/en-us/p/legal-information" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">{t('footer.legalInfo')}</a></li>
+                <li><a href="https://www.europcar.com/en-us/legal-pages/termsAndConditions" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">{t('footer.termsAndConditions')}</a></li>
+                <li><a href="https://www.europcar.com/en-us/p/legal-information/deposit-policy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors py-1 block">{t('footer.depositPolicy')}</a></li>
               </ul>
             </FooterAccordion>
 
             {/* Col 3 - Europcar Brasil */}
-            <FooterAccordion id="brasil" title="Europcar Brasil">
-              <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Documentos</p>
+            <FooterAccordion id="brasil" title={t('footer.brasilTitle')}>
+              <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">{t('footer.documents')}</p>
               <ul className="space-y-2 text-xs">
                 {termsAvailable.reserva && (
-                  <li><a href="/termos/contrato" className="hover:text-white transition-colors py-1 block">Contrato de Locação de Veículo</a></li>
+                  <li><a href="/termos/contrato" className="hover:text-white transition-colors py-1 block">{t('footer.rentalContract')}</a></li>
                 )}
 
-                <li><a href="/termos/privacidade" className="hover:text-white transition-colors py-1 block">Segurança e Política de Privacidade</a></li>
-                <li><a href="/termos/cookies" className="hover:text-white transition-colors py-1 block">Política de Cookies</a></li>
-                <li><a href="/termos/uso-site" className="hover:text-white transition-colors py-1 block">Termo de Uso do Site</a></li>
+                <li><a href="/termos/privacidade" className="hover:text-white transition-colors py-1 block">{t('footer.securityPrivacy')}</a></li>
+                <li><a href="/termos/cookies" className="hover:text-white transition-colors py-1 block">{t('footer.cookiePolicy')}</a></li>
+                <li><a href="/termos/uso-site" className="hover:text-white transition-colors py-1 block">{t('footer.siteTerms')}</a></li>
               </ul>
             </FooterAccordion>
 
             {/* Col 4 - Atendimento */}
-            <FooterAccordion id="atendimento" title="Atendimento">
-              <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Termos</p>
+            <FooterAccordion id="atendimento" title={t('footer.serviceTitle')}>
+              <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">{t('footer.termsAndConditions')}</p>
               <ul className="space-y-1 text-xs mb-3">
-                <li><a href="/termos/reserva-online" className="hover:text-white transition-colors py-1 block">Termos e Condições de Reserva</a></li>
-                <li><a href="/termos/locacao" className="hover:text-white transition-colors py-1 block">Termos e Condições Gerais de Locação</a></li>
+                <li><a href="/termos/reserva-online" className="hover:text-white transition-colors py-1 block">{t('footer.bookingTerms')}</a></li>
+                <li><a href="/termos/locacao" className="hover:text-white transition-colors py-1 block">{t('footer.rentalGeneralTerms')}</a></li>
               </ul>
-              <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Canais</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">{t('footer.channels')}</p>
               <ul className="space-y-2 text-xs">
                 <li className="flex items-center gap-2">
                   <span>📧</span>
@@ -107,7 +105,7 @@ export default function Footer() {
                 </li>
                 <li className="flex items-center gap-2">
                   <span>🕐</span>
-                  <span>Seg-Sex: 8h às 20h</span>
+                  <span>{t('footer.schedule')}</span>
                 </li>
               </ul>
               {/* WhatsApp — discreto */}

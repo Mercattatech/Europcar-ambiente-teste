@@ -69,13 +69,13 @@ export default function HomePage() {
             {/* Links */}
             <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
               {[
-                { href: "/reservation/searchbooking", label: "Sobre suas Reservas", icon: "📋" },
-                { href: "/reservas", label: "Minhas Reservas", icon: "🚗" },
-                { href: "/promocoes", label: "Promoções", icon: "🏷️" },
-                { href: "/filiais", label: "Filiais", icon: "📍" },
-                { href: "/frota", label: "Nossa Frota", icon: "🚙" },
-                { href: "https://www.europcar.com/en-us/loyalty-program", label: "Programa de Fidelidade", icon: "⭐", external: true },
-                { href: "https://www.europcar.com/pt-br/contact-us", label: "Ajuda", icon: "❓", external: true },
+                { href: "/reservation/searchbooking", label: t('menu.aboutBookings'), icon: "📋" },
+                { href: "/reservas", label: t('menu.myBookings'), icon: "🚗" },
+                { href: "/promocoes", label: t('menu.promotions'), icon: "🏷️" },
+                { href: "/filiais", label: t('menu.branches'), icon: "📍" },
+                { href: "/frota", label: t('menu.fleet'), icon: "🚙" },
+                { href: "https://www.europcar.com/en-us/loyalty-program", label: t('menu.loyalty'), icon: "⭐", external: true },
+                { href: "https://www.europcar.com/pt-br/contact-us", label: t('menu.help'), icon: "❓", external: true },
               ].map((link) => (
                 <a
                   key={link.href}
@@ -167,11 +167,11 @@ export default function HomePage() {
         <div className="relative z-10 max-w-6xl mx-auto px-4 mt-6 md:mt-8 flex justify-center">
           <div className="w-full md:w-[95%] bg-white/10 backdrop-blur-sm border border-white/20 rounded pl-0 flex items-center shadow-lg cursor-pointer hover:bg-white/20 transition-colors">
             <div className="bg-[#008d36] text-white font-black text-[9px] md:text-xs py-2 px-2 md:px-4 shadow-sm flex-shrink-0">
-              ✈️ INTERNACIONAL
+              ✈️ {t('hero.international')}
             </div>
             <div className="flex-1 px-2 md:px-4 text-white font-bold text-xs md:text-sm truncate">
-              Reservas Internacionais livre de IOF
-              <span className="font-normal text-gray-300 hidden sm:inline">, com pagamentos on-line.</span>
+              {t('hero.intlBanner')}
+              <span className="font-normal text-gray-300 hidden sm:inline">{t('hero.intlBannerSub')}</span>
             </div>
             <div className="pr-2 md:pr-4 text-white text-xs md:text-sm font-bold flex items-center gap-1 shrink-0">
               <span className="hidden sm:inline">Saiba mais</span>
@@ -214,8 +214,8 @@ export default function HomePage() {
           <div className="flex items-center gap-3 mb-6 md:mb-10">
             <div className="w-1 h-8 bg-[#008d36] rounded-full"></div>
             <div>
-              <h2 className="text-xl md:text-2xl font-black text-gray-900">Nossa Frota</h2>
-              <p className="text-xs md:text-sm text-gray-500 font-medium">Conheça os veículos disponíveis para aluguel</p>
+              <h2 className="text-xl md:text-2xl font-black text-gray-900">{t('menu.fleet')}</h2>
+              <p className="text-xs md:text-sm text-gray-500 font-medium">{t('hero.knowFleet')}</p>
             </div>
           </div>
 

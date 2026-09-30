@@ -298,15 +298,15 @@ export default function HeroSearchForm() {
     e.preventDefault();
 
     if (!pickupLocation) {
-      alert("Selecione um local de retirada válido da lista");
+      alert(t('hero.alertPickup'));
       return;
     }
     if (!sameReturnLocation && !returnLocation) {
-      alert("Selecione um local de devolução válido da lista");
+      alert(t('hero.alertReturn'));
       return;
     }
     if (!pickupDate) {
-      alert("Selecione a data de retirada");
+      alert(t('hero.alertPickupDate'));
       return;
     }
     // Defesa extra: o widget nativo <input type="date"> pode desincronizar do
@@ -319,11 +319,11 @@ export default function HeroSearchForm() {
       return year >= 2000 && year <= 2099;
     };
     if (!isSaneDate(pickupDate)) {
-      alert("Data de retirada inválida.");
+      alert(t('hero.alertPickupDateInvalid'));
       return;
     }
     if (returnDate && !isSaneDate(returnDate)) {
-      alert("Data de devolução inválida.");
+      alert(t('hero.alertReturnDateInvalid'));
       return;
     }
     if (minPickupDate && pickupDate < minPickupDate) {
@@ -394,7 +394,7 @@ export default function HeroSearchForm() {
   return (
     <div className="bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.2)] overflow-visible p-4 sm:p-6 md:p-8 relative mt-0">
       <h2 className="text-gray-900 font-bold mb-4 text-base md:text-lg">
-        Qual tipo de veículo?
+        {t('hero.vehicleType')}
       </h2>
 
       {/* Veículo Type Tabs */}
@@ -403,7 +403,7 @@ export default function HeroSearchForm() {
           type="button"
           className="bg-[#008d36] text-white font-bold px-4 md:px-6 py-2 text-xs md:text-sm rounded shadow-sm flex items-center gap-1 md:gap-2"
         >
-          🚗 Carro
+          🚗 {t('hero.car')}
         </button>
       </div>
 
@@ -414,7 +414,7 @@ export default function HeroSearchForm() {
           <div className="lg:col-span-2 relative">
             <div className="flex justify-between items-center mb-2">
               <label className="text-sm font-bold text-gray-900">
-                {sameReturnLocation ? `${t('hero.pickupLocation')}` : t('hero.pickupLocation')}
+                {sameReturnLocation ? t('hero.pickupLocation') : t('hero.pickupLocationOnly')}
               </label>
               <label className="text-xs text-gray-400 font-bold flex items-center gap-1 cursor-pointer">
                 <input
@@ -446,7 +446,7 @@ export default function HeroSearchForm() {
                 </span>
                 <input
                   type="text"
-                  placeholder={sameReturnLocation ? "Cidade, endereço, ponto de interesse" : "Local de retirada"}
+                  placeholder={sameReturnLocation ? t('hero.pickupPlaceholder') : t('hero.pickupPlaceholderShort')}
                   className="w-full pl-11 p-4 bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#008d36] focus:border-[#008d36] outline-none text-base font-medium transition-all text-gray-900 placeholder-gray-400"
                   value={stationQuery}
                   onChange={(e) => {
@@ -522,25 +522,25 @@ export default function HeroSearchForm() {
                                 {Boolean(stationDetail?.hasOutOfHours ?? stationDetail?.features?.hasOutOfHours) && (
                                   <div className="flex items-center gap-2">
                                     <span className="text-gray-500 text-sm shrink-0">🕐</span>
-                                    <span className="text-xs font-bold text-gray-700">Retirada fora do horário de funcionamento</span>
+                                    <span className="text-xs font-bold text-gray-700">{t('station.outOfHours')}</span>
                                   </div>
                                 )}
                                 {Boolean(stationDetail?.hasElectricVehicles ?? stationDetail?.features?.hasElectricVehicles) && (
                                   <div className="flex items-center gap-2">
                                     <svg className="w-4 h-4 text-[#008d36] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z" /></svg>
-                                    <span className="text-xs font-bold text-gray-700">Veículos elétricos</span>
+                                    <span className="text-xs font-bold text-gray-700">{t('station.electricVehicles')}</span>
                                   </div>
                                 )}
                                 {Boolean(stationDetail?.features?.hasMeetAndGreet) && (
                                   <div className="flex items-center gap-2">
                                     <span className="text-gray-500 text-sm shrink-0">🤝</span>
-                                    <span className="text-xs font-bold text-gray-700">Meet & Greet</span>
+                                    <span className="text-xs font-bold text-gray-700">{t('station.meetAndGreet')}</span>
                                   </div>
                                 )}
                                 {Boolean(stationDetail?.features?.hasShuttle) && (
                                   <div className="flex items-center gap-2">
                                     <span className="text-gray-500 text-sm shrink-0">🚐</span>
-                                    <span className="text-xs font-bold text-gray-700">Transfer / Shuttle</span>
+                                    <span className="text-xs font-bold text-gray-700">{t('station.transferShuttle')}</span>
                                   </div>
                                 )}
                               </div>
@@ -552,7 +552,7 @@ export default function HeroSearchForm() {
                                 <svg className="w-3.5 h-3.5 text-[#008d36]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                Horário de atendimento
+                                {t('station.operatingHours')}
                               </div>
                               {loadingDetail ? (
                                 <div className="flex gap-1.5 items-center text-[11px] text-gray-400">
@@ -733,7 +733,7 @@ export default function HeroSearchForm() {
           {/* Pickup Date / Time */}
           <div className="relative">
             <label className="text-sm font-bold text-gray-900 block mb-2">
-              Data e hora de retirada
+              {t('hero.pickupDate')}
             </label>
             <div className={`flex border rounded-lg overflow-hidden transition-colors border-gray-300 focus-within:border-[#008d36] focus-within:ring-1 focus-within:ring-[#008d36]`}>
               <div className="flex-1 flex items-center bg-white px-3 border-r border-gray-200">
@@ -756,9 +756,9 @@ export default function HeroSearchForm() {
                 value={pickupTime}
                 onChange={(e) => setPickupTime(e.target.value)}
               >
-                {TIMES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                {TIMES.map((tm) => (
+                  <option key={tm} value={tm}>
+                    {tm}
                   </option>
                 ))}
               </select>
@@ -768,7 +768,7 @@ export default function HeroSearchForm() {
           {/* Return Date / Time */}
           <div>
             <label className="text-sm font-bold text-gray-900 block mb-2">
-              Data e hora de devolução
+              {t('hero.returnDate')}
             </label>
             <div className={`flex border rounded-lg overflow-hidden transition-colors border-gray-300 focus-within:border-[#008d36] focus-within:ring-1 focus-within:ring-[#008d36]`}>
               <div className="flex-1 flex items-center bg-white px-3 border-r border-gray-200">
@@ -791,9 +791,9 @@ export default function HeroSearchForm() {
                 value={returnTime}
                 onChange={(e) => setReturnTime(e.target.value)}
               >
-                {TIMES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                {TIMES.map((tm) => (
+                  <option key={tm} value={tm}>
+                    {tm}
                   </option>
                 ))}
               </select>

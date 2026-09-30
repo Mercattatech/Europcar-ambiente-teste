@@ -1647,7 +1647,7 @@ function VehiclesContent() {
               ))}
             </div>
             <div className="mb-5 border-t border-gray-100 pt-4">
-              <h4 className="font-bold text-sm text-gray-900 mb-2">Tipo de veículo</h4>
+              <h4 className="font-bold text-sm text-gray-900 mb-2">{t('vehicles.vehicleType')}</h4>
               {["Todos", "Carro", "Premium"].map(v => (
                 <label key={v} className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer mb-1.5">
                   <input type="radio" name="tipo" checked={vehicleType === v} onChange={() => setVehicleType(v)} className="accent-[#008d36]" /> {v}
@@ -1655,7 +1655,7 @@ function VehiclesContent() {
               ))}
             </div>
             <div className="border-t border-gray-100 pt-4">
-              <h4 className="font-bold text-sm text-gray-900 mb-2">Assentos mín.</h4>
+              <h4 className="font-bold text-sm text-gray-900 mb-2">{t('vehicles.minSeats')}</h4>
               <div className="flex justify-between text-xs font-bold text-gray-600 mb-1">{[2, 4, 5, 7].map(n => <span key={n}>{n}+</span>)}</div>
               <input
                 type="range" min="2" max="7" value={minSeats}
@@ -1700,7 +1700,7 @@ function VehiclesContent() {
               )}
 
               <div className="flex justify-end items-center mb-5">
-                <label className="text-sm font-bold text-gray-900 mr-3">Classificar por:</label>
+                <label className="text-sm font-bold text-gray-900 mr-3">{t('vehicles.sortBy')}</label>
                 <select className="border border-gray-300 rounded bg-white px-3 py-2 text-sm font-bold text-gray-700 outline-none w-52" value={sortBy} onChange={e => setSortBy(e.target.value)}>
                   <option>Recomendado</option>
                   <option>Preço: Menor para maior</option>
@@ -1712,7 +1712,7 @@ function VehiclesContent() {
               {loading && (
                 <div className="bg-white rounded-lg border border-gray-200 p-16 text-center">
                   <div className="w-10 h-10 border-4 border-[#008d36] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                  <p className="font-bold text-gray-600">Buscando veículos disponíveis...</p>
+                  <p className="font-bold text-gray-600">{t('vehicles.loading')}</p>
                   <p className="text-sm text-gray-400 mt-1">Consultando API Europcar XRS</p>
                 </div>
               )}
@@ -1721,9 +1721,9 @@ function VehiclesContent() {
               {!loading && error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
                   <div className="text-4xl mb-3">⚠️</div>
-                  <p className="font-bold text-red-700 text-lg mb-1">Não foi possível carregar os veículos</p>
+                  <p className="font-bold text-red-700 text-lg mb-1">{t('vehicles.loadError')}</p>
                   <p className="text-red-600 text-sm mb-4">{error}</p>
-                  <button onClick={fetchCars} className="bg-[#008d36] text-white px-6 py-2 rounded font-bold text-sm hover:bg-[#007530]">Tentar novamente</button>
+                  <button onClick={fetchCars} className="bg-[#008d36] text-white px-6 py-2 rounded font-bold text-sm hover:bg-[#007530]">{t('vehicles.tryAgain')}</button>
                 </div>
               )}
 
@@ -1743,7 +1743,7 @@ function VehiclesContent() {
               {!loading && !error && (
                 <div className="flex flex-col gap-5">
                   {filteredCars.length === 0 && (
-                    <div className="bg-white p-8 text-center rounded-lg border border-gray-200 text-gray-500">Nenhum veículo com estes filtros. Tente redefinir.</div>
+                    <div className="bg-white p-8 text-center rounded-lg border border-gray-200 text-gray-500">{t('vehicles.noVehicles')}</div>
                   )}
                   {filteredCars.map((car: any, idx: number) => {
                     const code = car.carCategoryCode;
@@ -1999,11 +1999,11 @@ function VehiclesContent() {
                         {/* Expandable Details */}
                         <details className="group">
                           <summary className="list-none flex items-center gap-1 cursor-pointer text-[#008d36] text-[15px] font-bold pl-[284px] pb-5 select-none hover:underline">
-                            <span className="group-open:hidden flex items-center gap-1">Mais detalhes <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg></span>
-                            <span className="hidden group-open:flex items-center gap-1">Menos detalhes <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7" /></svg></span>
+                            <span className="group-open:hidden flex items-center gap-1">{t('vehicles.moreDetails')} <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg></span>
+                            <span className="hidden group-open:flex items-center gap-1">{t('vehicles.lessDetails')} <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7" /></svg></span>
                           </summary>
                           <div className="bg-[#f9f9f9] p-8 flex flex-col gap-6">
-                            <h3 className="text-[22px] font-black text-gray-900">Detalhes completos do veículo</h3>
+                            <h3 className="text-[22px] font-black text-gray-900">{t('vehicles.fullDetails')}</h3>
                             
                             {/* Full specs row matching official site */}
                             <div className="flex items-center gap-x-8 gap-y-4 text-[15px] font-black text-gray-900 flex-wrap">
@@ -2084,7 +2084,7 @@ function VehiclesContent() {
                               {!isBrazil && (
                               <div className="border-[2px] border-gray-100 bg-white rounded-xl p-5 flex flex-col justify-start">
                                 <span className="text-[10px] font-black text-[#e4002b] uppercase tracking-wider mb-1">INCLUÍDO</span>
-                                <h4 className="text-[17px] font-black text-gray-900 mb-2">Proteção básica</h4>
+                                <h4 className="text-[17px] font-black text-gray-900 mb-2">{t('extras.protectionTitle')}</h4>
                                 {car.deductibleAmount && (
                                   <div className="text-sm font-bold text-gray-900 mb-4">
                                     Excesso: {car.deductibleCurrency || currency} {parseFloat(car.deductibleAmount).toLocaleString("pt-BR", {minimumFractionDigits: 2, maximumFractionDigits: 2})}
@@ -2102,11 +2102,11 @@ function VehiclesContent() {
                                     <>
                                       <div className="flex items-start gap-2 text-sm text-gray-700 font-bold">
                                         <svg className="w-4 h-4 text-[#008d36] mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                        <span>Proteção contra danos por colisão</span>
+                                        <span>{t('extras.collisionProtection')}</span>
                                       </div>
                                       <div className="flex items-start gap-2 text-sm text-gray-700 font-bold">
                                         <svg className="w-4 h-4 text-[#008d36] mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                        <span>Proteção contra roubo</span>
+                                        <span>{t('extras.theftProtection')}</span>
                                       </div>
                                     </>
                                   )}
@@ -2135,7 +2135,7 @@ function VehiclesContent() {
                 <div className="flex items-center gap-2 mb-2">
                   <button onClick={() => { setCurrentStep(2); setEquipmentPrices({}); setXrsEquipment([]); setQuoteInsurances([]); setQuoteMileage(null); setQuoteTotals(null); setSelectedEquipmentMap({}); }} className="text-[#008d36] font-bold hover:underline text-sm">← Voltar</button>
                 </div>
-                <h2 className="text-lg md:text-2xl font-black text-gray-900 mb-3">Escolha sua proteção e seus extras</h2>
+                <h2 className="text-lg md:text-2xl font-black text-gray-900 mb-3">{t('extras.title')}</h2>
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[10px] md:text-xs text-gray-500 uppercase font-bold">TOTAL</div>
@@ -2224,7 +2224,7 @@ function VehiclesContent() {
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                   </div>
                   <h3 className="text-2xl font-black text-gray-900 mb-2">🎉 Parabéns, você tomou a decisão correta!</h3>
-                  <p className="text-gray-600 mb-6">Clique abaixo para ir para revisão e finalizar o seu pagamento.</p>
+                  <p className="text-gray-600 mb-6">{t('extras.reviewAndPay')}</p>
                   <button
                     onClick={() => {
                       const selectedInsuranceCodes2 = Object.keys(selectedExtrasMap).filter(k => selectedExtrasMap[k] > 0);
@@ -2350,10 +2350,10 @@ function VehiclesContent() {
                               <h3 className="font-black text-gray-900 text-base md:text-lg">Proteção Premium — Franquia Zero</h3>
                               <span className="text-[9px] bg-[#e67e00] text-white px-2 py-0.5 rounded-full font-black uppercase">Recomendado</span>
                             </div>
-                            <p className="text-xs md:text-sm text-gray-600 mb-3">Elimine completamente a franquia em caso de dano ou roubo. Viaje com tranquilidade total — você não paga <strong>nenhum valor adicional</strong> em caso de sinistro.</p>
+                            <p className="text-xs md:text-sm text-gray-600 mb-3">{t('extras.zeroExcessDesc')}</p>
                             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 md:gap-6">
                               <div>
-                                <span className="text-[10px] text-gray-400 uppercase font-bold block">Upgrade por apenas</span>
+                                <span className="text-[10px] text-gray-400 uppercase font-bold block">{t('extras.upgradeFor')}</span>
                                 <span className="text-xl md:text-2xl font-black text-[#e67e00]">+ {currency} {fmtPrice(upgradeCost)}</span>
                                 {upgradeBRL > 0 && <span className="text-xs text-gray-500 ml-2">(+ R$ {fmtPrice(upgradeBRL)})</span>}
                               </div>
@@ -2498,7 +2498,7 @@ function VehiclesContent() {
                      return (
                       <>
                         <h3 className="font-extrabold text-2xl text-gray-900 mb-2">Proteções</h3>
-                        <p className="text-sm text-gray-500 mb-6">Selecione as proteções desejadas. Os valores são somados e incluídos no total.</p>
+                        <p className="text-sm text-gray-500 mb-6">{t('extras.selectProtection')}</p>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                           {quoteInsurances
@@ -2546,7 +2546,7 @@ function VehiclesContent() {
                                       <p className="text-xs text-gray-400 mb-1">Franquia: R$ {fmtPrice(excessBRL)}</p>
                                     )}
                                     {ins.excessWithPOM === 0 && !isIncluded && insId !== 'RSA' && insId !== 'PAI' && (
-                                      <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full mb-2 self-start uppercase tracking-wide">Sem franquia</span>
+                                      <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full mb-2 self-start uppercase tracking-wide">{t('extras.noExcess')}</span>
                                     )}
                                   </div>
 
@@ -2589,7 +2589,7 @@ function VehiclesContent() {
                       </>
                     );
                   })() : (
-                    <p className="text-gray-400 text-sm py-4">Carregando proteções disponíveis...</p>
+                    <p className="text-gray-400 text-sm py-4">{t('extras.loadingProtections')}</p>
                   )}
 
                   {/* 🚗 Quilometragem Incluída */}
@@ -2622,7 +2622,7 @@ function VehiclesContent() {
 
                   {/* 🧳 Extras disponíveis (XRS API) */}
                   <div className="mt-10">
-                    <h3 className="font-black text-xl text-gray-900 mb-6">Extras disponíveis</h3>
+                    <h3 className="font-black text-xl text-gray-900 mb-6">{t('extras.availableExtras')}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                       {xrsEquipment.slice().sort((a: any, b: any) => {
                         const epA = equipmentPrices[a.code];
@@ -2754,7 +2754,7 @@ function VehiclesContent() {
                   {/* ETO: Skip protections button */}
                   {selectedTariffType === 'ETO' && (
                     <div className="text-center mt-6">
-                      <button onClick={() => setProtectionsSkipped(true)} className="bg-[#e67e00] hover:bg-[#cc6f00] text-white font-black py-4 px-10 rounded-lg text-base uppercase tracking-wide shadow-lg transition-colors">Continuar sem proteções adicionais →</button>
+                      <button onClick={() => setProtectionsSkipped(true)} className="bg-[#e67e00] hover:bg-[#cc6f00] text-white font-black py-4 px-10 rounded-lg text-base uppercase tracking-wide shadow-lg transition-colors">{t('vehicles.continueNoProtection')}</button>
                     </div>
                   )}
                 </>
