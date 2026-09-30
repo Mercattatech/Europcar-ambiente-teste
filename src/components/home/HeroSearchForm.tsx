@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 const TIMES = Array.from({ length: 24 * 4 }).map((_, i) => {
   const h = Math.floor(i / 4)
@@ -74,6 +75,7 @@ const COUNTRIES = [
 ];
 
 export default function HeroSearchForm() {
+  const { t } = useLanguage();
   const [pickupLocation, setPickupLocation] = useState("");
   const [stationCountryCode, setStationCountryCode] = useState("");
   const [stationQuery, setStationQuery] = useState("");
@@ -412,7 +414,7 @@ export default function HeroSearchForm() {
           <div className="lg:col-span-2 relative">
             <div className="flex justify-between items-center mb-2">
               <label className="text-sm font-bold text-gray-900">
-                {sameReturnLocation ? "Local de retirada e devolução" : "Local de retirada"}
+                {sameReturnLocation ? `${t('hero.pickupLocation')}` : t('hero.pickupLocation')}
               </label>
               <label className="text-xs text-gray-400 font-bold flex items-center gap-1 cursor-pointer">
                 <input
@@ -429,7 +431,7 @@ export default function HeroSearchForm() {
                     }
                   }}
                 />{" "}
-                Mesmo local de devolução
+                {t('hero.sameReturn')}
               </label>
             </div>
 
@@ -619,7 +621,7 @@ export default function HeroSearchForm() {
             {/* Return Station Field - only when One-Way */}
             {!sameReturnLocation && (
               <div className="relative mt-3" ref={returnStationRef}>
-                <label className="text-sm font-bold text-[#e67e00] block mb-2">Local de devolução</label>
+                <label className="text-sm font-bold text-[#e67e00] block mb-2">{t('hero.returnLocation')}</label>
                 <div className="relative">
                   <span className="absolute left-3 top-3.5 text-[#e67e00]">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -804,7 +806,7 @@ export default function HeroSearchForm() {
           <div className="flex flex-wrap gap-4 md:gap-8 items-center w-full md:w-auto">
             {/* Idade Dropdown */}
             <div className="flex items-center gap-1 cursor-pointer text-sm relative group">
-              <span className="font-bold text-gray-500">Tenho </span>
+              <span className="font-bold text-gray-500">{t('hero.age')}: </span>
               <select
                 value={age}
                 onChange={(e) => setAge(e.target.value)}
@@ -835,7 +837,7 @@ export default function HeroSearchForm() {
             {/* País Dropdown */}
             <div className="flex items-center gap-1 cursor-pointer text-sm relative group">
               <span className="font-bold text-gray-500 whitespace-nowrap">
-                Eu resido em{" "}
+                {t('hero.country')}:{" "}
               </span>
 
               <div className="relative flex items-center">
@@ -1167,7 +1169,7 @@ export default function HeroSearchForm() {
               type="submit"
               className="w-full md:w-56 bg-[#ffcc00] hover:bg-[#e6b800] text-gray-900 font-black py-3.5 md:py-4 px-6 md:px-8 rounded transition-colors text-sm md:text-base flex justify-center items-center shadow-md border-0 touch-target"
             >
-              Pesquisar
+              {t('hero.search')}
             </button>
           </div>
         </div>

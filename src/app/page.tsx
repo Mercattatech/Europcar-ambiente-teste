@@ -4,6 +4,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
 import HeroSearchForm from "@/components/home/HeroSearchForm";
 import LoginModal from "@/components/auth/LoginModal";
+import { LanguageSelector, useLanguage } from "@/lib/i18n/LanguageContext";
 
 // Car image overrides
 const carImageOverrides: Record<string,string> = {};
@@ -13,6 +14,7 @@ export default function HomePage() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [carImages, setCarImages] = useState<Record<string,string>>({});
+  const { t } = useLanguage();
 
   useEffect(() => {
     fetch("/api/admin/fleet-images")
@@ -60,7 +62,7 @@ export default function HomePage() {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
-                  Fazer login
+                  {t('nav.login')}
                 </button>
               )}
             </div>
@@ -119,22 +121,19 @@ export default function HomePage() {
                <span className="text-gray-400">Carregando...</span>
             ) : session?.user ? (
                <div className="flex items-center gap-4">
-                  <span className="text-[#008d36]">Olá, {session.user.name || session.user.email?.split('@')[0]}</span>
-                  <a href="/reservas" className="text-xs text-white hover:text-[#008d36] font-normal">Meu Perfil</a>
-                  <button onClick={() => signOut()} className="text-xs text-gray-300 hover:text-red-500 font-normal">Sair</button>
+                  <span className="text-[#008d36]">{t('nav.hello')}, {session.user.name || session.user.email?.split('@')[0]}</span>
+                  <a href="/reservas" className="text-xs text-white hover:text-[#008d36] font-normal">{t('nav.myBookings')}</a>
+                  <button onClick={() => signOut()} className="text-xs text-gray-300 hover:text-red-500 font-normal">{t('nav.logout')}</button>
                </div>
             ) : (
                <button onClick={() => setShowLoginModal(true)} className="flex items-center gap-2 cursor-pointer hover:text-gray-300">
                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                  </svg>
-                 Fazer login
+                 {t('nav.login')}
                </button>
             )}
-            <span className="flex items-center gap-2 cursor-pointer hover:text-gray-300">
-              <span className="bg-yellow-400 w-4 h-3 rounded-sm inline-block"></span>
-              BR
-            </span>
+            <LanguageSelector className="text-white" />
             <a href="https://www.europcar.com/pt-br/contact-us" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 cursor-pointer hover:text-gray-300">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

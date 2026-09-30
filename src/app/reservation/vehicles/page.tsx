@@ -5,6 +5,7 @@ import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import LoginModal from "@/components/auth/LoginModal";
+import { LanguageSelector, useLanguage } from "@/lib/i18n/LanguageContext";
 import { parsePayerList, type PayerSplit } from "@/lib/europcar/parsePayerList";
 import { DEFAULT_POA_CID, SECONDARY_POA_CID } from "@/lib/europcar/xrsClient";
 import { calculateRentalDays, formatRentalDays } from "@/lib/europcar/rentalDuration";
@@ -53,6 +54,7 @@ function CarImage({ sample, code, alt, imageUrl, overrideUrl }: { sample: string
 function VehiclesContent() {
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
+  const { t } = useLanguage();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [selectedCar, setSelectedCar] = useState<any>(null);
   const [currentStep, setCurrentStep] = useState(2);
@@ -1494,13 +1496,13 @@ function VehiclesContent() {
           <div className="flex items-center gap-3 md:gap-6 text-xs md:text-sm font-bold text-gray-900">
             {session?.user ? (
               <div className="flex items-center gap-4">
-                <span className="text-[#008d36]">Olá, {session.user.name || session.user.email?.split("@")[0]}</span>
-                <button onClick={() => signOut()} className="text-xs text-gray-500 hover:text-red-500 font-normal">Sair</button>
+                <span className="text-[#008d36]">{t('nav.hello')}, {session.user.name || session.user.email?.split("@")[0]}</span>
+                <button onClick={() => signOut()} className="text-xs text-gray-500 hover:text-red-500 font-normal">{t('nav.logout')}</button>
               </div>
             ) : status !== "loading" && (
-              <button onClick={() => setShowLoginModal(true)} className="hover:text-[#008d36]">Fazer login</button>
+              <button onClick={() => setShowLoginModal(true)} className="hover:text-[#008d36]">{t('nav.login')}</button>
             )}
-            <span>🇧🇷 BR</span>
+            <LanguageSelector />
           </div>
         </div>
       </header>
@@ -1523,12 +1525,12 @@ function VehiclesContent() {
             {currentStep <= 2 ? (
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <div className="font-bold text-gray-400 uppercase text-[9px]">Retirada</div>
+                  <div className="font-bold text-gray-400 uppercase text-[9px]">{t('vehicles.pickup')}</div>
                   <div className="font-bold text-gray-900 truncate">{stationName || pickupStation}</div>
                   <div className="text-gray-500">{formatDate(pickupDate)}</div>
                 </div>
                 <div className="flex-1">
-                  <div className="font-bold text-gray-400 uppercase text-[9px]">Devolução</div>
+                  <div className="font-bold text-gray-400 uppercase text-[9px]">{t('vehicles.return')}</div>
                   <div className={`font-bold truncate ${isOneWay ? 'text-[#e67e00]' : 'text-gray-900'}`}>{isOneWay ? (returnStationName || returnStation) : (stationName || pickupStation)}</div>
                   <div className="text-gray-500">{formatDate(returnDate)}</div>
                 </div>
@@ -1547,16 +1549,16 @@ function VehiclesContent() {
             <div className="flex-1 bg-white border border-gray-200 rounded p-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="bg-[#008d36] text-white font-bold text-xs w-5 h-5 flex items-center justify-center rounded-sm">1</span>
-                <span className="text-[11px] font-bold text-gray-500 uppercase">LOCAL</span>
+                <span className="text-[11px] font-bold text-gray-500 uppercase">{t('vehicles.step1')}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <div>
-                  <div className="font-bold text-gray-900 uppercase text-[10px]">Retirada</div>
+                  <div className="font-bold text-gray-900 uppercase text-[10px]">{t('vehicles.pickup')}</div>
                   <div className="font-bold truncate max-w-[130px]">{stationName || pickupStation}</div>
                   <div className="text-gray-500">{formatDate(pickupDate)}</div>
                 </div>
                 <div>
-                  <div className="font-bold text-gray-900 uppercase text-[10px]">Devolução</div>
+                  <div className="font-bold text-gray-900 uppercase text-[10px]">{t('vehicles.return')}</div>
                   <div className={`font-bold truncate max-w-[130px] ${isOneWay ? 'text-[#e67e00]' : ''}`}>{isOneWay ? (returnStationName || returnStation) : (stationName || pickupStation)}</div>
                   <div className="text-gray-500">{formatDate(returnDate)}</div>
                 </div>
@@ -1566,22 +1568,22 @@ function VehiclesContent() {
                 <div className="flex gap-2 mt-2 flex-wrap">
                   {pickupStationInfo.features.hasShuttle && (
                     <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-[9px] font-bold px-2 py-0.5 rounded-full">
-                      🚌 Shuttle Bus
+                      🚌 {t('vehicles.shuttleBus')}
                     </span>
                   )}
                   {pickupStationInfo.type === 'airport' && (
                     <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 text-[9px] font-bold px-2 py-0.5 rounded-full">
-                      ✈️ Aeroporto
+                      ✈️ {t('vehicles.airport')}
                     </span>
                   )}
                   {pickupStationInfo.features.hasDelivery && (
                     <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 text-[9px] font-bold px-2 py-0.5 rounded-full">
-                      🚗 Delivery disponível
+                      🚗 {t('vehicles.deliveryAvailable')}
                     </span>
                   )}
                   {pickupStationInfo.features.has247Return && (
                     <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[9px] font-bold px-2 py-0.5 rounded-full">
-                      🔑 Devolução 24h
+                      🔑 {t('vehicles.return24h')}
                     </span>
                   )}
                 </div>
@@ -1902,7 +1904,7 @@ function VehiclesContent() {
                           <div className={`shrink-0 flex ${hasETO ? 'gap-4' : ''} items-stretch justify-end`}>
                             {/* POA - Pay at Counter */}
                             <div className={`${hasETO ? 'w-[180px]' : 'w-[200px]'} flex flex-col items-end justify-center text-right`}>
-                              <span className="text-[10px] text-gray-800 font-medium uppercase tracking-wider mb-2">PAGAR NO BALCÃO</span>
+                              <span className="text-[10px] text-gray-800 font-medium uppercase tracking-wider mb-2">{t('vehicles.payAtCounter')}</span>
                               <div className="flex flex-col items-end mb-1">
                                 <div className="text-2xl font-black text-gray-900 leading-none whitespace-nowrap">
                                   {dailyBRL_POA > 0 ? `R$ ${fmtPrice(dailyBRL_POA)}` : `${currency} ${fmtPrice(dailyPOA)}`} <span className="text-xl font-normal text-gray-900">/ dia</span>
@@ -1922,10 +1924,10 @@ function VehiclesContent() {
                                     <div className="w-full mt-4">
                                       <div className="bg-red-50 border border-red-200 rounded px-3 py-2 text-xs text-red-700 font-medium mb-2 flex items-center gap-1.5">
                                         <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
-                                        Idade mínima: {effectiveMin} anos
+                                        {t('vehicles.minAge')}: {effectiveMin} {t('vehicles.years')}
                                       </div>
                                       <button disabled className="w-full bg-gray-300 text-gray-500 font-black py-3 px-4 rounded text-base cursor-not-allowed">
-                                        Indisponível
+                                        {t('vehicles.unavailable')}
                                       </button>
                                     </div>
                                   );
@@ -1935,7 +1937,7 @@ function VehiclesContent() {
                                     onClick={() => handleSelectCarWithOnRequestCheck(car, 'POA')}
                                     className="w-full mt-4 bg-[#FFD100] hover:bg-[#F2C700] text-black font-black py-3 px-4 rounded text-base transition-colors"
                                   >
-                                    {isSelected && selectedTariffType === 'POA' ? "Selecionado" : "Selecionar"}
+                                    {isSelected && selectedTariffType === 'POA' ? t('vehicles.selected') : t('vehicles.select')}
                                   </button>
                                 );
                               })()}
@@ -1949,12 +1951,12 @@ function VehiclesContent() {
                                 <div className="w-[190px] flex flex-col items-end justify-center text-right bg-green-50 border border-green-200 rounded-lg p-3 relative">
                                   {discountPct > 0 && (
                                     <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-[#008d36] text-white text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
-                                      {discountPct}% MAIS BARATO
+                                      {discountPct}% {t('vehicles.cheaper')}
                                     </span>
                                   )}
                                   <div className="flex items-center gap-1.5 mb-2">
-                                    <span className="text-[10px] text-[#008d36] font-bold uppercase tracking-wider">PAGAR AGORA</span>
-                                    <span className="bg-blue-100 text-blue-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap">✓ Cancelamento Grátis</span>
+                                    <span className="text-[10px] text-[#008d36] font-bold uppercase tracking-wider">{t('vehicles.payNow')}</span>
+                                    <span className="bg-blue-100 text-blue-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap">{t('vehicles.freeCancellation')}</span>
                                   </div>
                                   <div className="flex flex-col items-end mb-1">
                                     <div className="text-2xl font-black text-[#008d36] leading-none whitespace-nowrap">
@@ -1972,7 +1974,7 @@ function VehiclesContent() {
                                     if (isBlocked) {
                                       return (
                                         <button disabled className="w-full mt-4 bg-gray-300 text-gray-500 font-black py-3 px-4 rounded text-base cursor-not-allowed">
-                                          Indisponível
+                                          {t('vehicles.unavailable')}
                                         </button>
                                       );
                                     }
@@ -1984,7 +1986,7 @@ function VehiclesContent() {
                                         }}
                                         className="w-full mt-4 bg-[#008d36] hover:bg-[#007530] text-white font-black py-3 px-4 rounded text-base transition-colors"
                                       >
-                                        {isSelected && selectedTariffType === 'ETO' ? "Selecionado ✓" : "Pagar Agora"}
+                                        {isSelected && selectedTariffType === 'ETO' ? `${t('vehicles.selected')} ✓` : t('vehicles.payNowBtn')}
                                       </button>
                                     );
                                   })()}

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function Footer() {
   const year = new Date().getFullYear();
   const [termsAvailable, setTermsAvailable] = useState<{reserva: boolean, pais: boolean, paisUrl: string, brasil: boolean}>({reserva: false, pais: false, paisUrl: '', brasil: false});
   const [openSection, setOpenSection] = useState<string | null>(null);
+  const { t } = useLanguage();
 
   useEffect(() => {
     fetch('/api/admin/terms')
@@ -140,7 +142,7 @@ export default function Footer() {
           <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col items-center gap-2">
             <div className="flex flex-col md:flex-row items-center justify-between gap-2 w-full">
               <p className="text-[10px] md:text-xs text-gray-600 text-center md:text-left">
-                © {year} Europcar Brasil — Grupo Mercatta. Todos os direitos reservados.
+                © {year} Europcar Brasil — Grupo Mercatta. {t('footer.rights')}
               </p>
               <p className="text-[10px] text-gray-700 text-center">
                 Rental Line Locadora Ltda. · CNPJ 00.938.766/0001-11

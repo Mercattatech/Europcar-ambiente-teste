@@ -41,6 +41,7 @@ import MaintenanceGuard from "@/components/MaintenanceGuard";
 import GoogleTags from "@/components/GoogleTags";
 import AIChatWidget from "@/components/chat/AIChatWidget";
 import CookieBanner from "@/components/CookieBanner";
+import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 
 export default function RootLayout({
   children,
@@ -51,12 +52,14 @@ export default function RootLayout({
     <html lang="pt-BR">
       <body className={`${inter.className} safe-top`}>
         <AuthProvider>
-          <MaintenanceGuard />
-          <GoogleTags />
-          {children}
-          <Footer />
-          <AIChatWidget />
-          <CookieBanner />
+          <LanguageProvider>
+            <MaintenanceGuard />
+            <GoogleTags />
+            {children}
+            <Footer />
+            <AIChatWidget />
+            <CookieBanner />
+          </LanguageProvider>
         </AuthProvider>
       </body>
     </html>
