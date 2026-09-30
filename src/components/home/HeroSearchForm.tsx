@@ -334,11 +334,11 @@ export default function HeroSearchForm() {
     const fmt = (d: string) => d.replace(/-/g, "");
     const fmtTime = (t: string) => t.replace(":", "");
 
-    // Garantir returnDate >= pickupDate + 3 dias
+    // Garantir returnDate >= pickupDate (mesma data = 1 dia de aluguel)
     let effectiveReturn = returnDate;
-    if (!effectiveReturn || effectiveReturn <= pickupDate) {
+    if (!effectiveReturn || effectiveReturn < pickupDate) {
       const d = new Date(pickupDate);
-      d.setDate(d.getDate() + 3);
+      d.setDate(d.getDate() + 1);
       effectiveReturn = d.toISOString().split("T")[0];
     }
 
