@@ -349,6 +349,7 @@ export default function HeroSearchForm() {
       returnTime:  fmtTime(returnTime),
       country:     country,
       countryName: COUNTRIES.find(c => c.code === country)?.name ?? country,
+      age:         age,
     });
     if (stationCountryCode) params.set("stationCountry", stationCountryCode);
     if (tarifNumber) params.set("contractID", tarifNumber);

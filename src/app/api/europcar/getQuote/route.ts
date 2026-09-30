@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       prepaidMode,    // "NP" | "PP"
       equipmentList,  // Array of { code, qty } — optional
       insuranceList,  // Array of { code } — optional
+      driverAge,      // Driver age for young/senior driver validation
     } = body;
 
     if (!carCategory) {
@@ -94,7 +95,7 @@ export async function POST(request: Request) {
         <checkout stationID="${escapeXml(pickupStation)}" date="${escapeXml(pickupDate)}" time="${escapeXml(pickupTime || '1000')}"/>
         <checkin stationID="${escapeXml(returnStation || pickupStation)}" date="${escapeXml(returnDate)}" time="${escapeXml(returnTime || '1000')}"/>${equipmentXml}${insuranceXml}
       </reservation>
-      <driver countryOfResidence="BR"/>
+      <driver countryOfResidence="BR"${driverAge ? ` age="${escapeXml(String(driverAge))}"` : ''}/>
     </serviceParameters>
   </serviceRequest>
 </message>`;
@@ -107,6 +108,24 @@ export async function POST(request: Request) {
     };
 
     const xrsResponse = await callXRS(xmlRequest, config);
+
+    // ── Detectar erro de idade retornado pelo XRS (returnCode="KO") ──────────
+    const serviceResponse = xrsResponse?.message?.serviceResponse || xrsResponse?.serviceResponse;
+    const xrsStatus = serviceResponse?.status?.$ || serviceResponse?.status;
+    if (xrsStatus?.returnCode === 'KO') {
+      const errorList = serviceResponse?.errorList?.error;
+      const errors = Array.isArray(errorList) ? errorList : errorList ? [errorList] : [];
+      const parsedErrors = errors.map((e: any) => {
+        const a = e.$ || e;
+        return { code: a.code || '', severity: a.severity || '', description: e.description || a.description || '' };
+      });
+      console.warn('[getQuote] ❌ XRS returnCode=KO:', JSON.stringify(parsedErrors));
+      return NextResponse.json({
+        ...xrsResponse,
+        _xrsError: true,
+        _xrsErrors: parsedErrors,
+      });
+    }
 
     // Extrai o payerList da resposta do XRS (chargesDetail="TRE")
     // Retorna o split driver/BA para o frontend usar no cálculo do amountInCents
@@ -124,12 +143,28 @@ export async function POST(request: Request) {
     const durationAttr = reservationNode?.$?.duration || reservationNode?.duration;
     const apiDuration = durationAttr ? parseInt(String(durationAttr), 10) : undefined;
 
-    // Attach the resolved prepaidMode, payerSplit and duration to the response
+    // ── Extrair ageLimit do nó de resposta XRS ─────────────────────────────────
+    // O bloco <ageLimit> vem dentro da reservation ou da reservationRate e contém
+    // os limites de idade da categoria/país retornados pelo GreenWay.
+    const ageLimitNode = reservationNode?.ageLimit?.$ || reservationNode?.ageLimit || null;
+    const ageLimit = ageLimitNode ? {
+      minAgeForCategory: ageLimitNode.minAgeForCategory || '',
+      minAgeForCountry: ageLimitNode.minAgeForCountry || '',
+      maxAgeForCountry: ageLimitNode.maxAgeForCountry || '',
+      minLicencePeriod: ageLimitNode.minLicencePeriod || '',
+      youngDriverAge: ageLimitNode.youngDriverAge || '',
+    } : null;
+    if (ageLimit) {
+      console.log(`[getQuote] ageLimit extraído:`, JSON.stringify(ageLimit));
+    }
+
+    // Attach the resolved prepaidMode, payerSplit, duration and ageLimit to the response
     return NextResponse.json({
       ...xrsResponse,
       _prepaidMode: resolvedPrepaidMode,
       _payerSplit: payerSplit ?? undefined,
       _duration: apiDuration,
+      _ageLimit: ageLimit ?? undefined,
     });
 
   } catch (error: any) {

@@ -207,6 +207,10 @@ function getXRSErrors(parsedData: any): any {
   if (parsedData?.Errors) return parsedData.Errors;
   if (parsedData?.Response?.Errors) return parsedData.Response.Errors;
   if (parsedData?.Envelope?.Body?.Fault) return parsedData.Envelope.Body.Fault;
+  // XRS serviceResponse with returnCode="KO" and errorList (age validation, etc.)
+  const sr = parsedData?.message?.serviceResponse || parsedData?.serviceResponse;
+  const status = sr?.status?.$ || sr?.status;
+  if (status?.returnCode === 'KO' && sr?.errorList) return sr.errorList;
   return null;
 }
 

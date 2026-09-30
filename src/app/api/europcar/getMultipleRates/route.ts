@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, acrissCodes, contractID } = body;
+    const { pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, acrissCodes, contractID, driverAge } = body;
 
     if (!acrissCodes || !Array.isArray(acrissCodes)) {
       return NextResponse.json({ error: 'acrissCodes precisa ser um array' }, { status: 400 });
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         <checkout stationID="${escapeXml(pickupStation)}" date="${escapeXml(pickupDate)}" time="${escapeXml(pickupTime || '1000')}"/>
         <checkin stationID="${escapeXml(returnStation || pickupStation)}" date="${escapeXml(returnDate)}" time="${escapeXml(returnTime || '1000')}"/>
       </reservation>
-      <driver countryOfResidence="BR" />
+      <driver countryOfResidence="BR"${driverAge ? ` age="${escapeXml(String(driverAge))}"` : ''} />
     </serviceParameters>
   </serviceRequest>
 </message>`;

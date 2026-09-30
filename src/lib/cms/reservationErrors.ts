@@ -7,15 +7,31 @@ import prisma from '@/lib/prisma';
  * conhecido (ex: ReturnCode 129 "Affiliation not found"), buscamos o texto
  * correspondente no CMS antes de cair no fallback técnico.
  */
+
+/**
+ * Mapeamento estático de erros de idade do XRS → mensagens amigáveis em PT-BR.
+ * Estes fallbacks garantem que, mesmo sem cadastro no CMS (ContentBlock),
+ * o usuário veja uma mensagem compreensível e não o código técnico do XRS.
+ */
+const AGE_ERROR_FALLBACKS: Record<string, string> = {
+  'rental.drivertooyoungforcategory': 'O condutor não possui a idade mínima exigida para alugar esta categoria de veículo.',
+  'rental.drivertooyoungforcountry': 'A idade do condutor é inferior ao limite mínimo permitido no país de retirada.',
+  'rental.drivertoooldforcountry': 'A idade do condutor ultrapassa o limite máximo permitido para locação neste país.',
+  'xrs.driver.notlegal.age': 'É necessário ter no mínimo 18 anos de idade para realizar a reserva.',
+};
+
 export async function getReservationErrorMessage(code: string | number | undefined | null, fallback: string): Promise<string> {
   if (!code && code !== 0) return fallback;
+  const codeStr = String(code).toLowerCase();
   try {
     const block = await prisma.contentBlock.findUnique({
       where: { key: `reservation.error.${code}` },
     });
-    return block?.value_ptBR || fallback;
+    if (block?.value_ptBR) return block.value_ptBR;
   } catch (err) {
     console.warn('[CMS] Falha ao buscar reservation.error:', (err as Error).message);
-    return fallback;
   }
+  // Fallback estático para erros de idade do XRS
+  return AGE_ERROR_FALLBACKS[codeStr] || fallback;
 }
+

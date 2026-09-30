@@ -75,6 +75,11 @@ function VehiclesContent() {
   const driverCountryName = searchParams.get("countryName") || "Brasil";
   const stationCountry = searchParams.get("stationCountry") || "";
 
+  // Driver age — from search form dropdown (18-25 or "26+")
+  // Convert "26+" to numeric 30 (above young driver threshold, below senior)
+  const rawAge = searchParams.get("age") || "26+";
+  const driverAge: number = rawAge === "26+" ? 30 : parseInt(rawAge, 10) || 30;
+
   // Duração oficial retornada pela API XRS (getMultipleRates / getQuote)
   const [apiRentalDuration, setApiRentalDuration] = useState<number | null>(null);
 
@@ -335,6 +340,7 @@ function VehiclesContent() {
         returnTime,
         acrissCodes,
         contractID: cid,
+        driverAge,
       });
 
       // Skip ETO fetches for Brazilian stations (Brazil = POA only)
@@ -492,6 +498,10 @@ function VehiclesContent() {
             // Extract ageLimit from the reservationRate node
             const ageLimit = r.ageLimit?.$ || r.ageLimit || {};
             const minAgeForCategory = ageLimit.minAgeForCategory || attrs.minAgeForCategory || '';
+            const youngDriverAge = ageLimit.youngDriverAge || '';
+            const minAgeForCountry = ageLimit.minAgeForCountry || '';
+            const maxAgeForCountry = ageLimit.maxAgeForCountry || '';
+            const minLicencePeriod = ageLimit.minLicencePeriod || '';
 
             // Build specs from the reservationRate attributes directly (all fields come from API)
             const specsFromRate = {
@@ -510,6 +520,10 @@ function VehiclesContent() {
               carCategoryModelWidth:      attrs.carCategoryModelWidth || '',
               carCategoryModelGuaranteed: attrs.carCategoryModelGuaranteed || '',
               carCategoryMinDriverAge:    minAgeForCategory,
+              youngDriverAge,
+              minAgeForCountry,
+              maxAgeForCountry,
+              minLicencePeriod,
             };
             // Merge with catDetailsMap (fallback for any field not in reservationRate)
             const specs = { ...specsMap[attrs.carCategoryCode] || {}, ...specsFromRate };
@@ -776,6 +790,7 @@ function VehiclesContent() {
             contractID:  cidForQuote,
             rateId:      rateIdForQuote,
             prepaidMode,           // ← dynamic NP or PP
+            driverAge,
             equipmentList: [],     // ← empty — prices come from getMultipleRates
           }),
         })
@@ -1086,6 +1101,30 @@ function VehiclesContent() {
 
                 // Skip insurance items already captured from insuranceList
                 if (alreadyCaptured.has(auxK)) return;
+
+                // ── Young/Senior Driver Surcharge (chrgTy 00070 or codes YOU/SNR) ──
+                // When the driver age is below youngDriverAge, the XRS automatically
+                // includes this surcharge. We display it as a visible line item.
+                if (chrgTy === '00070' || auxK === 'YOU' || auxK === 'SNR') {
+                  const isYoung = chrgTy === '00070' || auxK === 'YOU';
+                  const surchargeLabel = isYoung ? 'Taxa de Jovem Condutor' : 'Taxa de Condutor Sênior';
+                  parsedInsurances.push({
+                    code: auxK || chrgTy,
+                    descr: surchargeLabel,
+                    type: 'M',
+                    includedInTotal: 'Y',
+                    price:   price   * vatMultiplier,
+                    priceInBookingCurrency: priceBK * vatMultiplier,
+                    rentalPriceAI: 0,
+                    rentalPriceInBookingCurrencyAI: 0,
+                    excessWithPOM: 0,
+                    bkExcessWithPOM: 0,
+                    prepaid: '',
+                    paidBy,
+                  });
+                  console.log(`[Step3] 🧑 ${surchargeLabel}: EUR ${price.toFixed(2)} / BRL ${priceBK.toFixed(2)} (paidBy=${paidBy})`);
+                  return;
+                }
 
                 // VAT / Tax line
                 if (chrgTy === '00028' || chrgTyDesc.toUpperCase() === 'VAT') {
@@ -1809,12 +1848,34 @@ function VehiclesContent() {
                                   TOTAL {totalBRL_POA > 0 ? `R$ ${fmtPrice(totalBRL_POA)}` : `${currency} ${fmtPrice(totalPricePOA)}`}
                                 </div>
                               </div>
-                              <button
-                                onClick={() => handleSelectCarWithOnRequestCheck(car, 'POA')}
-                                className="w-full mt-4 bg-[#FFD100] hover:bg-[#F2C700] text-black font-black py-3 px-4 rounded text-base transition-colors"
-                              >
-                                {isSelected && selectedTariffType === 'POA' ? "Selecionado" : "Selecionar"}
-                              </button>
+                              {/* Age restriction warning */}
+                              {(() => {
+                                const minAge = parseInt(car.specs?.carCategoryMinDriverAge || '0', 10);
+                                const minCountryAge = parseInt(car.specs?.minAgeForCountry || '0', 10);
+                                const effectiveMin = Math.max(minAge, minCountryAge);
+                                const isBlocked = effectiveMin > 0 && driverAge < effectiveMin;
+                                if (isBlocked) {
+                                  return (
+                                    <div className="w-full mt-4">
+                                      <div className="bg-red-50 border border-red-200 rounded px-3 py-2 text-xs text-red-700 font-medium mb-2 flex items-center gap-1.5">
+                                        <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
+                                        Idade mínima: {effectiveMin} anos
+                                      </div>
+                                      <button disabled className="w-full bg-gray-300 text-gray-500 font-black py-3 px-4 rounded text-base cursor-not-allowed">
+                                        Indisponível
+                                      </button>
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <button
+                                    onClick={() => handleSelectCarWithOnRequestCheck(car, 'POA')}
+                                    className="w-full mt-4 bg-[#FFD100] hover:bg-[#F2C700] text-black font-black py-3 px-4 rounded text-base transition-colors"
+                                  >
+                                    {isSelected && selectedTariffType === 'POA' ? "Selecionado" : "Selecionar"}
+                                  </button>
+                                );
+                              })()}
                             </div>
 
                             {/* ETO - Pay Now (with markup) */}
@@ -1840,15 +1901,30 @@ function VehiclesContent() {
                                       TOTAL {totalBRL_ETO > 0 ? `R$ ${fmtPrice(totalBRL_ETO)}` : `${currency} ${fmtPrice(totalPriceETO)}`}
                                     </div>
                                   </div>
-                                  <button
-                                    onClick={() => {
-                                      const merged = { ...car, ...etoCar, totalRateEstimate: totalPriceETO.toFixed(2), totalRateEstimateInBookingCurrency: totalBRL_ETO.toFixed(2), optionalInsurances: car.optionalInsurances, imageUrl: car.imageUrl, _etoCID: '56935466' };
-                                      handleSelectCarWithOnRequestCheck(merged, 'ETO');
-                                    }}
-                                    className="w-full mt-4 bg-[#008d36] hover:bg-[#007530] text-white font-black py-3 px-4 rounded text-base transition-colors"
-                                  >
-                                    {isSelected && selectedTariffType === 'ETO' ? "Selecionado ✓" : "Pagar Agora"}
-                                  </button>
+                                  {(() => {
+                                    const minAge = parseInt(car.specs?.carCategoryMinDriverAge || '0', 10);
+                                    const minCountryAge = parseInt(car.specs?.minAgeForCountry || '0', 10);
+                                    const effectiveMin = Math.max(minAge, minCountryAge);
+                                    const isBlocked = effectiveMin > 0 && driverAge < effectiveMin;
+                                    if (isBlocked) {
+                                      return (
+                                        <button disabled className="w-full mt-4 bg-gray-300 text-gray-500 font-black py-3 px-4 rounded text-base cursor-not-allowed">
+                                          Indisponível
+                                        </button>
+                                      );
+                                    }
+                                    return (
+                                      <button
+                                        onClick={() => {
+                                          const merged = { ...car, ...etoCar, totalRateEstimate: totalPriceETO.toFixed(2), totalRateEstimateInBookingCurrency: totalBRL_ETO.toFixed(2), optionalInsurances: car.optionalInsurances, imageUrl: car.imageUrl, _etoCID: '56935466' };
+                                          handleSelectCarWithOnRequestCheck(merged, 'ETO');
+                                        }}
+                                        className="w-full mt-4 bg-[#008d36] hover:bg-[#007530] text-white font-black py-3 px-4 rounded text-base transition-colors"
+                                      >
+                                        {isSelected && selectedTariffType === 'ETO' ? "Selecionado ✓" : "Pagar Agora"}
+                                      </button>
+                                    );
+                                  })()}
                                 </div>
                               );
                             })()}
@@ -2022,7 +2098,7 @@ function VehiclesContent() {
                         ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
                         : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID);
                       const enrichedCar = { ...selectedCar, ...quoteTotals, duration: bookingDurationDays };
-                      const payload = { car: enrichedCar, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit };
+                      const payload = { car: enrichedCar, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit, driverAge };
                       sessionStorage.setItem("europcar_booking", JSON.stringify(payload));
                       try {
                         const sessionId = sessionStorage.getItem("europcar_journey_session");
@@ -2100,7 +2176,7 @@ function VehiclesContent() {
                       const cidForTariff = selectedTariffType === 'ETO'
                         ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
                         : (zeroExcessUpgrade ? '56935495' : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID));
-                      const payload = { car: { ...selectedCar, duration: bookingDurationDays }, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload2, xrsInsurances: xrsInsurancesPayload2, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage };
+                      const payload = { car: { ...selectedCar, duration: bookingDurationDays }, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload2, xrsInsurances: xrsInsurancesPayload2, pickupStation, returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, driverCountry, driverCountryName, stationCountry, quoteMileage, driverAge };
                       sessionStorage.setItem("europcar_booking", JSON.stringify(payload));
                       // Journey tracking — Step 3: Extras selected (ETO path)
                       try {

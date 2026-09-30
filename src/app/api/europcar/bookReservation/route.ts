@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       pickupDate, returnDate,
       pickupTime, returnTime,
       driverData, paymentData, contractID,
-      voucherData
+      voucherData, driverAge
     } = body;
 
     if (!carCategory || !rateId) {
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
         <checkin stationID="${escapeXml(returnStation || pickupStation)}" date="${escapeXml(returnDate)}" time="${escapeXml(returnTime || '1000')}"/>
         <equipmentList>${equipmentXml}</equipmentList>${insuranceXml ? `\n        <insuranceList>${insuranceXml}\n        </insuranceList>` : ''}${meanOfPaymentXml}${loyaltyXml}
       </reservation>
-      <driver countryOfResidence="BR"
+      <driver countryOfResidence="BR"${driverAge ? ` age="${escapeXml(String(driverAge))}"` : ''}
               firstName="${escapeXml(driverData?.firstName || 'Test')}"
               lastName="${escapeXml(driverData?.lastName || 'Client')}"
               title="${escapeXml(driverData?.title || 'MR')}"/>

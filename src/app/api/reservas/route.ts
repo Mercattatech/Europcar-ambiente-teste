@@ -420,7 +420,7 @@ export async function POST(request: Request) {
         <checkin stationID="${escapeXml(returnStation)}" date="${escapeXml(returnDate)}" time="${escapeXml(bookingData.returnTime || '1000')}"/>
         <equipmentList>${equipmentXml}</equipmentList>${insuranceXml ? `\n        <insuranceList>${insuranceXml}\n        </insuranceList>` : ''}${paymentAttrs.meanOfPaymentXml}${loyaltyXml}
       </reservation>
-      <driver countryOfResidence="BR"
+      <driver countryOfResidence="BR"${bookingData.driverAge ? ` age="${escapeXml(String(bookingData.driverAge))}"` : ''}
               firstName="${escapeXml(customerData.nome.trim())}"
               lastName="${escapeXml(customerData.sobrenome.trim())}"
               title="MR"/>
