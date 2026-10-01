@@ -64,13 +64,24 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
       sourceFile: 'bookXRS.ts'
     });
     
-    const resNode = quoteRes?.message?.serviceResponse?.reservation?.$ || quoteRes?.serviceResponse?.reservation?.$;
+    const sr = quoteRes?.message?.serviceResponse || quoteRes?.serviceResponse;
+    const srStatus = sr?.status?.$ || sr?.status;
+    const retCode = sr?.$?.returnCode || sr?.returnCode || srStatus?.returnCode;
+    const errCode = sr?.$?.errorCode || sr?.errorCode;
+    if (retCode === 'KO' || errCode === 'rental.vehiclenotavailable') {
+      throw new Error(`Veículo indisponível no sistema Europcar (XRS getQuote: ${errCode || 'returnCode=KO'})`);
+    }
+    
+    const resNode = sr?.reservation?.$ || sr?.reservation;
     if (resNode?.rateId) rateId = resNode.rateId;
     
     if (resNode?.productCode) productDataAttr += ` productCode="${resNode.productCode}"`;
     if (resNode?.productFamily) productDataAttr += ` productFamily="${resNode.productFamily}"`;
     if (resNode?.productVersion) productDataAttr += ` productVersion="${resNode.productVersion}"`;
   } catch (quoteErr: any) {
+    if (quoteErr.message?.includes('Veículo indisponível')) {
+      throw quoteErr;
+    }
     console.warn('[xrsBook] Erro no refresh do rateId:', quoteErr.message);
   }
 

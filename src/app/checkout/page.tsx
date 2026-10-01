@@ -866,7 +866,14 @@ export default function CheckoutPage() {
             }).catch(() => { });
           }
         } catch { }
-        alert("Erro ao finalizar reserva: " + errorMsg);
+        if (json.code === 'VEHICLE_NOT_AVAILABLE') {
+          if (confirm(`${errorMsg}\n\nDeseja voltar para a seleção de veículos e escolher outro modelo disponível?`)) {
+            window.location.href = '/reservation/vehicles';
+            return;
+          }
+        } else {
+          alert("Erro ao finalizar reserva: " + errorMsg);
+        }
       }
     } catch {
       try {

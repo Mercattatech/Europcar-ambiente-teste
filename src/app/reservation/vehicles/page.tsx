@@ -217,6 +217,7 @@ function VehiclesContent() {
   const [etoZeroCars, setEtoZeroCars] = useState<any[]>([]); // ETO Zero Excesso rates
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [step3Error, setStep3Error] = useState<string | null>(null);
 
   // Equipment from getMultipleRates (serviceResponse.reservation.equipmentList)
   // Contains equipment with full pricing — replaces the old getEquipmentList call
@@ -475,6 +476,9 @@ function VehiclesContent() {
           for (const r of rateArr) {
             const attrs = r.$ || r;
             if (!attrs.carCategoryCode || !attrs.totalRateEstimate) continue;
+            // ── Filtro de segurança: categoria DEVE constar nas categorias operadas pela estação ──
+            if (acrissCodes.length > 0 && !acrissCodes.includes(attrs.carCategoryCode)) continue;
+            if (attrs.statusCode === 'U') continue; // U = Unavailable
             const linksRaw = r.links?.link || [];
             const linksArr: any[] = Array.isArray(linksRaw) ? linksRaw : [linksRaw];
             const carvisual = linksArr.find((l: any) => (l.$ || l).id === "carvisual");
@@ -908,6 +912,23 @@ function VehiclesContent() {
               console.log(`[Step3] NP airport surcharge: ${npAirPrice} EUR / ${npAirBRL} BRL (VAT ${npVatPct}%)`);
             }
           } catch (e) { /* ignore */ }
+        }
+
+        // ── Validar disponibilidade do veículo retornado pelo getQuote ──────
+        const primaryQuote = quoteDataList[0];
+        const primaryReservation = primaryQuote?.message?.serviceResponse?.reservation || primaryQuote?.serviceResponse?.reservation;
+        if (primaryQuote?._xrsError || !primaryReservation) {
+          const errCode = primaryQuote?._errorCode || primaryQuote?._xrsErrors?.[0]?.code || '';
+          console.warn('[Step3] ❌ Veículo indisponível no getQuote:', errCode);
+          setStep3Error(
+            errCode === 'rental.onewaynotallowed'
+              ? 'A Europcar não permite devolução deste modelo na estação de retorno selecionada (One-Way não permitido para este veículo).'
+              : 'Este veículo não está disponível para confirmação nesta estação ou rota selecionada. Por favor, volte e escolha outro modelo.'
+          );
+          setLoadingEquipment(false);
+          return;
+        } else {
+          setStep3Error(null);
         }
 
         // ── Parse prices from getQuote responses (merged across chunks) ──
@@ -1513,6 +1534,7 @@ function VehiclesContent() {
     setQuoteInsurances([]);            // reset insurances for new car
     setQuoteMileage(null);             // reset mileage for new car
     setSelectedEquipmentMap({});       // clear previous selections
+    setStep3Error(null);               // reset previous quote error
     setCurrentStep(3);
     window.scrollTo({ top: 0, behavior: "smooth" });
 
@@ -2292,7 +2314,9 @@ function VehiclesContent() {
                     </div>
                   </div>
                   <button
+                    disabled={!!step3Error || loadingEquipment}
                     onClick={() => {
+                      if (step3Error || loadingEquipment) return;
                       const selectedInsuranceCodes = Object.keys(selectedExtrasMap).filter(k => selectedExtrasMap[k] > 0);
                       const xrsEquipmentPayload = Object.entries(selectedEquipmentMap).filter(([, qty]) => qty > 0).map(([code, qty]) => {
                         const ep = equipmentPrices[code];
@@ -2353,17 +2377,47 @@ function VehiclesContent() {
                       } catch {}
                       window.location.href = "/checkout";
                     }}
-                    className="bg-[#008d36] hover:bg-[#007530] text-white font-black py-3 px-4 md:px-6 rounded text-xs md:text-sm whitespace-nowrap"
+                    className={`font-black py-3 px-4 md:px-6 rounded text-xs md:text-sm whitespace-nowrap transition-colors ${
+                      (step3Error || loadingEquipment)
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-[#008d36] hover:bg-[#007530] text-white'
+                    }`}
                   >
-                    Ir para revisão →
+                    {loadingEquipment ? 'Verificando...' : 'Ir para revisão →'}
                   </button>
                 </div>
               </div>
 
               <div className="p-8">
 
-              {/* Congrats message — show ONLY when ETO skipped protections */}
-              {(selectedTariffType === 'ETO' && protectionsSkipped) ? (
+              {step3Error ? (
+                <div className="border-2 border-amber-300 rounded-xl p-8 md:p-12 text-center bg-amber-50 mb-8 max-w-2xl mx-auto shadow-sm">
+                  <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                    ⚠️
+                  </div>
+                  <h3 className="text-2xl font-black text-gray-900 mb-3">Veículo Indisponível</h3>
+                  <p className="text-gray-700 text-base mb-6 leading-relaxed">
+                    {step3Error}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setCurrentStep(2);
+                      setStep3Error(null);
+                      setEquipmentPrices({});
+                      setXrsEquipment([]);
+                      setQuoteInsurances([]);
+                      setQuoteMileage(null);
+                      setQuoteTotals(null);
+                      setSelectedEquipmentMap({});
+                    }}
+                    className="inline-flex items-center justify-center gap-2 bg-[#008d36] hover:bg-[#007530] text-white font-bold py-3 px-8 rounded-lg shadow transition-colors text-base"
+                  >
+                    ← Voltar e escolher outro veículo
+                  </button>
+                </div>
+              ) : null}
+
+              {!step3Error && ((selectedTariffType === 'ETO' && protectionsSkipped) ? (
                 <div className="border-2 border-[#008d36] rounded-xl p-10 text-center bg-green-50 mb-8">
                   <div className="w-20 h-20 bg-green-100 text-[#008d36] rounded-full flex items-center justify-center mx-auto mb-6">
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
@@ -2924,7 +2978,7 @@ function VehiclesContent() {
                     </div>
                   )}
                 </>
-              )}
+              ))}
               </div> {/* close p-8 wrapper */}
             </div>
           )}

@@ -110,20 +110,27 @@ export async function POST(request: Request) {
 
     const xrsResponse = await callXRS(xmlRequest, config);
 
-    // ── Detectar erro de idade retornado pelo XRS (returnCode="KO") ──────────
+    // ── Detectar erros retornados pelo XRS (returnCode="KO", errorCode, etc.) ──────────
     const serviceResponse = xrsResponse?.message?.serviceResponse || xrsResponse?.serviceResponse;
     const xrsStatus = serviceResponse?.status?.$ || serviceResponse?.status;
-    if (xrsStatus?.returnCode === 'KO') {
+    const returnCode = serviceResponse?.$?.returnCode || serviceResponse?.returnCode || xrsStatus?.returnCode;
+    const errorCode = serviceResponse?.$?.errorCode || serviceResponse?.errorCode;
+
+    if (returnCode === 'KO' || errorCode) {
       const errorList = serviceResponse?.errorList?.error;
       const errors = Array.isArray(errorList) ? errorList : errorList ? [errorList] : [];
       const parsedErrors = errors.map((e: any) => {
         const a = e.$ || e;
         return { code: a.code || '', severity: a.severity || '', description: e.description || a.description || '' };
       });
-      console.warn('[getQuote] ❌ XRS returnCode=KO:', JSON.stringify(parsedErrors));
+      if (errorCode && parsedErrors.length === 0) {
+        parsedErrors.push({ code: errorCode, severity: 'ERROR', description: errorCode });
+      }
+      console.warn('[getQuote] ❌ XRS returnCode=KO ou errorCode detectado:', returnCode, errorCode, JSON.stringify(parsedErrors));
       return NextResponse.json({
         ...xrsResponse,
         _xrsError: true,
+        _errorCode: errorCode || parsedErrors[0]?.code || '',
         _xrsErrors: parsedErrors,
       });
     }
@@ -134,6 +141,16 @@ export async function POST(request: Request) {
       xrsResponse?.message?.serviceResponse?.reservation ||
       xrsResponse?.serviceResponse?.reservation ||
       null;
+
+    if (!reservationNode) {
+      console.warn('[getQuote] ❌ reservationNode não retornado pelo XRS');
+      return NextResponse.json({
+        ...xrsResponse,
+        _xrsError: true,
+        _errorCode: 'rental.vehiclenotavailable',
+        _xrsErrors: [{ code: 'rental.vehiclenotavailable', severity: 'ERROR', description: 'Veículo não disponível para esta estação/período' }],
+      });
+    }
     const payerSplit = reservationNode ? parsePayerList(reservationNode) : null;
     if (payerSplit) {
       console.log(`[getQuote] ✅ payerSplit extraído: driver=BRL ${payerSplit.driverDueBRL}, BA=BRL ${payerSplit.businessDueBRL}`);

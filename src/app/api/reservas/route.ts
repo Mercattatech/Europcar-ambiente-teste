@@ -76,6 +76,73 @@ export async function POST(request: Request) {
          return NextResponse.json({ error: 'Chaves da Cielo não configuradas no Admin e nem no .env.' }, { status: 400 });
       }
 
+      // ─────────────────────────────────────────────────────────────────────────────
+      // PRE-FLIGHT AVAILABILITY CHECK (XRS GreenWay)
+      // Validação obrigatória ANTES de cobrar o cartão ou gerar o QR Code do PIX.
+      // Evita cobrar o cliente quando a estação não tem o veículo na frota ou a rota
+      // não é permitida (ex: rental.vehiclenotavailable, rental.onewaynotallowed).
+      // ─────────────────────────────────────────────────────────────────────────────
+      const checkCar = bookingData?.car || {};
+      const checkCategory = checkCar.carCategoryCode || checkCar.category || bookingData?.carCategory;
+      const checkPickupStation = bookingData?.pickupStation || bookingData?.pickupLocation;
+      const checkReturnStation = bookingData?.returnStation || bookingData?.returnLocation || checkPickupStation;
+      const checkPickupDate = bookingData?.pickupDate;
+      const checkReturnDate = bookingData?.returnDate;
+      const checkPickupTime = bookingData?.pickupTime || '1000';
+      const checkReturnTime = bookingData?.returnTime || '1000';
+      const checkContractID = bookingData?.contractID || checkCar.contractID;
+      const checkRateId = checkCar.rateId || checkCar.$?.rateId || bookingData?.rateId;
+
+      if (checkCategory && checkPickupStation && checkPickupDate && checkReturnDate) {
+        try {
+          const preflightXml = `<?xml version="1.0" encoding="UTF-8"?>
+<message>
+  <serviceRequest serviceCode="getQuote">
+    <serviceContext language="pt_PT"/>
+    <caller/>
+    <serviceParameters>
+      <reservation chargesDetail="TRE" rateDetails="Y" prepaidMode="${paymentData.method === 'CREDIT' ? 'PP' : 'NP'}" carCategory="${escapeXml(checkCategory)}"${checkContractID ? ` contractID="${escapeXml(checkContractID)}" type="C"` : ''}${checkRateId ? ` rateId="${escapeXml(checkRateId)}"` : ''}>
+        <checkout stationID="${escapeXml(checkPickupStation)}" date="${escapeXml(checkPickupDate)}" time="${escapeXml(checkPickupTime)}"/>
+        <checkin stationID="${escapeXml(checkReturnStation)}" date="${escapeXml(checkReturnDate)}" time="${escapeXml(checkReturnTime)}"/>
+      </reservation>
+      <driver countryOfResidence="BR"${customerData?.idade || bookingData?.driverAge ? ` age="${escapeXml(String(customerData?.idade || bookingData?.driverAge))}"` : ''}/>
+    </serviceParameters>
+  </serviceRequest>
+</message>`;
+
+          const preflightRes = await callXRS(preflightXml, {
+            callerCode: process.env.XRS_CALLER_CODE || 'DEMO',
+            password:   process.env.XRS_PASSWORD    || 'DEMO',
+            action:     'preflightGetQuote',
+            sourceFile: 'reservas/route.ts',
+          });
+
+          const sr = preflightRes?.message?.serviceResponse || preflightRes?.serviceResponse;
+          const srStatus = sr?.status?.$ || sr?.status;
+          const retCode = sr?.$?.returnCode || sr?.returnCode || srStatus?.returnCode;
+          const errCode = sr?.$?.errorCode || sr?.errorCode;
+          const reservation = sr?.reservation;
+
+          if (retCode === 'KO' || errCode || !reservation) {
+            console.warn(`[reservas] ❌ Pre-flight check falhou! retCode=${retCode}, errCode=${errCode}`);
+            let friendlyMsg = 'Este veículo não está disponível para confirmação na estação e datas selecionadas. Por favor, retorne e escolha outro modelo da frota.';
+            if (errCode === 'rental.onewaynotallowed') {
+              friendlyMsg = 'A Europcar não permite devolução deste modelo na estação de retorno selecionada (One-Way não permitido para este veículo). Por favor, escolha outro veículo.';
+            } else if (errCode === 'rental.vehiclenotavailable') {
+              friendlyMsg = 'Veículo indisponível na estação para as datas selecionadas (frota esgotada ou não operada neste local). Por favor, escolha outro modelo da nossa frota.';
+            }
+            return NextResponse.json({
+              error: friendlyMsg,
+              code: 'VEHICLE_NOT_AVAILABLE',
+              xrsErrorCode: errCode || 'rental.vehiclenotavailable',
+            }, { status: 422 });
+          }
+          console.log(`[reservas] ✅ Pre-flight availability check aprovado para ${checkCategory} em ${checkPickupStation}`);
+        } catch (pfErr: any) {
+          console.warn('[reservas] ⚠️ Erro no pre-flight check (prosseguindo com cautela):', pfErr.message);
+        }
+      }
+
       // 1. Iniciar transação CIELO baseada no paymentData.method
       let cieloLog = "Não enviou para Cielo";
       let pixData: any = null;
