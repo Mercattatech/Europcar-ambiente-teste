@@ -392,6 +392,7 @@ export async function POST(request: Request) {
       let isOnRequest = false;
       let onRequestItems: any[] = [];
       let xrsStatusCode: string = 'S';
+      let xrsWarnings: any[] = [];
       if (paymentApproved) {
         const car = bookingData.car || {};
         const pickupDate = bookingData.pickupDate;
@@ -581,6 +582,65 @@ export async function POST(request: Request) {
           }
         }
 
+        // ── Extrai cotação real e avisos (ex: rateIDNotApplied) do bookReservation ──
+        const quoteNode = bookResNode?.quote?.$ || bookResNode?.quote;
+        const rawWarnings = xrsResponse?.message?.serviceResponse?.warningList?.warning
+          || xrsResponse?.serviceResponse?.warningList?.warning
+          || bookResNode?.warningList?.warning;
+        xrsWarnings = Array.isArray(rawWarnings)
+          ? rawWarnings.map((w: any) => w.$ || w)
+          : rawWarnings ? [rawWarnings.$ || rawWarnings] : [];
+
+        const hasRateNotApplied = xrsWarnings.some((w: any) =>
+          (w?.warningDesc || '').toLowerCase().includes('rateidnotapplied') ||
+          (w?.warningCode || '').toLowerCase().includes('rateidnotapplied')
+        );
+
+        if (hasRateNotApplied) {
+          console.warn(`[reservas] ⚠️ XRS retornou aviso xrs.rateIDNotApplied para reserva ${resNumber}. A tarifa foi recalculada pelo Greenway.`);
+        }
+
+        if (quoteNode) {
+          const xrsTotalRateBRL = parseFloat(quoteNode.totalRateEstimateInBookingCurrency || quoteNode.totalRateEstimate || '0');
+          const xrsTotalRateOrig = parseFloat(quoteNode.totalRateEstimate || '0');
+
+          if (xrsTotalRateBRL > 0) {
+            console.log(`[reservas] ℹ️ Cotação confirmada pelo Greenway para ${resNumber}: totalRate=${xrsTotalRateOrig}, totalRateBRL=${xrsTotalRateBRL}`);
+            if (!bookingData.car) bookingData.car = {};
+            bookingData.car.totalRateEstimate = String(quoteNode.totalRateEstimate || xrsTotalRateOrig);
+            bookingData.car.totalRateEstimateInBookingCurrency = String(quoteNode.totalRateEstimateInBookingCurrency || xrsTotalRateBRL);
+            if (quoteNode.basePrice) bookingData.car.basePrice = String(quoteNode.basePrice);
+            if (quoteNode.currency) bookingData.car.currency = String(quoteNode.currency);
+            if (quoteNode.bookingCurrency) bookingData.car.bookingCurrency = String(quoteNode.bookingCurrency);
+
+            // Para BALCÃO (POA): o valor total registrado deve ser exatamente
+            // a tarifa confirmada pelo Greenway + opcionais selecionados
+            if (paymentData.method === 'BALCAO') {
+              const bookingDays = calculateRentalDays({
+                pickupDate: bookingData.pickupDate,
+                pickupTime: bookingData.pickupTime || '1000',
+                returnDate: bookingData.returnDate,
+                returnTime: bookingData.returnTime || '1000',
+                station: bookingData.pickupStation,
+                country: bookingData.stationCountry || bookingData.driverCountry || customerData.pais,
+                apiDuration: bookingData.duration || bookingData.car?.duration,
+              });
+              const confirmedInsBRL = (Array.isArray(xrsInsurances) ? xrsInsurances : [])
+                .reduce((s: number, ins: any) => s + parseFloat(ins.priceBRL || 0), 0);
+              const confirmedEquipBRL = (Array.isArray(xrsEquipment) ? xrsEquipment : [])
+                .reduce((s: number, eq: any) => {
+                  const t = parseFloat(eq.totalBRL || 0);
+                  const d = parseFloat(eq.priceBRL || 0);
+                  return s + (t > 0 ? t : d * bookingDays) * (eq.qty || 1);
+                }, 0);
+
+              const fullBalcaoBRL = xrsTotalRateBRL + confirmedInsBRL + confirmedEquipBRL;
+              paymentData.amountInCents = Math.round(fullBalcaoBRL * 100);
+              console.log(`[reservas] 💰 Valor Balcão sincronizado com cotação real do GW: R$ ${fullBalcaoBRL.toFixed(2)} (${paymentData.amountInCents} centavos)`);
+            }
+          }
+        }
+
         if (resNumber) {
           try {
             const dFirstName = customerData.nome.trim();
@@ -721,6 +781,7 @@ export async function POST(request: Request) {
                 ...(bookingData?.payerSplit && { payerSplit: bookingData.payerSplit }),
                 // Cupom de desconto aplicado
                 ...(couponData && { couponData }),
+                ...(xrsWarnings.length > 0 && { xrsWarnings }),
               })
            }
         });

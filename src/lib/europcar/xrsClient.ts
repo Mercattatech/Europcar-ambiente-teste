@@ -409,6 +409,13 @@ export interface ReadBookingResult {
   isRejected?: boolean;
   raw?: any;
   error?: string;
+  quote?: {
+    totalRateEstimate?: string;
+    totalRateEstimateInBookingCurrency?: string;
+    currency?: string;
+    bookingCurrency?: string;
+    basePrice?: string;
+  };
 }
 
 const XRS_STATUS_MAP: Record<string, string> = {
@@ -492,6 +499,15 @@ export async function readBooking(resNumber: string): Promise<ReadBookingResult>
       (w.warningDesc || '').toLowerCase().includes('nochangeallowed')
     )) || statusCode === 'CC' || statusCode === 'CS' || statusCode === 'CP';
 
+    const quoteNode = resNode?.quote?.$ || resNode?.quote;
+    const quote = quoteNode ? {
+      totalRateEstimate: quoteNode.totalRateEstimate ? String(quoteNode.totalRateEstimate) : undefined,
+      totalRateEstimateInBookingCurrency: quoteNode.totalRateEstimateInBookingCurrency ? String(quoteNode.totalRateEstimateInBookingCurrency) : (quoteNode.totalRateEstimate ? String(quoteNode.totalRateEstimate) : undefined),
+      currency: quoteNode.currency ? String(quoteNode.currency) : undefined,
+      bookingCurrency: quoteNode.bookingCurrency ? String(quoteNode.bookingCurrency) : undefined,
+      basePrice: quoteNode.basePrice ? String(quoteNode.basePrice) : undefined,
+    } : undefined;
+
     return {
       found: true,
       resNumber: attrs.resNumber || resNumber,
@@ -504,6 +520,7 @@ export async function readBooking(resNumber: string): Promise<ReadBookingResult>
       warnings,
       isRejected,
       raw: resNode,
+      quote,
     };
   } catch (err: any) {
     return {

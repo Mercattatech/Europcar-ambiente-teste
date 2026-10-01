@@ -170,16 +170,17 @@ export async function POST(req: Request) {
         let customerName = '';
         let customerLastName = '';
         let bookingData: any = {};
+        let parsedCustomerData: any = {};
         try {
-          const parsed = typeof res.customerData === 'string'
+          parsedCustomerData = typeof res.customerData === 'string'
             ? JSON.parse(res.customerData)
             : (res.customerData || {});
-          customerEmail = parsed.email || parsed.driverData?.email || parsed.customerData?.email || '';
-          customerName = parsed.nome || parsed.firstName || parsed.driverData?.firstName || '';
-          customerLastName = parsed.sobrenome || parsed.lastName || parsed.driverData?.lastName || '';
-          bookingData = parsed.booking || parsed.bookingData || {};
-          const pm = parsed.paymentMethod || parsed.paymentData?.method || '';
-          isPrepaid = pm === 'CREDIT' || pm === 'PIX' || !!parsed.cieloPaymentId || res.status === 'CONFIRMED_PREPAID';
+          customerEmail = parsedCustomerData.email || parsedCustomerData.driverData?.email || parsedCustomerData.customerData?.email || '';
+          customerName = parsedCustomerData.nome || parsedCustomerData.firstName || parsedCustomerData.driverData?.firstName || '';
+          customerLastName = parsedCustomerData.sobrenome || parsedCustomerData.lastName || parsedCustomerData.driverData?.lastName || '';
+          bookingData = parsedCustomerData.booking || parsedCustomerData.bookingData || {};
+          const pm = parsedCustomerData.paymentMethod || parsedCustomerData.paymentData?.method || '';
+          isPrepaid = pm === 'CREDIT' || pm === 'PIX' || !!parsedCustomerData.cieloPaymentId || res.status === 'CONFIRMED_PREPAID';
         } catch { }
 
         const newStatus = mapXRSStatusToLocal(xrs.xrsStatusCode, res.status, isPrepaid, xrs.isRejected);
@@ -189,7 +190,44 @@ export async function POST(req: Request) {
         const opStatusChanged = oldOpStatus !== newOpStatus;
         const statusChanged = !!newStatus && newStatus !== res.status;
 
-        if (!opStatusChanged && !statusChanged) {
+        // ── Sincronização de valores com o Greenway para reservas BALCÃO (POA) ──
+        let amountChanged = false;
+        let newAmountInCents: number = res.amountInCents || 0;
+        let updatedCustomerDataStr: string | null = null;
+
+        if (xrs.quote) {
+          const quoteTotalBRL = parseFloat(xrs.quote.totalRateEstimateInBookingCurrency || xrs.quote.totalRateEstimate || '0');
+          if (quoteTotalBRL > 0) {
+            const pm = parsedCustomerData.paymentMethod || parsedCustomerData.paymentData?.method || '';
+            const isBalcao = pm === 'BALCAO' || res.status === 'CONFIRMED_NON_PREPAID';
+
+            if (isBalcao) {
+              const insArr = Array.isArray(parsedCustomerData.xrsInsurances) ? parsedCustomerData.xrsInsurances : [];
+              const equipArr = Array.isArray(parsedCustomerData.xrsEquipment) ? parsedCustomerData.xrsEquipment : [];
+              const confirmedInsBRL = insArr.reduce((s: number, ins: any) => s + parseFloat(ins.priceBRL || 0), 0);
+              const confirmedEquipBRL = equipArr.reduce((s: number, eq: any) => {
+                const t = parseFloat(eq.totalBRL || 0);
+                return s + (t > 0 ? t : 0);
+              }, 0);
+              const expectedAmountInCents = Math.round((quoteTotalBRL + confirmedInsBRL + confirmedEquipBRL) * 100);
+
+              if (Math.abs(expectedAmountInCents - (res.amountInCents || 0)) > 50) {
+                amountChanged = true;
+                newAmountInCents = expectedAmountInCents;
+                if (!bookingData.car) bookingData.car = {};
+                bookingData.car.totalRateEstimate = xrs.quote.totalRateEstimate;
+                bookingData.car.totalRateEstimateInBookingCurrency = xrs.quote.totalRateEstimateInBookingCurrency || xrs.quote.totalRateEstimate;
+                if (xrs.quote.basePrice) bookingData.car.basePrice = xrs.quote.basePrice;
+                if (xrs.quote.currency) bookingData.car.currency = xrs.quote.currency;
+                parsedCustomerData.booking = bookingData;
+                updatedCustomerDataStr = JSON.stringify(parsedCustomerData);
+                console.log(`[sync-greenway] ${res.resNumber}: Valor BALCAO sincronizado com Greenway: R$ ${(res.amountInCents || 0) / 100} → R$ ${newAmountInCents / 100}`);
+              }
+            }
+          }
+        }
+
+        if (!opStatusChanged && !statusChanged && !amountChanged) {
           if (singleResNumber) {
             results.push({
               resNumber: res.resNumber,
@@ -204,8 +242,8 @@ export async function POST(req: Request) {
           continue;
         }
 
-        // ═══ STATUS OU STATUS OPERACIONAL MUDOU ═══
-        console.log(`[sync-greenway] ${res.resNumber}: status=${res.status}${statusChanged ? ` → ${newStatus}` : ''} | opStatus=${oldOpStatus} → ${newOpStatus} (XRS: ${xrs.xrsStatusCode})`);
+        // ═══ STATUS, STATUS OPERACIONAL OU VALOR MUDOU ═══
+        console.log(`[sync-greenway] ${res.resNumber}: status=${res.status}${statusChanged ? ` → ${newStatus}` : ''} | opStatus=${oldOpStatus} → ${newOpStatus} (XRS: ${xrs.xrsStatusCode})${amountChanged ? ` | valor=R$ ${(res.amountInCents||0)/100} → R$ ${newAmountInCents/100}` : ''}`);
 
         // Atualizar no banco
         await prisma.localReservation.update({
@@ -213,10 +251,12 @@ export async function POST(req: Request) {
           data: {
             ...(statusChanged && newStatus ? { status: newStatus } : {}),
             operationalStatus: newOpStatus,
+            ...(amountChanged ? { amountInCents: newAmountInCents } : {}),
+            ...(updatedCustomerDataStr ? { customerData: updatedCustomerDataStr } : {}),
           },
         });
 
-        let action = 'status_updated';
+        let action = amountChanged && !statusChanged ? 'amount_synced' : 'status_updated';
 
         // ── Ações específicas por tipo de mudança ──
 

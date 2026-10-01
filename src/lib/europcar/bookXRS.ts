@@ -150,6 +150,37 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
     console.warn('[xrsBook] ⚠️ GW não retornou payerList no bookReservation — verificar se chargesDetail=TRE foi aceito');
   }
 
+  // ── Extrair quote e warningList do bookReservation ──
+  const quoteNode = bookResNode?.quote?.$ || bookResNode?.quote;
+  const rawWarnings = xrsResponse?.message?.serviceResponse?.warningList?.warning
+    || xrsResponse?.serviceResponse?.warningList?.warning
+    || bookResNode?.warningList?.warning;
+  const xrsWarnings: Array<{ warningCode?: string; warningDesc?: string }> = Array.isArray(rawWarnings)
+    ? rawWarnings.map((w: any) => w.$ || w)
+    : rawWarnings ? [rawWarnings.$ || rawWarnings] : [];
+
+  const hasRateNotApplied = xrsWarnings.some((w: any) =>
+    (w?.warningDesc || '').toLowerCase().includes('rateidnotapplied') ||
+    (w?.warningCode || '').toLowerCase().includes('rateidnotapplied')
+  );
+
+  if (hasRateNotApplied) {
+    console.warn(`[xrsBook] ⚠️ XRS retornou aviso xrs.rateIDNotApplied para reserva ${resNumber}. Tarifa recalculada pelo Greenway.`);
+  }
+
+  if (quoteNode) {
+    const xrsTotalRateBRL = parseFloat(quoteNode.totalRateEstimateInBookingCurrency || quoteNode.totalRateEstimate || '0');
+    const xrsTotalRateOrig = parseFloat(quoteNode.totalRateEstimate || '0');
+    if (xrsTotalRateBRL > 0) {
+      if (!bookingData.car) bookingData.car = {};
+      bookingData.car.totalRateEstimate = String(quoteNode.totalRateEstimate || xrsTotalRateOrig);
+      bookingData.car.totalRateEstimateInBookingCurrency = String(quoteNode.totalRateEstimateInBookingCurrency || xrsTotalRateBRL);
+      if (quoteNode.basePrice) bookingData.car.basePrice = String(quoteNode.basePrice);
+      if (quoteNode.currency) bookingData.car.currency = String(quoteNode.currency);
+      if (quoteNode.bookingCurrency) bookingData.car.bookingCurrency = String(quoteNode.bookingCurrency);
+    }
+  }
+
   if (!resNumber) {
     throw new Error("Europcar não retornou número de reserva. Verifique os logs.");
   }
@@ -263,5 +294,18 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
     }
   }
 
-  return { resNumber, isOnRequest, onRequestItems, xrsStatusCode };
+  return {
+    resNumber,
+    isOnRequest,
+    onRequestItems,
+    xrsStatusCode,
+    quote: quoteNode ? {
+      totalRateEstimate: quoteNode.totalRateEstimate ? String(quoteNode.totalRateEstimate) : undefined,
+      totalRateEstimateInBookingCurrency: quoteNode.totalRateEstimateInBookingCurrency ? String(quoteNode.totalRateEstimateInBookingCurrency) : (quoteNode.totalRateEstimate ? String(quoteNode.totalRateEstimate) : undefined),
+      currency: quoteNode.currency ? String(quoteNode.currency) : undefined,
+      bookingCurrency: quoteNode.bookingCurrency ? String(quoteNode.bookingCurrency) : undefined,
+      basePrice: quoteNode.basePrice ? String(quoteNode.basePrice) : undefined,
+    } : undefined,
+    warnings: xrsWarnings,
+  };
 }

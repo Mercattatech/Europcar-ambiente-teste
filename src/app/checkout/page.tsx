@@ -730,7 +730,7 @@ export default function CheckoutPage() {
           },
           paymentData: {
             method: paymentMethod,
-            amountInCents,
+            amountInCents: paymentMethod === 'BALCAO' ? balcaoFullAmountCents : amountInCents,
             installments: paymentMethod === "CREDIT" ? ccInstallments : 1,
             // Reaproveita o mesmo MerchantOrderId autenticado no 3DS — evita
             // inconsistência entre a autenticação e a cobrança na Cielo.
