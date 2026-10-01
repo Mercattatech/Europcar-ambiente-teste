@@ -32,15 +32,50 @@ async function authenticateRequest(request: Request): Promise<boolean> {
   return false;
 }
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-mcp-key',
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: corsHeaders,
+  });
+}
+
 /**
  * GET /api/mcp
  * Endpoint de descoberta e documentação de configuração para o Claude Desktop / MCP Clients
+ * Suporta tanto JSON simples quanto SSE (Server-Sent Events) padrão MCP
  */
 export async function GET(request: Request) {
   const isAuth = await authenticateRequest(request);
   const host = request.headers.get('host') || 'localhost:3000';
   const protocol = host.includes('localhost') ? 'http' : 'https';
   const fullUrl = `${protocol}://${host}/api/mcp`;
+  const acceptHeader = request.headers.get('accept') || '';
+
+  // Se o Claude conectar via SSE (Server-Sent Events padrão MCP)
+  if (acceptHeader.includes('text/event-stream')) {
+    const encoder = new TextEncoder();
+    const endpointUrl = `${fullUrl}?key=${DEFAULT_MCP_KEY}`;
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`event: endpoint\ndata: ${endpointUrl}\n\n`));
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        ...corsHeaders,
+      },
+    });
+  }
 
   return NextResponse.json({
     status: 'ONLINE',
@@ -62,6 +97,8 @@ export async function GET(request: Request) {
         }
       }
     }
+  }, {
+    headers: corsHeaders
   });
 }
 
@@ -74,10 +111,10 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         jsonrpc: '2.0',
-        error: { code: -32000, message: 'Não autorizado. Forneça o Bearer Token no cabeçalho Authorization.' },
+        error: { code: -32000, message: 'Não autorizado. Forneça o Bearer Token no cabeçalho Authorization ou query param ?key=...' },
         id: null
       },
-      { status: 401 }
+      { status: 401, headers: corsHeaders }
     );
   }
 
@@ -100,17 +137,17 @@ export async function POST(request: Request) {
             version: '1.0.0'
           }
         }
-      });
+      }, { headers: corsHeaders });
     }
 
     // 2. Notificação Initialized
     if (method === 'notifications/initialized') {
-      return new NextResponse(null, { status: 204 });
+      return new NextResponse(null, { status: 204, headers: corsHeaders });
     }
 
     // 3. Ping
     if (method === 'ping') {
-      return NextResponse.json({ jsonrpc: '2.0', id, result: {} });
+      return NextResponse.json({ jsonrpc: '2.0', id, result: {} }, { headers: corsHeaders });
     }
 
     // 4. Listar Ferramentas (tools/list)
@@ -121,7 +158,7 @@ export async function POST(request: Request) {
         result: {
           tools: AI_TOOLS_DEFINITIONS
         }
-      });
+      }, { headers: corsHeaders });
     }
 
     // 5. Executar Ferramenta (tools/call)
@@ -143,7 +180,7 @@ export async function POST(request: Request) {
               }
             ]
           }
-        });
+        }, { headers: corsHeaders });
       } catch (toolError: any) {
         return NextResponse.json({
           jsonrpc: '2.0',
@@ -157,7 +194,7 @@ export async function POST(request: Request) {
               }
             ]
           }
-        });
+        }, { headers: corsHeaders });
       }
     }
 
@@ -166,7 +203,7 @@ export async function POST(request: Request) {
       jsonrpc: '2.0',
       error: { code: -32601, message: `Método não suportado: ${method}` },
       id
-    });
+    }, { headers: corsHeaders });
   } catch (error: any) {
     console.error('[MCP Route Error]:', error);
     return NextResponse.json(
@@ -175,7 +212,7 @@ export async function POST(request: Request) {
         error: { code: -32700, message: `Erro ao processar mensagem JSON-RPC: ${error.message}` },
         id: null
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
