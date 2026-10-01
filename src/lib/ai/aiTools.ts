@@ -369,6 +369,22 @@ export async function executeAITool(toolName: string, args: Record<string, any>)
       const booking = cd.booking || {};
       const car = booking.car || {};
 
+      // Busca logs XRS associados a esta reserva no banco
+      const logsXrs = await prisma.logXRS.findMany({
+        where: {
+          OR: [
+            { xmlResponse: { contains: term } },
+            { xmlRequest: { contains: term } },
+            ...(reserva.merchantOrderId ? [
+              { xmlRequest: { contains: reserva.merchantOrderId } },
+              { xmlResponse: { contains: reserva.merchantOrderId } }
+            ] : [])
+          ]
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 3
+      });
+
       return {
         encontrado: true,
         numeroReserva: reserva.resNumber || 'Pendente XRS',
@@ -395,6 +411,20 @@ export async function executeAITool(toolName: string, args: Record<string, any>)
           devolucaoData: booking.returnDate || '-',
           devolucaoHora: booking.returnTime || '-'
         },
+        valoresCalculoXrs: {
+          totalRateEstimate: car.totalRateEstimate || null,
+          totalRateEstimateInBookingCurrency: car.totalRateEstimateInBookingCurrency || null,
+          totalRateInBookingCurrency: car.totalRateInBookingCurrency || null,
+          exchangeRate: car.exchangeRate || null,
+          bookingCurrency: car.bookingCurrencyOfTotalRateEstimate || car.currency || null,
+          payerSplit: cd.payerSplit || booking.payerSplit || null,
+        },
+        xmlsXRS: logsXrs.map(l => ({
+          acao: l.action,
+          dataHora: l.createdAt,
+          requestXml: l.xmlRequest,
+          responseXml: l.xmlResponse
+        })),
         criadoEm: reserva.createdAt
       };
     }
@@ -1136,38 +1166,57 @@ export async function executeAITool(toolName: string, args: Record<string, any>)
     case 'consultar_logs_sistema': {
       const tipo = args.tipo || 'CIELO';
       const limit = Math.min(25, Math.max(1, args.limit || 10));
+      const termo = String(args.termo || args.query || args.resNumber || '').trim();
 
       if (tipo === 'XRS') {
+        const whereClause = termo ? {
+          OR: [
+            { xmlRequest: { contains: termo } },
+            { xmlResponse: { contains: termo } }
+          ]
+        } : {};
+
         const xrsLogs = await prisma.logXRS.findMany({
+          where: whereClause,
           orderBy: { createdAt: 'desc' },
           take: limit
         });
         return {
           tipo: 'XRS',
+          termoFiltrado: termo || null,
           total: xrsLogs.length,
           logs: xrsLogs.map(l => ({
             id: l.id,
             dataHora: l.createdAt,
             acao: l.action,
-            requestXml: (l.xmlRequest || '').slice(0, 300) + '...',
-            responseXml: (l.xmlResponse || '').slice(0, 300) + '...'
+            requestXml: termo ? l.xmlRequest : (l.xmlRequest || '').slice(0, 300) + '...',
+            responseXml: termo ? l.xmlResponse : (l.xmlResponse || '').slice(0, 300) + '...'
           }))
         };
       }
 
+      const whereCielo = termo ? {
+        OR: [
+          { payload: { contains: termo } },
+          { response: { contains: termo } }
+        ]
+      } : {};
+
       const cieloLogs = await prisma.logCielo.findMany({
+        where: whereCielo,
         orderBy: { createdAt: 'desc' },
         take: limit
       });
       return {
         tipo: 'CIELO',
+        termoFiltrado: termo || null,
         total: cieloLogs.length,
         logs: cieloLogs.map(l => ({
           id: l.id,
           dataHora: l.createdAt,
           endpoint: l.endpoint,
-          payload: l.payload.slice(0, 300) + '...',
-          response: l.response.slice(0, 300) + '...'
+          payload: termo ? l.payload : l.payload.slice(0, 300) + '...',
+          response: termo ? l.response : l.response.slice(0, 300) + '...'
         }))
       };
     }
