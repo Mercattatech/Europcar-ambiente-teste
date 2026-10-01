@@ -726,13 +726,17 @@ function VehiclesContent() {
     // ── Step 3a: Equipment from getMultipleRates (already loaded in Step 2) ──
     // Friendly name / icon catalog (same as getEquipmentList route had)
     const EQUIPMENT_CATALOG: Record<string, { name: string; icon: string; description: string; maxQty: number }> = {
-      CSB: { name: 'Assento de bebê (0–12 meses)', icon: '👶', description: 'Cadeira infantil para bebês de 0 a 12 meses (grupo 0).', maxQty: 2 },
-      CSI: { name: 'Assento criança (1–3 anos)', icon: '🧒', description: 'Cadeira para crianças de 1 a 3 anos (grupo I, 9–18 kg).', maxQty: 2 },
-      CST: { name: 'Assento criança (4–7 anos)', icon: '🧒', description: 'Cadeira para crianças de 4 a 7 anos (15–30 kg).', maxQty: 2 },
-      CBS: { name: 'Assento de bebê (0–12 meses)', icon: '👶', description: 'Cadeira infantil para bebês de 0 a 12 meses.', maxQty: 2 },
-      BST: { name: 'Assento elevatório (4–7 anos)', icon: '💺', description: 'Booster para crianças de 4 a 7 anos (15–30 kg).', maxQty: 2 },
+      CSB: { name: 'Assento de bebê (0–12 meses)', icon: '👶', description: 'Cadeira infantil para bebês de 0 a 12 meses (grupo 0).', maxQty: 3 },
+      CSI: { name: 'Assento criança (1–3 anos)', icon: '🧒', description: 'Cadeira para crianças de 1 a 3 anos (grupo I, 9–18 kg).', maxQty: 3 },
+      CST: { name: 'Assento criança (4–7 anos)', icon: '🧒', description: 'Cadeira para crianças de 4 a 7 anos (15–30 kg).', maxQty: 3 },
+      CBS: { name: 'Assento de bebê (0–12 meses)', icon: '👶', description: 'Cadeira infantil para bebês de 0 a 12 meses.', maxQty: 3 },
+      BST: { name: 'Assento elevatório (4–7 anos)', icon: '💺', description: 'Booster para crianças de 4 a 7 anos (15–30 kg).', maxQty: 3 },
       NVS: { name: 'Sistema de navegação GPS', icon: '🗺️', description: 'Navegador GPS portátil com mapas atualizados.', maxQty: 1 },
       NAV: { name: 'Sistema de navegação GPS', icon: '🗺️', description: 'GPS com mapeamento local e internacional.', maxQty: 1 },
+      TOL: { name: 'Pedágio eletrônico (Via Verde / Toll)', icon: '🛣️', description: 'Dispositivo eletrônico para pagamento automático de pedágios (ex: Via Verde).', maxQty: 1 },
+      TOLL: { name: 'Pedágio eletrônico (Via Verde / Toll)', icon: '🛣️', description: 'Dispositivo eletrônico para pagamento automático de pedágios.', maxQty: 1 },
+      VVR: { name: 'Dispositivo Via Verde', icon: '🛣️', description: 'Dispositivo eletrônico para pagamento automático de portagens em Portugal.', maxQty: 1 },
+      ETL: { name: 'Pedágio eletrônico', icon: '🛣️', description: 'Dispositivo eletrônico para pagamento automático de pedágios.', maxQty: 1 },
       ADD: { name: 'Condutor adicional', icon: '👤', description: 'Permite compartilhar a direção em longas viagens.', maxQty: 3 },
       ADR: { name: 'Condutor adicional', icon: '👤', description: 'Condutor extra habilitado a dirigir o veículo alugado.', maxQty: 3 },
       JAC: { name: 'Sobretaxa motorista jovem', icon: '🧑‍🦱', description: 'Exigida para motoristas com menos de 25 anos.', maxQty: 1 },
@@ -769,7 +773,7 @@ function VehiclesContent() {
           name:        meta?.name        || eq.descr || eq.code,
           icon:        meta?.icon        || '📦',
           description: meta?.description || eq.descr || '',
-          maxQty:      Math.min(meta?.maxQty ?? 4, 4),
+          maxQty:      meta?.maxQty ?? 1,
           onRequest:   eq.onRequest,
           statusCode:  eq.statusCode || 'F',
           priceFromList: eq.priceInBookingCurrency || eq.price || 0,
@@ -1359,12 +1363,40 @@ function VehiclesContent() {
 
 
 
-  const handleEquipmentQuantity = (code: string, delta: number, maxQty: number = 4) => {
+  const CHILD_SEAT_CODES = useMemo(() => new Set(['CSB', 'CSI', 'CST', 'CBS', 'BST']), []);
+
+  const handleEquipmentQuantity = (code: string, delta: number, maxQty: number = 1) => {
     setSelectedEquipmentMap(prev => {
       const current = prev[code] || 0;
-      const totalOtherItems = Object.entries(prev).filter(([k]) => k !== code).reduce((sum, [, v]) => sum + v, 0);
-      const next = Math.max(0, Math.min(current + delta, maxQty, 4 - totalOtherItems + current));
-      if (next === 0) { const { [code]: _, ...rest } = prev; return rest; }
+      const next = current + delta;
+      if (next <= 0) {
+        const { [code]: _, ...rest } = prev;
+        return rest;
+      }
+      if (next > maxQty) return prev;
+
+      // Limite combinado de assentos infantis de acordo com a capacidade do veículo
+      if (CHILD_SEAT_CODES.has(code) && delta > 0) {
+        const currentTotalChildSeats = Object.entries(prev)
+          .filter(([k]) => CHILD_SEAT_CODES.has(k))
+          .reduce((sum, [, v]) => sum + v, 0);
+        const maxSeatsNum = parseInt(selectedCar?.carCategorySeats || '5', 10);
+        const maxChildSeats = maxSeatsNum > 5 ? 4 : 3;
+        if (currentTotalChildSeats >= maxChildSeats) {
+          return prev;
+        }
+      }
+
+      // Limite combinado de condutores adicionais (máx 3 adicionais)
+      if ((code === 'ADD' || code === 'ADR') && delta > 0) {
+        const currentTotalDrivers = Object.entries(prev)
+          .filter(([k]) => k === 'ADD' || k === 'ADR')
+          .reduce((sum, [, v]) => sum + v, 0);
+        if (currentTotalDrivers >= 3) {
+          return prev;
+        }
+      }
+
       return { ...prev, [code]: next };
     });
   };
@@ -2640,8 +2672,24 @@ function VehiclesContent() {
                         return 0;
                       }).map((eq: any) => {
                         const qty = selectedEquipmentMap[eq.code] || 0;
-                        const totalSelectedItems = Object.values(selectedEquipmentMap).reduce((a: number, b: number) => a + b, 0);
-                        const canAdd = totalSelectedItems < 4;
+                        const isChildSeat = CHILD_SEAT_CODES.has(eq.code);
+                        const totalChildSeats = isChildSeat
+                          ? Object.entries(selectedEquipmentMap)
+                              .filter(([k]) => CHILD_SEAT_CODES.has(k))
+                              .reduce((sum, [, v]) => sum + v, 0)
+                          : 0;
+                        const maxSeatsNum = parseInt(selectedCar?.carCategorySeats || '5', 10);
+                        const maxChildSeats = maxSeatsNum > 5 ? 4 : 3;
+                        const isDriver = eq.code === 'ADD' || eq.code === 'ADR';
+                        const totalDrivers = isDriver
+                          ? Object.entries(selectedEquipmentMap)
+                              .filter(([k]) => k === 'ADD' || k === 'ADR')
+                              .reduce((sum, [, v]) => sum + v, 0)
+                          : 0;
+
+                        const canAdd = qty < eq.maxQty &&
+                          (!isChildSeat || totalChildSeats < maxChildSeats) &&
+                          (!isDriver || totalDrivers < 3);
                         const fallbackPrice = parseFloat(eq.priceFromList) || 0;
                         const ep = equipmentPrices[eq.code];
                         const hasPrice = (ep && (ep.price > 0 || ep.priceBRL > 0 || ep.totalBRL > 0)) || fallbackPrice > 0;
@@ -2722,9 +2770,9 @@ function VehiclesContent() {
                                       <span className="font-black text-base text-gray-900">{qty}</span>
                                       <button
                                         onClick={() => handleEquipmentQuantity(eq.code, 1, eq.maxQty)}
-                                        disabled={!canAdd || qty >= eq.maxQty}
+                                        disabled={!canAdd}
                                         className={`w-10 h-10 flex items-center justify-center rounded text-lg font-bold transition-colors
-                                          ${canAdd && qty < eq.maxQty ? 'border border-[#008d36] text-[#008d36] hover:bg-green-50' : 'bg-gray-50 text-gray-300 cursor-not-allowed'}`}
+                                          ${canAdd ? 'border border-[#008d36] text-[#008d36] hover:bg-green-50' : 'bg-gray-50 text-gray-300 cursor-not-allowed'}`}
                                       >+</button>
                                     </div>
                                   ) : (
@@ -2733,10 +2781,13 @@ function VehiclesContent() {
                                         ? handleEquipmentQuantity(eq.code, -1, eq.maxQty)
                                         : handleEquipmentQuantity(eq.code, 1, eq.maxQty)
                                       }
+                                      disabled={qty === 0 && !canAdd}
                                       className={`w-full font-bold py-3 rounded-lg text-sm transition-all
                                         ${qty > 0
                                           ? 'bg-[#008d36] text-white hover:bg-[#007a2d]'
-                                          : 'bg-[#ffcc00] hover:bg-[#e6b800] text-gray-900'
+                                          : canAdd
+                                            ? 'bg-[#ffcc00] hover:bg-[#e6b800] text-gray-900 cursor-pointer'
+                                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                         }`}
                                     >
                                       {qty > 0 ? '✓ Selecionado — Remover' : 'Adicionar'}

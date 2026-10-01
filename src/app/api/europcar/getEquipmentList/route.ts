@@ -8,12 +8,17 @@ export const dynamic = 'force-dynamic';
 // Used as fallback when the API doesn't return a description.
 // Production names come from the admin CMS (extras table).
 const EQUIPMENT_CATALOG: Record<string, { name: string; icon: string; description: string; maxQty: number }> = {
-  CSB: { name: 'Assento de bebê (0–12 meses)', icon: '👶', description: 'Cadeira infantil para bebês de 0 a 12 meses (grupo 0).', maxQty: 2 },
-  CSI: { name: 'Assento criança (1–3 anos)', icon: '🧒', description: 'Cadeira para crianças de 1 a 3 anos (grupo I, 9–18 kg).', maxQty: 2 },
-  CST: { name: 'Assento criança (1–3 anos)', icon: '🧒', description: 'Cadeira para crianças de 1 a 3 anos (grupo I, 9–18 kg).', maxQty: 2 },
-  BST: { name: 'Assento elevatório (4–7 anos)', icon: '💺', description: 'Booster para crianças de 4 a 7 anos (15–30 kg).', maxQty: 2 },
+  CSB: { name: 'Assento de bebê (0–12 meses)', icon: '👶', description: 'Cadeira infantil para bebês de 0 a 12 meses (grupo 0).', maxQty: 3 },
+  CSI: { name: 'Assento criança (1–3 anos)', icon: '🧒', description: 'Cadeira para crianças de 1 a 3 anos (grupo I, 9–18 kg).', maxQty: 3 },
+  CST: { name: 'Assento criança (4–7 anos)', icon: '🧒', description: 'Cadeira para crianças de 4 a 7 anos (15–30 kg).', maxQty: 3 },
+  CBS: { name: 'Assento de bebê (0–12 meses)', icon: '👶', description: 'Cadeira infantil para bebês de 0 a 12 meses.', maxQty: 3 },
+  BST: { name: 'Assento elevatório (4–7 anos)', icon: '💺', description: 'Booster para crianças de 4 a 7 anos (15–30 kg).', maxQty: 3 },
   NVS: { name: 'Sistema de navegação GPS', icon: '🗺️', description: 'Navegador GPS portátil com mapas atualizados.', maxQty: 1 },
   NAV: { name: 'Sistema de navegação GPS', icon: '🗺️', description: 'GPS com mapeamento local e internacional.', maxQty: 1 },
+  TOL: { name: 'Pedágio eletrônico (Via Verde / Toll)', icon: '🛣️', description: 'Dispositivo eletrônico para pagamento automático de pedágios (ex: Via Verde).', maxQty: 1 },
+  TOLL: { name: 'Pedágio eletrônico (Via Verde / Toll)', icon: '🛣️', description: 'Dispositivo eletrônico para pagamento automático de pedágios.', maxQty: 1 },
+  VVR: { name: 'Dispositivo Via Verde', icon: '🛣️', description: 'Dispositivo eletrônico para pagamento automático de portagens em Portugal.', maxQty: 1 },
+  ETL: { name: 'Pedágio eletrônico', icon: '🛣️', description: 'Dispositivo eletrônico para pagamento automático de pedágios.', maxQty: 1 },
   ADD: { name: 'Condutor adicional', icon: '👤', description: 'Permite compartilhar a direção em longas viagens.', maxQty: 3 },
   ADR: { name: 'Condutor adicional', icon: '👤', description: 'Condutor extra habilitado a dirigir o veículo alugado.', maxQty: 3 },
   JAC: { name: 'Sobretaxa motorista jovem', icon: '🧑‍🦱', description: 'Exigida para motoristas com menos de 25 anos.', maxQty: 1 },
@@ -26,12 +31,17 @@ const EQUIPMENT_CATALOG: Record<string, { name: string; icon: string; descriptio
   SKB: { name: 'Rack de esqui', icon: '🎿', description: 'Rack para esquis ou snowboards.', maxQty: 1 },
   SKV: { name: 'Rack de esqui', icon: '🎿', description: 'Rack para transporte de esquis.', maxQty: 1 },
   SNO: { name: 'Correntes para neve', icon: '⛓️', description: 'Correntes para pneus — obrigatórias em certas regiões.', maxQty: 1 },
+  SNR: { name: 'Sobretaxa motorista sênior', icon: '👴', description: 'Taxa para motoristas acima da idade máxima.', maxQty: 1 },
   CHN: { name: 'Correntes para neve', icon: '⛓️', description: 'Correntes para pneus em condições de neve.', maxQty: 1 },
   WFI: { name: 'Wi-Fi portátil', icon: '📶', description: 'Hotspot Wi-Fi móvel com dados inclusos.', maxQty: 1 },
   LUG: { name: 'Proteção de bagagem', icon: '🧳', description: 'Cobertura para danos ou roubo de bagagem.', maxQty: 1 },
   HEL: { name: 'Capacete de motocicleta', icon: '🪖', description: 'Capacete fornecido junto com o veículo.', maxQty: 2 },
   MMS: { name: 'Proteção de espelhos', icon: '🪞', description: 'Cobertura adicional para espelhos retrovisores.', maxQty: 1 },
   JAB: { name: 'Dispositivo antiabandono', icon: '🔔', description: 'Alarme antiabandono para crianças.', maxQty: 1 },
+  STR: { name: 'Pneus de neve', icon: '🛞', description: 'Pneus especiais para condições de neve.', maxQty: 1 },
+  DSL: { name: 'Carga para carros a diesel', icon: '⛽', description: 'Suplemento para veículos a diesel.', maxQty: 1 },
+  EMS: { name: 'Serviço de emergência no exterior', icon: '🆘', description: 'Assistência de emergência para viagens internacionais.', maxQty: 1 },
+  LSR: { name: 'Cinta de amarração com catraca', icon: '🔧', description: 'Cinta para fixação de carga.', maxQty: 1 },
 };
 
 /**
@@ -125,7 +135,7 @@ export async function GET(request: Request) {
           name:        meta?.name        || a.equipmentName  || a.description || code,
           icon:        meta?.icon        || '📦',
           description: meta?.description || a.description    || '',
-          maxQty:      Math.min(parseInt(a.maxQuantity || a.maxQty || String(meta?.maxQty ?? 4), 10), 4),
+          maxQty:      meta?.maxQty ?? (parseInt(a.maxQuantity || a.maxQty || '1', 10) || 1),
           // Pricing
           price:       priceRaw,
           priceNP,
