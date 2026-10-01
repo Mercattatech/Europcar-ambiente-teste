@@ -54,6 +54,10 @@ export async function GET(req: Request) {
          if (statusFilter && statusFilter !== 'ALL') {
             if (statusFilter === 'CANCELLED') {
                sql += ` AND ("status" = 'CANCELLED' OR "status" = 'CANCELLED_GREENWAY')`;
+            } else if (statusFilter === 'PIX_PAID') {
+               sql += ` AND ("status" IN ('CONFIRMED_PREPAID', 'CONFIRMED', 'ON_REQUEST')) AND (CAST("customerData" AS TEXT) LIKE '%"paymentMethod":"PIX"%')`;
+            } else if (statusFilter === 'CREDIT_CARD') {
+               sql += ` AND ("status" = 'CONFIRMED_PREPAID') AND (CAST("customerData" AS TEXT) NOT LIKE '%"paymentMethod":"PIX"%')`;
             } else {
                sql += ` AND "status" = $${paramIndex}`;
                params.push(statusFilter);
@@ -111,6 +115,16 @@ export async function GET(req: Request) {
       if (statusFilter && statusFilter !== 'ALL') {
          if (statusFilter === 'CANCELLED') {
             andConditions.push({ status: { in: ['CANCELLED', 'CANCELLED_GREENWAY'] } });
+         } else if (statusFilter === 'PIX_PAID') {
+            andConditions.push({
+               status: { in: ['CONFIRMED_PREPAID', 'CONFIRMED', 'ON_REQUEST'] },
+               customerData: { contains: '"paymentMethod":"PIX"' }
+            });
+         } else if (statusFilter === 'CREDIT_CARD') {
+            andConditions.push({
+               status: 'CONFIRMED_PREPAID',
+               NOT: { customerData: { contains: '"paymentMethod":"PIX"' } }
+            });
          } else {
             andConditions.push({ status: statusFilter });
          }

@@ -42,6 +42,29 @@ function formatTimeBR(timeStr?: string): string {
    return `${timeStr.slice(0, 2)}:${timeStr.slice(2)}`;
 }
 
+function getPaymentMethodLabel(res: any, parsed: any): string {
+   const pm = parsed?.paymentMethod || (parsed?.cieloPaymentId && res.status === 'PENDING_PIX' ? 'PIX' : null);
+   if (pm === 'PIX' || res.status === 'PENDING_PIX') {
+      if (res.status === 'CONFIRMED_PREPAID' || res.status === 'CONFIRMED' || res.status === 'ON_REQUEST') {
+         return 'PIX (Pago)';
+      }
+      if (res.status === 'PENDING_PIX') {
+         return 'PIX (Pendente)';
+      }
+      return 'PIX (Pago)';
+   }
+   if (res.status === 'CONFIRMED_PREPAID' || pm === 'CREDIT') {
+      return 'Cartão de Crédito';
+   }
+   if (res.status === 'CONFIRMED_NON_PREPAID' || pm === 'BALCAO') {
+      return 'Pagar no Balcão';
+   }
+   if (res.status === 'CANCELLED' || res.status === 'CANCELLED_GREENWAY') {
+      return 'Cancelada';
+   }
+   return res.status || '—';
+}
+
 function escapeCSV(val: any): string {
    if (val === null || val === undefined) return "";
    let str = String(val);
@@ -72,6 +95,16 @@ export async function GET(req: Request) {
       if (statusFilter && statusFilter !== 'ALL') {
          if (statusFilter === 'CANCELLED') {
             andConditions.push({ status: { in: ['CANCELLED', 'CANCELLED_GREENWAY'] } });
+         } else if (statusFilter === 'PIX_PAID') {
+            andConditions.push({
+               status: { in: ['CONFIRMED_PREPAID', 'CONFIRMED', 'ON_REQUEST'] },
+               customerData: { contains: '"paymentMethod":"PIX"' }
+            });
+         } else if (statusFilter === 'CREDIT_CARD') {
+            andConditions.push({
+               status: 'CONFIRMED_PREPAID',
+               NOT: { customerData: { contains: '"paymentMethod":"PIX"' } }
+            });
          } else {
             andConditions.push({ status: statusFilter });
          }
@@ -230,7 +263,7 @@ export async function GET(req: Request) {
                totalBRLStr,
                isPrepaid && !isCancelled ? totalBRLStr : "",
                !isPrepaid && !isCancelled ? totalBRLStr : "",
-               STATUS_LABELS[res.status] || res.status,
+               getPaymentMethodLabel(res, parsed),
                car?.exchangeRate ? parseFloat(car.exchangeRate).toFixed(4) : "",
                car?.exchangeRate ? "EUR/BRL" : "",
                booking?.country || "BR",
@@ -293,6 +326,7 @@ export async function GET(req: Request) {
             "Status Operacional",
             "Código Status",
             "Status Pagamento",
+            "Tipo Pagamento",
             "Data Criação",
             "Data Retirada",
             "Data Devolução",
@@ -354,6 +388,7 @@ export async function GET(req: Request) {
                OP_STATUS_LABELS[opStatus] || opStatus,
                opStatus,
                STATUS_LABELS[res.status] || res.status,
+               getPaymentMethodLabel(res, parsed),
                new Date(res.createdAt).toLocaleDateString("pt-BR") + " " + new Date(res.createdAt).toLocaleTimeString("pt-BR"),
                formatDateBR(booking?.pickupDate) + (booking?.pickupTime ? " " + formatTimeBR(booking.pickupTime) : ""),
                formatDateBR(booking?.returnDate) + (booking?.returnTime ? " " + formatTimeBR(booking.returnTime) : ""),

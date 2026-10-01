@@ -11,8 +11,16 @@ import { DEFAULT_POA_CID, SECONDARY_POA_CID } from "@/lib/europcar/xrsClient";
 import { calculateRentalDays, formatRentalDays } from "@/lib/europcar/rentalDuration";
 
 function getVehicleType(car: any): string {
-  const code = car.carCategoryCode || "";
-  if (code.startsWith("U") || code.startsWith("L")) return "Premium";
+  const code = (car.carCategoryCode || "").toUpperCase();
+  const c3 = code[2] || '';
+  if (c3 === 'F' || c3 === 'G' || c3 === 'K') return "SUV";
+  if (c3 === 'V') return "Van / Minivan";
+  if (code.startsWith("M") || code.startsWith("N")) return "Mini";
+  if (code.startsWith("E")) return "Econômico";
+  if (code.startsWith("C")) return "Compacto";
+  if (code.startsWith("I") || code.startsWith("J")) return "Intermediário";
+  if (code.startsWith("S") || code.startsWith("F") || code.startsWith("G")) return "Standard";
+  if (code.startsWith("P") || code.startsWith("L") || code.startsWith("U") || code.startsWith("W")) return "Premium";
   return "Carro";
 }
 
@@ -258,6 +266,8 @@ function VehiclesContent() {
   const [vehicleType, setVehicleType] = useState("Todos");
   const [minSeats, setMinSeats] = useState(2);
   const [sortBy, setSortBy] = useState("Recomendado");
+  const [selectedMinPrice, setSelectedMinPrice] = useState<number | null>(null);
+  const [selectedMaxPrice, setSelectedMaxPrice] = useState<number | null>(null);
 
   // Promo modal for Balcão (Pagar no balcão)
   const [showBalcaoPromoModal, setShowBalcaoPromoModal] = useState(false);
@@ -733,10 +743,10 @@ function VehiclesContent() {
       BST: { name: 'Assento elevatório (4–7 anos)', icon: '💺', description: 'Booster para crianças de 4 a 7 anos (15–30 kg).', maxQty: 3 },
       NVS: { name: 'Sistema de navegação GPS', icon: '🗺️', description: 'Navegador GPS portátil com mapas atualizados.', maxQty: 1 },
       NAV: { name: 'Sistema de navegação GPS', icon: '🗺️', description: 'GPS com mapeamento local e internacional.', maxQty: 1 },
-      TOL: { name: 'Pedágio eletrônico (Via Verde / Toll)', icon: '🛣️', description: 'Dispositivo eletrônico para pagamento automático de pedágios (ex: Via Verde).', maxQty: 1 },
-      TOLL: { name: 'Pedágio eletrônico (Via Verde / Toll)', icon: '🛣️', description: 'Dispositivo eletrônico para pagamento automático de pedágios.', maxQty: 1 },
-      VVR: { name: 'Dispositivo Via Verde', icon: '🛣️', description: 'Dispositivo eletrônico para pagamento automático de portagens em Portugal.', maxQty: 1 },
-      ETL: { name: 'Pedágio eletrônico', icon: '🛣️', description: 'Dispositivo eletrônico para pagamento automático de pedágios.', maxQty: 1 },
+      TOL: { name: 'Ativação de pedágio eletrônico (Via Verde / Toll)', icon: '🛣️', description: 'Taxa de ativação do dispositivo eletrônico para pedágios e portagens (ex: Via Verde). O valor do consumo será cobrado pela locadora.', maxQty: 1 },
+      TOLL: { name: 'Ativação de pedágio eletrônico (Via Verde / Toll)', icon: '🛣️', description: 'Taxa de ativação do dispositivo eletrônico para pedágios.', maxQty: 1 },
+      VVR: { name: 'Ativação de dispositivo Via Verde', icon: '🛣️', description: 'Taxa de ativação para pagamento automático de portagens em Portugal.', maxQty: 1 },
+      ETL: { name: 'Ativação de pedágio eletrônico', icon: '🛣️', description: 'Taxa de ativação de dispositivo eletrônico para pedágios.', maxQty: 1 },
       ADD: { name: 'Condutor adicional', icon: '👤', description: 'Permite compartilhar a direção em longas viagens.', maxQty: 3 },
       ADR: { name: 'Condutor adicional', icon: '👤', description: 'Condutor extra habilitado a dirigir o veículo alugado.', maxQty: 3 },
       JAC: { name: 'Sobretaxa motorista jovem', icon: '🧑‍🦱', description: 'Exigida para motoristas com menos de 25 anos.', maxQty: 1 },
@@ -768,12 +778,13 @@ function VehiclesContent() {
       .filter((eq: any) => eq.type === 'O')
       .map((eq: any) => {
         const meta = EQUIPMENT_CATALOG[eq.code];
+        const isToll = ['TOL', 'TOLL', 'VVR', 'ETL'].includes(eq.code);
         return {
           code:        eq.code,
           name:        meta?.name        || eq.descr || eq.code,
-          icon:        meta?.icon        || '📦',
+          icon:        meta?.icon        || (isToll ? '🛣️' : '📦'),
           description: meta?.description || eq.descr || '',
-          maxQty:      meta?.maxQty ?? 1,
+          maxQty:      isToll ? 1 : (meta?.maxQty ?? 1),
           onRequest:   eq.onRequest,
           statusCode:  eq.statusCode || 'F',
           priceFromList: eq.priceInBookingCurrency || eq.price || 0,
@@ -1364,6 +1375,7 @@ function VehiclesContent() {
 
 
   const CHILD_SEAT_CODES = useMemo(() => new Set(['CSB', 'CSI', 'CST', 'CBS', 'BST']), []);
+  const TOLL_CODES = useMemo(() => new Set(['TOL', 'TOLL', 'VVR', 'ETL']), []);
 
   const handleEquipmentQuantity = (code: string, delta: number, maxQty: number = 1) => {
     setSelectedEquipmentMap(prev => {
@@ -1373,6 +1385,12 @@ function VehiclesContent() {
         const { [code]: _, ...rest } = prev;
         return rest;
       }
+
+      // Pedágio eletrônico é taxa de ativação única (máx 1 por veículo)
+      if (TOLL_CODES.has(code) && next > 1) {
+        return prev;
+      }
+
       if (next > maxQty) return prev;
 
       // Limite combinado de assentos infantis de acordo com a capacidade do veículo
@@ -1438,6 +1456,21 @@ function VehiclesContent() {
       }, 0);
   }, [selectedEquipmentMap, equipmentPrices, bookingDurationDays]);
 
+  const absolutePriceRange = useMemo(() => {
+    if (!cars.length) return { min: 0, max: 0 };
+    const prices = cars.map((c: any) => parseFloat(c.totalRateEstimate || 0)).filter((p: number) => p > 0);
+    if (!prices.length) return { min: 0, max: 0 };
+    return { min: Math.min(...prices), max: Math.max(...prices) };
+  }, [cars]);
+
+  const availableVehicleTypes = useMemo(() => {
+    const types = new Set<string>();
+    cars.forEach((c: any) => {
+      types.add(getVehicleType(c));
+    });
+    return ["Todos", ...Array.from(types).sort()];
+  }, [cars]);
+
   const filteredCars = useMemo(() => {
     let result = cars.filter((car: any) => {
       const auto = car.carCategoryAutomatic === "Y";
@@ -1446,16 +1479,20 @@ function VehiclesContent() {
       if (vehicleType !== "Todos" && getVehicleType(car) !== vehicleType) return false;
       const seats = parseInt(car.carCategorySeats || "2");
       if (seats < minSeats) return false;
+      const price = parseFloat(car.totalRateEstimate || "0");
+      if (selectedMinPrice !== null && price < selectedMinPrice) return false;
+      if (selectedMaxPrice !== null && price > selectedMaxPrice) return false;
       return true;
     });
     if (sortBy === "Preço: Menor para maior") result.sort((a: any, b: any) => parseFloat(a.totalRateEstimate) - parseFloat(b.totalRateEstimate));
     else if (sortBy === "Preço: Maior para menor") result.sort((a: any, b: any) => parseFloat(b.totalRateEstimate) - parseFloat(a.totalRateEstimate));
     return result;
-  }, [cars, transmission, vehicleType, minSeats, sortBy]);
+  }, [cars, transmission, vehicleType, minSeats, sortBy, selectedMinPrice, selectedMaxPrice]);
 
   const priceRange = useMemo(() => {
     if (!filteredCars.length) return { min: 0, max: 0 };
-    const prices = filteredCars.map((c: any) => parseFloat(c.totalRateEstimate || 0));
+    const prices = filteredCars.map((c: any) => parseFloat(c.totalRateEstimate || 0)).filter((p: number) => p > 0);
+    if (!prices.length) return { min: 0, max: 0 };
     return { min: Math.min(...prices), max: Math.max(...prices) };
   }, [filteredCars]);
 
@@ -1668,7 +1705,18 @@ function VehiclesContent() {
           <div className="bg-white rounded border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
               <h3 className="font-bold text-gray-900">Filtros</h3>
-              <button onClick={() => { setTransmission("Ambos"); setVehicleType("Todos"); setMinSeats(2); }} className="text-[#008d36] text-xs font-bold hover:underline">Redefinir</button>
+              <button
+                onClick={() => {
+                  setTransmission("Ambos");
+                  setVehicleType("Todos");
+                  setMinSeats(2);
+                  setSelectedMinPrice(null);
+                  setSelectedMaxPrice(null);
+                }}
+                className="text-[#008d36] text-xs font-bold hover:underline"
+              >
+                Redefinir
+              </button>
             </div>
             <div className="mb-5">
               <h4 className="font-bold text-sm text-gray-900 mb-2">Transmissão</h4>
@@ -1680,11 +1728,17 @@ function VehiclesContent() {
             </div>
             <div className="mb-5 border-t border-gray-100 pt-4">
               <h4 className="font-bold text-sm text-gray-900 mb-2">{t('vehicles.vehicleType')}</h4>
-              {["Todos", "Carro", "Premium"].map(v => (
-                <label key={v} className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer mb-1.5">
-                  <input type="radio" name="tipo" checked={vehicleType === v} onChange={() => setVehicleType(v)} className="accent-[#008d36]" /> {v}
-                </label>
-              ))}
+              {availableVehicleTypes.map(v => {
+                const count = v === "Todos" ? cars.length : cars.filter((c: any) => getVehicleType(c) === v).length;
+                return (
+                  <label key={v} className="flex items-center justify-between text-sm text-gray-600 cursor-pointer mb-1.5 hover:text-gray-900">
+                    <span className="flex items-center gap-2">
+                      <input type="radio" name="tipo" checked={vehicleType === v} onChange={() => setVehicleType(v)} className="accent-[#008d36]" /> {v}
+                    </span>
+                    <span className="text-[11px] text-gray-400 font-mono">({count})</span>
+                  </label>
+                );
+              })}
             </div>
             <div className="border-t border-gray-100 pt-4">
               <h4 className="font-bold text-sm text-gray-900 mb-2">{t('vehicles.minSeats')}</h4>
@@ -1698,13 +1752,72 @@ function VehiclesContent() {
                 }}
               />
             </div>
-            {priceRange.max > 0 && (
+            {absolutePriceRange.max > 0 && (
               <div className="border-t border-gray-100 pt-4 mt-4">
-                <h4 className="font-bold text-sm text-gray-900 mb-2">Preços ({filteredCars[0]?.currency || "EUR"})</h4>
-                <div className="flex gap-3">
-                  <div className="flex-1 text-center border border-gray-200 rounded p-2 text-sm font-bold">{fmtPrice(priceRange.min)}</div>
-                  <span className="self-center text-gray-400">—</span>
-                  <div className="flex-1 text-center border border-gray-200 rounded p-2 text-sm font-bold">{fmtPrice(priceRange.max)}</div>
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="font-bold text-sm text-gray-900">Preços ({cars[0]?.currency || "EUR"})</h4>
+                  {(selectedMinPrice !== null || selectedMaxPrice !== null) && (
+                    <button
+                      onClick={() => { setSelectedMinPrice(null); setSelectedMaxPrice(null); }}
+                      className="text-[10px] text-gray-400 hover:text-red-500 font-bold"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-2 items-center">
+                  <div className="flex-1">
+                    <label className="block text-[9px] text-gray-400 uppercase font-bold mb-0.5">Mín.</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min={Math.floor(absolutePriceRange.min)}
+                      max={selectedMaxPrice ?? Math.ceil(absolutePriceRange.max)}
+                      value={selectedMinPrice !== null ? selectedMinPrice : ''}
+                      placeholder={absolutePriceRange.min.toFixed(2)}
+                      onChange={e => {
+                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                        setSelectedMinPrice(val !== null && !isNaN(val) ? val : null);
+                      }}
+                      className="w-full text-center border border-gray-300 rounded p-1.5 text-xs font-bold bg-white text-gray-900 focus:border-[#008d36] focus:outline-none"
+                    />
+                  </div>
+                  <span className="self-end pb-2 text-gray-400 font-bold">—</span>
+                  <div className="flex-1">
+                    <label className="block text-[9px] text-gray-400 uppercase font-bold mb-0.5">Máx.</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min={selectedMinPrice ?? Math.floor(absolutePriceRange.min)}
+                      max={Math.ceil(absolutePriceRange.max)}
+                      value={selectedMaxPrice !== null ? selectedMaxPrice : ''}
+                      placeholder={absolutePriceRange.max.toFixed(2)}
+                      onChange={e => {
+                        const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                        setSelectedMaxPrice(val !== null && !isNaN(val) ? val : null);
+                      }}
+                      className="w-full text-center border border-gray-300 rounded p-1.5 text-xs font-bold bg-white text-gray-900 focus:border-[#008d36] focus:outline-none"
+                    />
+                  </div>
+                </div>
+                {/* Slider de ajuste dinâmico */}
+                <div className="mt-3">
+                  <input
+                    type="range"
+                    min={Math.floor(absolutePriceRange.min)}
+                    max={Math.ceil(absolutePriceRange.max)}
+                    step="1"
+                    value={selectedMaxPrice ?? Math.ceil(absolutePriceRange.max)}
+                    onChange={e => setSelectedMaxPrice(Number(e.target.value))}
+                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #008d36 ${(((selectedMaxPrice ?? Math.ceil(absolutePriceRange.max)) - Math.floor(absolutePriceRange.min)) / Math.max(1, Math.ceil(absolutePriceRange.max) - Math.floor(absolutePriceRange.min))) * 100}%, #d1d5db ${(((selectedMaxPrice ?? Math.ceil(absolutePriceRange.max)) - Math.floor(absolutePriceRange.min)) / Math.max(1, Math.ceil(absolutePriceRange.max) - Math.floor(absolutePriceRange.min))) * 100}%)`,
+                    }}
+                  />
+                  <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                    <span>{fmtPrice(absolutePriceRange.min)}</span>
+                    <span className="font-bold text-[#008d36]">Até {fmtPrice(selectedMaxPrice ?? absolutePriceRange.max)}</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -2790,7 +2903,9 @@ function VehiclesContent() {
                                             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                         }`}
                                     >
-                                      {qty > 0 ? '✓ Selecionado — Remover' : 'Adicionar'}
+                                      {qty > 0
+                                        ? (['TOL', 'TOLL', 'VVR', 'ETL'].includes(eq.code) ? '✓ Ativado — Remover' : '✓ Selecionado — Remover')
+                                        : (['TOL', 'TOLL', 'VVR', 'ETL'].includes(eq.code) ? 'Ativar Pedágio' : 'Adicionar')}
                                     </button>
                                   )}
                                 </>

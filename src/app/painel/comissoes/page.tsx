@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 
-type FilterType = 'ALL' | 'CREDIT_CARD' | 'PIX' | 'BALCAO';
+type FilterType = 'ALL' | 'PIX' | 'CREDIT_CARD' | 'BALCAO' | 'PIX_PENDING';
 
 const FILTER_OPTIONS: { key: FilterType; label: string; emoji: string; color: string; active: string }[] = [
-   { key: 'ALL',         label: 'Todos',          emoji: '📋', color: 'text-gray-400  border-gray-700 bg-gray-800/50',         active: 'text-white    border-white      bg-gray-700' },
-   { key: 'CREDIT_CARD', label: 'Cartão Crédito', emoji: '💳', color: 'text-blue-400  border-blue-800  bg-blue-900/20',         active: 'text-white    border-blue-500   bg-blue-700' },
-   { key: 'PIX',         label: 'PIX',            emoji: '📱', color: 'text-green-400 border-green-800 bg-green-900/20',        active: 'text-white    border-green-500  bg-green-700' },
-   { key: 'BALCAO',      label: 'Pagto. Balcão',  emoji: '🏢', color: 'text-yellow-400 border-yellow-800 bg-yellow-900/20',    active: 'text-white    border-yellow-500 bg-yellow-700' },
+   { key: 'ALL',         label: 'Todos',           emoji: '📋', color: 'text-gray-400  border-gray-700 bg-gray-800/50',         active: 'text-white    border-white      bg-gray-700' },
+   { key: 'PIX',         label: 'PIX (Efetivado)', emoji: '📱', color: 'text-emerald-400 border-emerald-800 bg-emerald-900/20', active: 'text-white    border-emerald-500 bg-emerald-700' },
+   { key: 'CREDIT_CARD', label: 'Cartão Crédito',  emoji: '💳', color: 'text-blue-400  border-blue-800  bg-blue-900/20',         active: 'text-white    border-blue-500   bg-blue-700' },
+   { key: 'BALCAO',      label: 'Pagto. Balcão',   emoji: '🏢', color: 'text-yellow-400 border-yellow-800 bg-yellow-900/20',    active: 'text-white    border-yellow-500 bg-yellow-700' },
+   { key: 'PIX_PENDING', label: 'PIX Pendente',    emoji: '⏳', color: 'text-amber-400 border-amber-800 bg-amber-900/20',        active: 'text-white    border-amber-500  bg-amber-700' },
 ];
 
 function fmt(v: number) {
@@ -146,35 +147,71 @@ export default function PainelComissoes() {
                   </div>
                </div>
 
-               {/* ── Cards de resumo (respeitam filtro) ─────────────────── */}
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+               {/* ── Cards de resumo ─────────────────────────────────── */}
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                   <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl p-5 shadow-lg relative overflow-hidden">
                      <div className="absolute top-3 right-3 text-2xl opacity-30">💵</div>
                      <p className="text-white/70 text-xs font-bold uppercase tracking-wide">
                         Total em Vendas {filter !== 'ALL' && <span className="normal-case">(filtrado)</span>}
                      </p>
-                     <p className="text-3xl font-black text-white mt-2">{fmt(filteredTotals.vendas)}</p>
+                     <p className="text-2xl font-black text-white mt-2">{fmt(filteredTotals.vendas)}</p>
+                     <p className="text-[11px] text-indigo-200 mt-1">{filtered.length} reservas</p>
                   </div>
                   <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-xl p-5 shadow-lg relative overflow-hidden">
                      <div className="absolute top-3 right-3 text-2xl opacity-30">🤑</div>
                      <p className="text-white/70 text-xs font-bold uppercase tracking-wide">
-                        Total de Comissões {filter !== 'ALL' && <span className="normal-case">(filtrado)</span>}
+                        Total Comissões {filter !== 'ALL' && <span className="normal-case">(filtrado)</span>}
                      </p>
-                     <p className="text-3xl font-black text-white mt-2">{fmt(filteredTotals.comissao)}</p>
+                     <p className="text-2xl font-black text-white mt-2">{fmt(filteredTotals.comissao)}</p>
+                     <p className="text-[11px] text-emerald-200 mt-1">Taxa: {data.rate}%</p>
                   </div>
-                  <div className="bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl p-5 shadow-lg relative overflow-hidden">
-                     <div className="absolute top-3 right-3 text-2xl opacity-30">💳</div>
-                     <p className="text-white/70 text-xs font-bold uppercase tracking-wide">Cartão ({data.grouped.CREDIT_CARD.count})</p>
-                     <p className="text-xl font-black text-blue-400 mt-2">{fmt(data.grouped.CREDIT_CARD.comissao)}</p>
-                     <p className="text-xs text-gray-500 mt-1">Vendas: {fmt(data.grouped.CREDIT_CARD.vendas)}</p>
+                  <div className="bg-gradient-to-br from-emerald-950/80 to-gray-900 border border-emerald-800/50 rounded-xl p-5 shadow-lg relative overflow-hidden">
+                     <div className="absolute top-3 right-3 text-2xl opacity-40">📱</div>
+                     <p className="text-emerald-400 text-xs font-bold uppercase tracking-wide">
+                        PIX Efetivado ({data.grouped.PIX?.count || 0})
+                     </p>
+                     <p className="text-xl font-black text-emerald-300 mt-2">{fmt(data.grouped.PIX?.comissao || 0)}</p>
+                     <p className="text-xs text-gray-400 mt-1">Vendas: {fmt(data.grouped.PIX?.vendas || 0)}</p>
                   </div>
-                  <div className="bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl p-5 shadow-lg relative overflow-hidden col-span-1">
-                     <div className="absolute top-3 right-3 text-2xl opacity-30">📱🏢</div>
-                     <p className="text-white/70 text-xs font-bold uppercase tracking-wide">PIX ({data.grouped.PIX.count}) + Balcão ({data.grouped.BALCAO.count})</p>
-                     <p className="text-xl font-black text-green-400 mt-2">{fmt(data.grouped.PIX.comissao + data.grouped.BALCAO.comissao)}</p>
-                     <p className="text-xs text-gray-500 mt-1">Vendas: {fmt(data.grouped.PIX.vendas + data.grouped.BALCAO.vendas)}</p>
+                  <div className="bg-gradient-to-br from-blue-950/80 to-gray-900 border border-blue-800/50 rounded-xl p-5 shadow-lg relative overflow-hidden">
+                     <div className="absolute top-3 right-3 text-2xl opacity-40">💳</div>
+                     <p className="text-blue-400 text-xs font-bold uppercase tracking-wide">
+                        Cartão ({data.grouped.CREDIT_CARD?.count || 0})
+                     </p>
+                     <p className="text-xl font-black text-blue-300 mt-2">{fmt(data.grouped.CREDIT_CARD?.comissao || 0)}</p>
+                     <p className="text-xs text-gray-400 mt-1">Vendas: {fmt(data.grouped.CREDIT_CARD?.vendas || 0)}</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-amber-950/80 to-gray-900 border border-amber-800/50 rounded-xl p-5 shadow-lg relative overflow-hidden">
+                     <div className="absolute top-3 right-3 text-2xl opacity-40">🏢</div>
+                     <p className="text-amber-400 text-xs font-bold uppercase tracking-wide">
+                        Balcão ({data.grouped.BALCAO?.count || 0})
+                     </p>
+                     <p className="text-xl font-black text-amber-300 mt-2">{fmt(data.grouped.BALCAO?.comissao || 0)}</p>
+                     <p className="text-xs text-gray-400 mt-1">Vendas: {fmt(data.grouped.BALCAO?.vendas || 0)}</p>
                   </div>
                </div>
+
+               {data.grouped.PIX_PENDING?.count > 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center justify-between">
+                     <div className="flex items-center gap-3">
+                        <span className="text-xl">⏳</span>
+                        <div>
+                           <p className="text-sm font-bold text-amber-300">
+                              {data.grouped.PIX_PENDING.count} reserva(s) com PIX Pendente (Aguardando Pagamento)
+                           </p>
+                           <p className="text-xs text-amber-400/80">
+                              Volume potencial: {fmt(data.grouped.PIX_PENDING.vendas)} · Comissão potencial: {fmt(data.grouped.PIX_PENDING.comissao)}
+                           </p>
+                        </div>
+                     </div>
+                     <button
+                        onClick={() => setFilter('PIX_PENDING')}
+                        className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-colors"
+                     >
+                        Ver Pendentes
+                     </button>
+                  </div>
+               )}
 
                {/* ── Tabela de reservas (filtrada) ──────────────────────── */}
                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
@@ -221,16 +258,23 @@ export default function PainelComissoes() {
                                           <div className="font-bold text-gray-300">{res.valorCalculado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                                        </td>
                                        <td className="px-5 py-4">
-                                          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${
-                                             res.tipoPagamento === 'CREDIT_CARD' ? 'bg-blue-500/20 text-blue-400' :
-                                             res.tipoPagamento === 'PIX'         ? 'bg-green-500/20 text-green-400' :
-                                                                                   'bg-yellow-500/20 text-yellow-400'
+                                          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded inline-flex items-center gap-1 ${
+                                             res.tipoPagamento === 'CREDIT_CARD' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                                             res.tipoPagamento === 'PIX'         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                                             res.tipoPagamento === 'PIX_PENDING' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                                                                                   'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
                                           }`}>
-                                             {res.tipoPagamento === 'CREDIT_CARD' ? '💳 Cartão' : res.tipoPagamento === 'PIX' ? '📱 PIX' : '🏢 Balcão'}
+                                             {res.tipoPagamento === 'CREDIT_CARD' ? '💳 Cartão' :
+                                              res.tipoPagamento === 'PIX'         ? '📱 PIX (Pago)' :
+                                              res.tipoPagamento === 'PIX_PENDING' ? '⏳ PIX Pendente' :
+                                                                                    '🏢 Balcão'}
                                           </span>
                                        </td>
                                        <td className="px-5 py-4 text-right">
-                                          <div className="font-bold text-emerald-400">{res.comissaoCalculada.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                                          <div className={`font-bold ${res.tipoPagamento === 'PIX_PENDING' ? 'text-amber-400/80 text-xs italic' : 'text-emerald-400'}`}>
+                                             {res.comissaoCalculada.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                             {res.tipoPagamento === 'PIX_PENDING' && <span className="block text-[9px] uppercase tracking-wider not-italic text-amber-500 font-semibold">Aguardando Pagto</span>}
+                                          </div>
                                        </td>
                                     </tr>
                                  );

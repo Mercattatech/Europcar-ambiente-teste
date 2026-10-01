@@ -61,15 +61,42 @@ function getReservationMetrics(res: any, parsed: any) {
    const isPrepaid = res.status === "CONFIRMED_PREPAID";
    const isCounter = res.status === "CONFIRMED_NON_PREPAID";
 
+   const pm = parsed?.paymentMethod || (parsed?.cieloPaymentId && res.status === 'PENDING_PIX' ? 'PIX' : null);
+   const isPixPaid = (res.status === 'CONFIRMED_PREPAID' || res.status === 'CONFIRMED' || res.status === 'ON_REQUEST') && pm === 'PIX';
+   const isPixPending = res.status === 'PENDING_PIX';
+   const isCreditCard = (res.status === 'CONFIRMED_PREPAID' && pm !== 'PIX') || pm === 'CREDIT';
+
    return {
       amountBRL,
       amountEUR,
       isCancelled,
       isPrepaid,
       isCounter,
+      isPixPaid,
+      isPixPending,
+      isCreditCard,
       days,
       opStatus,
    };
+}
+
+function getPaymentBadgeInfo(res: any, metrics: any) {
+   if (metrics.isCancelled) {
+      return { label: "🚫 Cancelada", badgeClass: "bg-red-500/20 text-red-400 border border-red-500/30" };
+   }
+   if (metrics.isPixPaid) {
+      return { label: "📱 PIX (Pago)", badgeClass: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" };
+   }
+   if (metrics.isPixPending) {
+      return { label: "⏳ PIX Pendente", badgeClass: "bg-amber-500/20 text-amber-400 border border-amber-500/30" };
+   }
+   if (metrics.isCreditCard) {
+      return { label: "💳 Cartão Crédito", badgeClass: "bg-blue-500/20 text-blue-400 border border-blue-500/30" };
+   }
+   if (metrics.isCounter) {
+      return { label: "🏢 Balcão", badgeClass: "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30" };
+   }
+   return { label: STATUS_LABELS[res.status] || res.status || "—", badgeClass: "bg-gray-700/40 text-gray-400 border border-gray-600/30" };
 }
 
 export default function PainelRelatorios() {
@@ -184,8 +211,14 @@ export default function PainelRelatorios() {
    const totalActiveBRL = activeReservations.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
    const totalActiveEUR = activeReservations.reduce((sum, r) => sum + r.metrics.amountEUR, 0);
    const totalActivePrepaidBRL = activeReservations.filter(r => r.metrics.isPrepaid).reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+   const totalActivePixBRL = activeReservations.filter(r => r.metrics.isPixPaid).reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+   const totalActiveCreditBRL = activeReservations.filter(r => r.metrics.isCreditCard).reduce((sum, r) => sum + r.metrics.amountBRL, 0);
    const totalActiveCounterBRL = activeReservations.filter(r => r.metrics.isCounter).reduce((sum, r) => sum + r.metrics.amountBRL, 0);
    const totalActiveDays = activeReservations.reduce((sum, r) => sum + r.metrics.days, 0);
+
+   const countActivePix = activeReservations.filter(r => r.metrics.isPixPaid).length;
+   const countActiveCredit = activeReservations.filter(r => r.metrics.isCreditCard).length;
+   const countActiveCounter = activeReservations.filter(r => r.metrics.isCounter).length;
 
    const totalCancelledBRL = cancelledReservations.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
    const totalCancelledEUR = cancelledReservations.reduce((sum, r) => sum + r.metrics.amountEUR, 0);
@@ -317,10 +350,12 @@ export default function PainelRelatorios() {
                      className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-green-600 transition-colors appearance-none min-w-[180px]"
                   >
                      <option value="ALL">Todos os Pagamentos</option>
-                     <option value="CONFIRMED_PREPAID">Pago Online (Cielo/Pix)</option>
-                     <option value="PENDING_PIX">PIX Pendente</option>
-                     <option value="CONFIRMED_NON_PREPAID">Pagar no Balcão</option>
-                     <option value="CANCELLED">Cancelada (Online ou GW)</option>
+                     <option value="PIX_PAID">📱 PIX (Efetivado / Pago)</option>
+                     <option value="CREDIT_CARD">💳 Cartão de Crédito</option>
+                     <option value="PENDING_PIX">⏳ PIX Pendente</option>
+                     <option value="CONFIRMED_NON_PREPAID">🏢 Pagar no Balcão</option>
+                     <option value="CONFIRMED_PREPAID">Pago Online (Todos)</option>
+                     <option value="CANCELLED">🚫 Cancelada (Online ou GW)</option>
                   </select>
                </div>
                {/* Clear */}
@@ -358,9 +393,20 @@ export default function PainelRelatorios() {
                <p className="text-2xl font-black text-emerald-400 mt-1">
                   R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                </p>
-               <p className="text-[10px] text-gray-400 mt-1 truncate" title={`Online: R$ ${totalActivePrepaidBRL.toFixed(2)} | Balcão: R$ ${totalActiveCounterBRL.toFixed(2)}`}>
-                  Online: R$ {totalActivePrepaidBRL.toFixed(2)} · Balcão: R$ {totalActiveCounterBRL.toFixed(2)}
-               </p>
+               <div className="text-[10px] text-gray-400 mt-2 space-y-0.5 border-t border-gray-800/80 pt-1.5 font-medium">
+                  <div className="flex justify-between items-center text-emerald-300">
+                     <span>📱 PIX ({countActivePix}):</span>
+                     <span>R$ {totalActivePixBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-blue-300">
+                     <span>💳 Cartão ({countActiveCredit}):</span>
+                     <span>R$ {totalActiveCreditBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-yellow-300">
+                     <span>🏢 Balcão ({countActiveCounter}):</span>
+                     <span>R$ {totalActiveCounterBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                  </div>
+               </div>
             </div>
 
             {/* Card 3: Receita Estimada (EUR) */}
@@ -460,8 +506,10 @@ export default function PainelRelatorios() {
                                        {opConfig.label} — {opConfig.description}
                                     </span>
                                  </td>
-                                 <td className="px-4 py-3 text-[10px] font-bold text-gray-400">
-                                    {STATUS_LABELS[res.status] || res.status}
+                                 <td className="px-4 py-3">
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border inline-flex items-center gap-1 ${getPaymentBadgeInfo(res, metrics).badgeClass}`}>
+                                       {getPaymentBadgeInfo(res, metrics).label}
+                                    </span>
                                  </td>
                                  <td className="px-4 py-3 text-xs text-gray-400">
                                     {new Date(res.createdAt).toLocaleDateString("pt-BR")}{" "}
@@ -616,8 +664,10 @@ export default function PainelRelatorios() {
                                        <span className="text-gray-600">—</span>
                                     )}
                                  </td>
-                                 <td className="px-3 py-3 text-[10px] font-bold text-gray-400">
-                                    {STATUS_LABELS[res.status] || res.status}
+                                 <td className="px-3 py-3">
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border inline-flex items-center gap-1 ${getPaymentBadgeInfo(res, metrics).badgeClass}`}>
+                                       {getPaymentBadgeInfo(res, metrics).label}
+                                    </span>
                                  </td>
                                  <td className="px-3 py-3 text-[10px] text-gray-500 font-mono">
                                     {car?.exchangeRate ? parseFloat(car.exchangeRate).toFixed(4) : "—"}
@@ -660,8 +710,8 @@ export default function PainelRelatorios() {
                                  <div className="text-emerald-400">
                                     R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                                  </div>
-                                 <div className="text-[9px] text-gray-400 font-normal mt-0.5">
-                                    Online: R$ {totalActivePrepaidBRL.toFixed(2)} | Balcão: R$ {totalActiveCounterBRL.toFixed(2)}
+                                 <div className="text-[9px] text-gray-300 font-normal mt-0.5 space-y-0.5">
+                                    <div>📱 PIX: R$ {totalActivePixBRL.toFixed(2)} | 💳 Cartão: R$ {totalActiveCreditBRL.toFixed(2)} | 🏢 Balcão: R$ {totalActiveCounterBRL.toFixed(2)}</div>
                                  </div>
                                  {cancelledReservations.length > 0 && (
                                     <div className="text-[9px] text-red-400 font-normal mt-0.5">

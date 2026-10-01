@@ -52,31 +52,59 @@ export async function GET(request: Request) {
       let totalComissao = 0;
       let totalVendas = 0;
       const grouped = {
-         'CREDIT_CARD': { vendas: 0, comissao: 0, count: 0 },
-         'PIX': { vendas: 0, comissao: 0, count: 0 },
-         'BALCAO': { vendas: 0, comissao: 0, count: 0 }
+         'PIX': { vendas: 0, comissao: 0, count: 0 },          // PIX Efetivado (Pago)
+         'CREDIT_CARD': { vendas: 0, comissao: 0, count: 0 },  // Cartão de Crédito
+         'BALCAO': { vendas: 0, comissao: 0, count: 0 },       // Pagamento no Balcão
+         'PIX_PENDING': { vendas: 0, comissao: 0, count: 0 }   // PIX Pendente (Aguardando)
       };
 
       const resultList = reservations.map(res => {
          const valor = res.amountInCents ? res.amountInCents / 100 : 0;
          const comissao = valor * (rate / 100);
          
-         let tipo = 'BALCAO';
-         if (res.status === 'CONFIRMED_PREPAID') tipo = 'CREDIT_CARD';
-         if (res.status === 'PENDING_PIX') tipo = 'PIX';
+         let parsed: any = {};
+         try {
+            parsed = typeof res.customerData === 'string' ? JSON.parse(res.customerData) : res.customerData;
+         } catch (e) {}
 
-         // Update totals
-         totalVendas += valor;
-         totalComissao += comissao;
+         const pm = parsed?.paymentMethod || (parsed?.cieloPaymentId && res.status === 'PENDING_PIX' ? 'PIX' : null);
+
+         let tipo = 'BALCAO';
+         if (pm === 'PIX' || res.status === 'PENDING_PIX') {
+            if (res.status === 'CONFIRMED_PREPAID' || res.status === 'CONFIRMED' || res.status === 'ON_REQUEST') {
+               tipo = 'PIX'; // PIX Efetivado!
+            } else if (res.status === 'PENDING_PIX') {
+               tipo = 'PIX_PENDING'; // Aguardando pagamento PIX
+            } else {
+               tipo = 'PIX';
+            }
+         } else if (pm === 'CREDIT' || (res.status === 'CONFIRMED_PREPAID' && pm !== 'PIX')) {
+            tipo = 'CREDIT_CARD';
+         } else if (pm === 'BALCAO' || res.status === 'CONFIRMED_NON_PREPAID') {
+            tipo = 'BALCAO';
+         } else {
+            tipo = res.status === 'CONFIRMED_PREPAID' ? 'CREDIT_CARD' : 'BALCAO';
+         }
+
+         // Totaliza apenas vendas efetivadas (PIX pendente não gera receita confirmada)
+         const isEfetivada = tipo !== 'PIX_PENDING';
+         if (isEfetivada) {
+            totalVendas += valor;
+            totalComissao += comissao;
+         }
          
-         if (tipo === 'CREDIT_CARD') {
-            grouped.CREDIT_CARD.vendas += valor;
-            grouped.CREDIT_CARD.comissao += comissao;
-            grouped.CREDIT_CARD.count += 1;
-         } else if (tipo === 'PIX') {
+         if (tipo === 'PIX') {
             grouped.PIX.vendas += valor;
             grouped.PIX.comissao += comissao;
             grouped.PIX.count += 1;
+         } else if (tipo === 'CREDIT_CARD') {
+            grouped.CREDIT_CARD.vendas += valor;
+            grouped.CREDIT_CARD.comissao += comissao;
+            grouped.CREDIT_CARD.count += 1;
+         } else if (tipo === 'PIX_PENDING') {
+            grouped.PIX_PENDING.vendas += valor;
+            grouped.PIX_PENDING.comissao += comissao;
+            grouped.PIX_PENDING.count += 1;
          } else {
             grouped.BALCAO.vendas += valor;
             grouped.BALCAO.comissao += comissao;
@@ -87,7 +115,8 @@ export async function GET(request: Request) {
             ...res,
             valorCalculado: valor,
             comissaoCalculada: comissao,
-            tipoPagamento: tipo
+            tipoPagamento: tipo,
+            isEfetivada
          };
       });
 
