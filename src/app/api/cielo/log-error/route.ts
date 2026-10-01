@@ -49,6 +49,23 @@ export async function POST(request: Request) {
       }
     });
 
+    // Registra na nova central de recusas /painel/logs (transaction_rejection_logs)
+    const { registerFailedTransaction } = await import('@/lib/rejectionService');
+    await registerFailedTransaction({
+      provider: 'Cielo / 3DS Lynx',
+      paymentMethod: 'CREDIT',
+      amount: 0,
+      customerName: safePayload.customerName !== 'Não Informado' ? safePayload.customerName : undefined,
+      customerEmail: safePayload.customerEmail !== 'Não Informado' ? safePayload.customerEmail : undefined,
+      customerPhone: safePayload.customerPhone !== 'Não Informado' ? safePayload.customerPhone : undefined,
+      merchantOrderId: safePayload.orderId || undefined,
+      endpoint: `[3DS Client Error] ${event || '3DS_EVENT'}`,
+      rawPayload: safePayload,
+      returnCode: event === 'AbortedByCardVerification' ? '33' : (event || '3DS_ERROR'),
+      returnMessage: detailsStr || 'Falha ou desafio 3DS recusado pelo emissor/portador',
+      is3dsError: true
+    }).catch(console.error);
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('[log-error] Falha ao gravar log 3DS:', error.message);

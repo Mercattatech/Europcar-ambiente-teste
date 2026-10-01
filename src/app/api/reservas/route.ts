@@ -10,6 +10,7 @@ import { buildReservationPaymentAttrs, buildCreateVoucherXml, CID_TO_BA } from '
 import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 import { getReservationErrorMessage } from '@/lib/cms/reservationErrors';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
+import { registerFailedTransaction } from '@/lib/rejectionService';
 import bcrypt from 'bcryptjs';
 
 /** Gera senha aleatória legível de 12 caracteres */
@@ -145,6 +146,20 @@ export async function POST(request: Request) {
              if (resCielo.status === 401) {
                  msg = "Erro 401 (Não Autorizado) na Cielo PIX. Verifique se o MerchantId e MerchantKey estão corretos. Se estiver usando chaves de Produção, o 'Modo Sandbox' deve estar DESMARCADO.";
              }
+             await registerFailedTransaction({
+               provider: 'Cielo',
+               paymentMethod: 'PIX',
+               amount: (paymentData?.amountInCents || 0) / 100,
+               customerName: `${customerData?.nome || ''} ${customerData?.sobrenome || ''}`.trim(),
+               customerEmail: customerData?.email,
+               customerPhone: customerData?.telefone,
+               merchantOrderId,
+               httpStatus: resCielo.status,
+               endpoint: CIELO_API_URL,
+               rawPayload: { error: msg, rawPixText },
+               returnCode: resCielo.status === 401 ? '401' : 'PARSE_ERROR',
+               returnMessage: msg
+             }).catch(console.error);
              throw new Error(msg);
          }
          
@@ -162,6 +177,21 @@ export async function POST(request: Request) {
                  // adivinhar a causa. Ver também /painel/logs (LogCielo) para o histórico completo.
                  errorMsg = `Código HTTP ${resCielo.status}. Resposta Cielo: ${rawPixText.slice(0, 300) || '[vazia]'}`;
              }
+             await registerFailedTransaction({
+               provider: 'Cielo',
+               paymentMethod: 'PIX',
+               amount: (paymentData?.amountInCents || 0) / 100,
+               customerName: `${customerData?.nome || ''} ${customerData?.sobrenome || ''}`.trim(),
+               customerEmail: customerData?.email,
+               customerPhone: customerData?.telefone,
+               merchantOrderId,
+               paymentId: cieloResponseJson?.Payment?.PaymentId,
+               httpStatus: resCielo.status,
+               endpoint: CIELO_API_URL,
+               rawPayload: cieloResponseJson || rawPixText,
+               returnCode: pixReturnCode || `HTTP_${resCielo.status}`,
+               returnMessage: errorMsg
+             }).catch(console.error);
              errorMsg = await getReservationErrorMessage(pixReturnCode, errorMsg);
              throw new Error("Transação PIX Recusada: " + errorMsg);
          }
@@ -198,6 +228,20 @@ export async function POST(request: Request) {
            cieloHeaders.MerchantId, cieloHeaders.MerchantKey, isSandboxMode
          );
          if (!zeroAuth.valid) {
+           await registerFailedTransaction({
+             provider: 'Cielo',
+             cardBrand: brand,
+             paymentMethod: 'CREDIT',
+             amount: (paymentData?.amountInCents || 0) / 100,
+             customerName: `${customerData?.nome || ''} ${customerData?.sobrenome || ''}`.trim(),
+             customerEmail: customerData?.email,
+             customerPhone: customerData?.telefone,
+             merchantOrderId,
+             endpoint: 'ZeroAuth',
+             rawPayload: { zeroAuth, brand },
+             returnCode: 'ZERO_AUTH',
+             returnMessage: zeroAuth.message || 'Cartão inválido ou não autorizado pelo emissor.'
+           }).catch(console.error);
            const msg = await getReservationErrorMessage('ZERO_AUTH', zeroAuth.message || 'Cartão inválido ou não autorizado pelo emissor.');
            throw new Error("Transação Recusada pela Operadora: " + msg);
          }
@@ -272,6 +316,21 @@ export async function POST(request: Request) {
              if (resCielo.status === 401) {
                  msg = "Erro 401 (Não Autorizado) na Cielo. Verifique se o MerchantId e MerchantKey estão corretos. Se estiver usando chaves de Produção, verifique se o botão 'Modo Sandbox' está DESMARCADO no painel. Chaves reais não funcionam no Sandbox.";
              }
+             await registerFailedTransaction({
+               provider: 'Cielo',
+               cardBrand: brand,
+               paymentMethod: 'CREDIT',
+               amount: (paymentData?.amountInCents || 0) / 100,
+               customerName: `${customerData?.nome || ''} ${customerData?.sobrenome || ''}`.trim(),
+               customerEmail: customerData?.email,
+               customerPhone: customerData?.telefone,
+               merchantOrderId,
+               httpStatus: resCielo.status,
+               endpoint: CIELO_API_URL,
+               rawPayload: { error: msg, rawText },
+               returnCode: resCielo.status === 401 ? '401' : 'PARSE_ERROR',
+               returnMessage: msg
+             }).catch(console.error);
              throw new Error(msg);
          }
 
@@ -292,6 +351,24 @@ export async function POST(request: Request) {
                  // adivinhar a causa. Ver também /painel/logs (LogCielo) para o histórico completo.
                  errorMsg = `Código HTTP ${resCielo.status}. Resposta Cielo: ${rawText.slice(0, 300) || '[vazia]'}`;
              }
+
+             await registerFailedTransaction({
+               provider: 'Cielo',
+               cardBrand: brand,
+               paymentMethod: 'CREDIT',
+               amount: (paymentData?.amountInCents || 0) / 100,
+               customerName: `${customerData?.nome || ''} ${customerData?.sobrenome || ''}`.trim(),
+               customerEmail: customerData?.email,
+               customerPhone: customerData?.telefone,
+               merchantOrderId,
+               paymentId: cieloResponseJson?.Payment?.PaymentId,
+               httpStatus: resCielo.status,
+               endpoint: CIELO_API_URL,
+               rawPayload: safePayload ? { request: safePayload, response: cieloResponseJson || rawText } : (cieloResponseJson || rawText),
+               returnCode: returnCode || `HTTP_${resCielo.status}`,
+               returnMessage: errorMsg,
+               fraudAnalysis: cieloResponseJson?.Payment?.FraudAnalysis
+             }).catch(console.error);
 
              // CMS: reservation.error.<ReturnCode> — mensagem amigável editável pelo admin,
              // sem nomes fixos no código (ex: ReturnCode 129 = "Affiliation not found").
@@ -454,6 +531,23 @@ export async function POST(request: Request) {
             ? `XRS statusCode=${bookResNode.$.statusCode}`
             : '';
           const detail = [xrsMsg, xrsStatusMsg].filter(Boolean).join(' | ');
+          const firstErrCode = errArr?.[0]?.$?.errorCode || errArr?.[0]?.errorCode || bookResNode?.$?.statusCode || 'XRS_BOOK_FAIL';
+
+          await registerFailedTransaction({
+            provider: 'Europcar XRS',
+            paymentMethod: paymentData?.method || 'UNKNOWN',
+            amount: (paymentData?.amountInCents || 0) / 100,
+            customerName: `${customerData?.nome || ''} ${customerData?.sobrenome || ''}`.trim(),
+            customerEmail: customerData?.email,
+            customerPhone: customerData?.telefone,
+            merchantOrderId,
+            paymentId: cieloPaymentId,
+            endpoint: 'XRS bookReservation',
+            rawPayload: xrsResponse,
+            returnCode: firstErrCode,
+            returnMessage: detail || 'Europcar não retornou número de reserva.'
+          }).catch(console.error);
+
           throw new Error(`Europcar não retornou número de reserva.${detail ? ' Motivo: ' + detail : ' Verifique os logs XRS.'}`);
         }
 

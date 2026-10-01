@@ -609,3 +609,79 @@ model CouponAuditLog {
   @@index([action])
   @@index([createdAt])
 }
+
+// ── Módulo Inteligente de Recusas e Vendas Perdidas ──
+model TransactionRejectionLog {
+  id                      String    @id @default(cuid())
+  createdAt               DateTime  @default(now()) @map("created_at")
+  eventId                 String?   @unique @map("event_id")
+  attemptNumber           Int?      @map("attempt_number")
+  customerName            String?   @map("customer_name")
+  customerEmail           String?   @map("customer_email")
+  customerPhone           String?   @map("customer_phone")
+  reservationId           String?   @map("reservation_id")
+  cieloPaymentId          String?   @map("cielo_payment_id")
+  cieloMerchantOrderId    String?   @map("cielo_merchant_order_id")
+  amount                  Decimal   @default(0) @db.Decimal(12, 2)
+  paymentMethod           String?   @map("payment_method")
+  provider                String
+  cardBrand               String?   @map("card_brand")
+  rejectionCategory       String    @map("rejection_category")
+  rejectionType           String?   @map("rejection_type")
+  canRetry                Boolean?  @map("can_retry")
+  returnCodeRaw           String?   @map("return_code_raw")
+  returnCodeNormalized    String?   @map("return_code_normalized")
+  returnMessage           String?   @map("return_message") @db.Text
+  dictionaryMessage       String?   @map("dictionary_message") @db.Text
+  customerMessage         String?   @map("customer_message") @db.Text
+  customerFriendlyMessage String?   @map("customer_friendly_message") @db.Text
+  friendlyExplanation     String?   @map("friendly_explanation") @db.Text
+  recommendedAction       String?   @map("recommended_action") @db.Text
+  actionStatus            String?   @map("action_status") @db.Text
+  responsibility          String?   @map("responsibility")
+  rootCause               String?   @map("root_cause") @db.Text
+  aiBehaviorInstruction   String?   @map("ai_behavior_instruction") @db.Text
+  retryPolicyText         String?   @map("retry_policy_text")
+  mappingStatus           String?   @default("MAPPED") @map("mapping_status")
+  mappingConfidence       Decimal?  @map("mapping_confidence") @db.Decimal(5, 2)
+  httpStatus              Int?      @map("http_status")
+  sourceEndpoint          String?   @map("source_endpoint")
+  rawPayload              Json?     @map("raw_payload")
+  fingerprint             String?
+
+  @@index([createdAt], name: "idx_trl_created_at")
+  @@index([provider], name: "idx_trl_provider")
+  @@index([cardBrand, returnCodeNormalized], name: "idx_trl_brand_code")
+  @@index([rejectionCategory], name: "idx_trl_category")
+  @@index([cieloMerchantOrderId], name: "idx_trl_order")
+  @@index([cieloPaymentId], name: "idx_trl_payment")
+  @@map("transaction_rejection_logs")
+}
+
+model RejectionCodeDictionary {
+  id                      String    @id @default(cuid())
+  provider                String?   @default("Cielo")
+  cardBrand               String    @map("card_brand")
+  codeDisplay             String    @map("code_display")
+  codeNormalized          String?   @map("code_normalized")
+  aliases                 Json?
+  rejectionType           String?   @map("rejection_type")
+  technicalMessage        String?   @map("technical_message") @db.Text
+  customerMessage         String?   @map("customer_message") @db.Text
+  rejectionCategory       String?   @map("rejection_category")
+  friendlyExplanation     String?   @map("friendly_explanation") @db.Text
+  recommendedAction       String?   @map("recommended_action") @db.Text
+  actionStatus            String?   @map("action_status") @db.Text
+  responsibility          String?   @map("responsibility")
+  rootCause               String?   @map("root_cause") @db.Text
+  aiBehaviorInstruction   String?   @map("ai_behavior_instruction") @db.Text
+  customerFriendlyMessage String?   @map("customer_friendly_message") @db.Text
+  retryPolicyText         String?   @map("retry_policy_text")
+  active                  Boolean   @default(true)
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@index([cardBrand, codeNormalized], name: "idx_rcd_brand_code")
+  @@map("rejection_code_dictionary")
+}
+
