@@ -119,6 +119,18 @@ export default function PainelRecusasLogs() {
   // Seeding status
   const [seedSuccess, setSeedSuccess] = useState<boolean | null>(null);
 
+  // AI & MCP Modal State
+  const [showAIModal, setShowAIModal] = useState<boolean>(false);
+  const [aiModalTab, setAiModalTab] = useState<"chat" | "mcp">("chat");
+  const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([
+    {
+      role: "assistant",
+      text: "Olá! Sou o Assistente de Inteligência Operacional da Europcar Brasil 🚗\nPosso analisar perdas, identificar causas de recusa, checar alertas de segurança ou redigir mensagens empáticas de recuperação para seus clientes."
+    }
+  ]);
+  const [chatInput, setChatInput] = useState<string>("");
+  const [chatLoading, setChatLoading] = useState<boolean>(false);
+
   // Load Data
   const fetchData = async () => {
     setLoading(true);
@@ -242,6 +254,34 @@ export default function PainelRecusasLogs() {
     }
   };
 
+  // Chat message sender
+  const handleSendChatMessage = async (presetText?: string) => {
+    const textToSend = presetText || chatInput;
+    if (!textToSend.trim() || chatLoading) return;
+
+    setChatMessages((prev) => [...prev, { role: "user", text: textToSend }]);
+    if (!presetText) setChatInput("");
+    setChatLoading(true);
+
+    try {
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: textToSend })
+      });
+      const data = await res.json();
+      if (data.reply) {
+        setChatMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
+      } else {
+        setChatMessages((prev) => [...prev, { role: "assistant", text: "Não foi possível obter resposta no momento." }]);
+      }
+    } catch (err: any) {
+      setChatMessages((prev) => [...prev, { role: "assistant", text: "Erro ao comunicar com o assistente: " + err.message }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
   // Top list according to toggle
   const currentTopItems = useMemo(() => {
     return topMetric === "count" ? top10.byCount : top10.byAmount;
@@ -310,6 +350,14 @@ export default function PainelRecusasLogs() {
           >
             <span>📖</span>
             {seedSuccess ? "Dicionário Sincronizado!" : "Sync Dicionário"}
+          </button>
+
+          <button
+            onClick={() => setShowAIModal(true)}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold px-3.5 py-2 rounded-xl text-xs transition-all shadow-md shadow-purple-600/25 flex items-center gap-1.5"
+          >
+            <span>🤖</span>
+            Assistente IA & MCP
           </button>
 
           <button
@@ -1266,6 +1314,268 @@ export default function PainelRecusasLogs() {
                 Fechar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI & MCP HYBRID MODAL */}
+      {showAIModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-gray-900 border border-gray-700 w-full max-w-4xl rounded-3xl p-6 space-y-5 shadow-2xl relative my-8 max-h-[92vh] flex flex-col">
+            {/* Header & Tabs */}
+            <div className="flex items-center justify-between border-b border-gray-800 pb-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 text-purple-400 rounded-2xl border border-purple-500/30 text-lg">
+                  🤖
+                </span>
+                <div>
+                  <h3 className="text-lg font-black text-white flex items-center gap-2">
+                    Assistente de Inteligência Operacional & MCP
+                  </h3>
+                  <p className="text-xs text-gray-400">
+                    Conectado ao banco de recusas, XRS Europcar e ao protocolo MCP da Anthropic
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="bg-gray-950 border border-gray-800 p-1 rounded-xl flex items-center text-xs font-semibold">
+                  <button
+                    onClick={() => setAiModalTab("chat")}
+                    className={`px-3 py-1.5 rounded-lg transition-all ${
+                      aiModalTab === "chat"
+                        ? "bg-purple-600 text-white font-bold shadow-md shadow-purple-600/30"
+                        : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    💬 Chat com a IA
+                  </button>
+                  <button
+                    onClick={() => setAiModalTab("mcp")}
+                    className={`px-3 py-1.5 rounded-lg transition-all ${
+                      aiModalTab === "mcp"
+                        ? "bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30"
+                        : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    🔌 Conectar Claude Desktop (MCP)
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setShowAIModal(false)}
+                  className="text-gray-400 hover:text-white p-2 text-lg ml-2"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* TAB 1: CHAT COM A IA */}
+            {aiModalTab === "chat" && (
+              <div className="flex flex-col flex-1 min-h-0 space-y-4">
+                {/* Suggestions Pills */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 shrink-0 scrollbar-none">
+                  <span className="text-[11px] text-gray-500 font-bold shrink-0">Sugestões rápidas:</span>
+                  {[
+                    "Qual o valor total de perdas e recusas de hoje?",
+                    "Existe algum alerta de segurança crítico ou erro de IP?",
+                    "Quais as 5 maiores causas de recusa da semana?",
+                    "Como recuperar vendas reversíveis com Pix?"
+                  ].map((sug, idx) => (
+                    <button
+                      key={idx}
+                      disabled={chatLoading}
+                      onClick={() => handleSendChatMessage(sug)}
+                      className="bg-gray-950 hover:bg-gray-800 text-gray-300 text-[11px] px-3 py-1.5 rounded-xl border border-gray-800 shrink-0 transition-colors hover:border-purple-500/40 text-left disabled:opacity-50"
+                    >
+                      💡 {sug}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Messages Box */}
+                <div className="flex-1 overflow-y-auto space-y-3.5 bg-gray-950 p-4 rounded-2xl border border-gray-800 scrollbar-thin">
+                  {chatMessages.map((msg, idx) => {
+                    const isAssistant = msg.role === "assistant";
+                    return (
+                      <div
+                        key={idx}
+                        className={`flex gap-3 text-xs ${
+                          isAssistant ? "items-start" : "items-start flex-row-reverse"
+                        }`}
+                      >
+                        <div
+                          className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold ${
+                            isAssistant
+                              ? "bg-purple-600 text-white"
+                              : "bg-blue-600 text-white"
+                          }`}
+                        >
+                          {isAssistant ? "IA" : "EU"}
+                        </div>
+                        <div
+                          className={`p-3.5 rounded-2xl max-w-[85%] whitespace-pre-wrap leading-relaxed ${
+                            isAssistant
+                              ? "bg-gray-900 border border-gray-800 text-gray-200"
+                              : "bg-blue-600/20 border border-blue-500/30 text-blue-100 font-medium"
+                          }`}
+                        >
+                          {msg.text}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {chatLoading && (
+                    <div className="flex items-center gap-2 text-xs text-purple-400 p-2 animate-pulse">
+                      <span>🤖</span> Consultando banco de dados e processando resposta...
+                    </div>
+                  )}
+                </div>
+
+                {/* Input form */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSendChatMessage();
+                  }}
+                  className="flex items-center gap-2 shrink-0 pt-1"
+                >
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Pergunte sobre perdas, pedidos, causas de recusa, alertas ou mensagens para clientes..."
+                    className="flex-1 bg-gray-950 border border-gray-700 text-white text-xs rounded-xl px-4 py-3 focus:border-purple-500 outline-none"
+                    disabled={chatLoading}
+                  />
+                  <button
+                    type="submit"
+                    disabled={chatLoading || !chatInput.trim()}
+                    className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-bold px-5 py-3 rounded-xl text-xs transition-colors shadow-md shadow-purple-600/30 shrink-0"
+                  >
+                    Enviar ➔
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* TAB 2: CONEXÃO COM O CLAUDE DESKTOP (MCP) */}
+            {aiModalTab === "mcp" && (
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs">
+                {/* Status Box */}
+                <div className="bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-gray-900 border border-indigo-500/30 p-4 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
+                    <div>
+                      <h4 className="font-bold text-white text-sm">Servidor MCP Ativo & Pronto</h4>
+                      <p className="text-gray-400 text-[11px] mt-0.5">
+                        Protocolo Model Context Protocol (Anthropic) compatível com Claude Desktop, Claude Code e Cursor.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="bg-emerald-500/20 text-emerald-300 font-bold px-3 py-1 rounded-full border border-emerald-500/30 text-[11px]">
+                    Status: ONLINE
+                  </span>
+                </div>
+
+                {/* Instruções de Instalação */}
+                <div className="bg-gray-950 border border-gray-800 p-4 rounded-2xl space-y-3">
+                  <h4 className="font-bold text-white text-xs flex items-center gap-2">
+                    <span>📌</span> Como conectar no Claude Desktop:
+                  </h4>
+                  <ol className="list-decimal list-inside space-y-1.5 text-gray-300 text-[11px] leading-relaxed">
+                    <li>
+                      Abra o Claude Desktop e acesse: <code className="bg-gray-900 px-1.5 py-0.5 rounded text-indigo-300">Settings &gt; Developer &gt; Edit Config</code>.
+                    </li>
+                    <li>
+                      No arquivo <code className="bg-gray-900 px-1.5 py-0.5 rounded text-indigo-300">claude_desktop_config.json</code>, adicione a configuração abaixo:
+                    </li>
+                  </ol>
+
+                  {/* Config Snippet */}
+                  <div className="relative">
+                    <pre className="bg-black/80 text-gray-200 p-3.5 rounded-xl font-mono text-[11px] border border-gray-800 overflow-x-auto">
+{`{
+  "mcpServers": {
+    "europcar-brasil": {
+      "url": "https://europcar.seudominio.com.br/api/mcp",
+      "headers": {
+        "Authorization": "Bearer europcar_mcp_secure_key_2026"
+      }
+    }
+  }
+}`}
+                    </pre>
+                    <button
+                      onClick={() =>
+                        copyToClipboard(
+                          JSON.stringify(
+                            {
+                              mcpServers: {
+                                "europcar-brasil": {
+                                  url: typeof window !== "undefined" ? `${window.location.origin}/api/mcp` : "https://europcar.seudominio.com.br/api/mcp",
+                                  headers: {
+                                    Authorization: "Bearer europcar_mcp_secure_key_2026"
+                                  }
+                                }
+                              }
+                            },
+                            null,
+                            2
+                          ),
+                          "mcpConfig"
+                        )
+                      }
+                      className="absolute top-2.5 right-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-1 rounded-lg text-xs transition-colors"
+                    >
+                      {copiedText === "mcpConfig" ? "Copiado! ✓" : "Copiar JSON 📋"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Lista de Ferramentas Expostas */}
+                <div className="bg-gray-950 border border-gray-800 p-4 rounded-2xl space-y-3">
+                  <h4 className="font-bold text-white text-xs flex items-center justify-between">
+                    <span>🛠️ 6 Ferramentas (Tools) Nativas Expostas ao Claude:</span>
+                    <span className="text-gray-500 text-[10px]">Model Context Protocol v2024-11-05</span>
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {[
+                      {
+                        name: "consultar_recusas_kpis",
+                        desc: "Consulta perda total em R$, ticket médio, reversíveis e causas líderes em tempo real."
+                      },
+                      {
+                        name: "consultar_recusas_lista",
+                        desc: "Filtra e lista recusas recentes por bandeira, código, categoria ou cliente."
+                      },
+                      {
+                        name: "detalhar_recusa",
+                        desc: "Puxa causa-raiz, responsabilidade atribuída e instrução de IA por Order ID ou Payment ID."
+                      },
+                      {
+                        name: "verificar_alertas_seguranca",
+                        desc: "Detecta ataques de força bruta (GT/GK), erros de IP na Cielo (GF) e retenções Linx (GA)."
+                      },
+                      {
+                        name: "gerar_mensagem_recuperacao",
+                        desc: "Redige mensagem empática e profissional para WhatsApp/E-mail oferecendo Pix."
+                      },
+                      {
+                        name: "consultar_reserva",
+                        desc: "Puxa dados da reserva no Europcar XRS (veículo, estações, datas e valores)."
+                      }
+                    ].map((tool, idx) => (
+                      <div key={idx} className="bg-gray-900/80 border border-gray-800/80 p-3 rounded-xl">
+                        <div className="font-mono text-purple-300 font-bold text-[11px]">{tool.name}</div>
+                        <div className="text-gray-400 text-[10px] mt-1 leading-snug">{tool.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

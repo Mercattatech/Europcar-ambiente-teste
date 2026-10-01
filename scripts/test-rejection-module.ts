@@ -59,10 +59,10 @@ async function runTests() {
 
   // 3. Código composto / alias
   const visa52 = await matchDictionaryCode({ brand: 'Visa', codeNormalized: '52', rawCode: '52', technicalMessage: 'DÉBITO' });
-  assert(visa52.mappingStatus === 'MAPPED' && visa52.entry?.codeDisplay.includes('52 ou 53'), '3.1 Visa alias 52 de "52 ou 53"');
+  assert(visa52.mappingStatus === 'MAPPED' && (visa52.entry?.codeDisplay?.includes('52 ou 53') ?? false), '3.1 Visa alias 52 de "52 ou 53"');
 
   const master01 = await matchDictionaryCode({ brand: 'Mastercard', codeNormalized: '01', rawCode: '01', technicalMessage: '' });
-  assert(master01.mappingStatus === 'MAPPED' && master01.entry?.codeDisplay.includes('14 ou 01'), '3.2 Master alias 01 de "14 ou 01"');
+  assert(master01.mappingStatus === 'MAPPED' && (master01.entry?.codeDisplay?.includes('14 ou 01') ?? false), '3.2 Master alias 01 de "14 ou 01"');
 
   // 4. Código com * documental
   const elo5C = await matchDictionaryCode({ brand: 'Elo', codeNormalized: '5C', rawCode: '5C', technicalMessage: '' });

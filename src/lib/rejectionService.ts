@@ -292,8 +292,8 @@ export async function ensureRejectionTablesAndSeed(): Promise<{ seededCount: num
  * 3.3 Ordem de resolução e matching do dicionário
  */
 export async function matchDictionaryCode(context: {
-  provider: string;
-  brand: string;
+  provider?: string;
+  brand?: string;
   codeNormalized: string;
   rawCode: string;
   technicalMessage?: string;
@@ -303,7 +303,9 @@ export async function matchDictionaryCode(context: {
   confidence: number;
   entry: Partial<RejectionDictionaryEntry>;
 }> {
-  const { provider, brand, codeNormalized, rawCode, technicalMessage = '', isAntifraud } = context;
+  const provider = context.provider || 'Cielo';
+  const brand = context.brand || 'Cielo/Geral';
+  const { codeNormalized, rawCode, technicalMessage = '', isAntifraud } = context;
 
   // 1. Códigos especiais prioritários: FG, GA, GF, GD, GT, GK
   const specialMatch = resolveSpecialCode(codeNormalized, rawCode);
