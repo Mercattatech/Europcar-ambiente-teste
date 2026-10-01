@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
+import { computeReservationMetrics } from '@/lib/europcar/reservationMetrics';
 
 const ADMIN_EMAILS = ["grupomercatta@gmail.com", "matheus@grupomercatta.com.br", "matheusconti@gmail.com", "matheus@grupomercatta.com"];
 
@@ -19,11 +20,11 @@ export async function GET() {
   }
 
   try {
-    // Busca todas as reservas não-canceladas com valor
+    // Busca todas as reservas não-canceladas com valor (exclui PENDING_PIX não concluído)
     const rawReservations = await prisma.localReservation.findMany({
       where: {
         AND: [
-          { status: { notIn: ['CANCELLED', 'CANCELLED_GREENWAY', 'ON_REQUEST_REJECTED'] } },
+          { status: { notIn: ['CANCELLED', 'CANCELLED_GREENWAY', 'ON_REQUEST_REJECTED', 'PENDING_PIX'] } },
           {
             OR: [
               { operationalStatus: { notIn: ['CC', 'CP', 'TD'] } },
@@ -32,29 +33,24 @@ export async function GET() {
           }
         ]
       },
-      select: { amountInCents: true, customerData: true, createdAt: true },
+      select: { amountInCents: true, status: true, operationalStatus: true, customerData: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
     });
 
-    const reservations = rawReservations.map(r => {
-      let parsed: any = {};
-      try {
-        parsed = typeof r.customerData === 'string' ? JSON.parse(r.customerData) : r.customerData;
-      } catch (e) {}
-      const car = parsed?.booking?.car || {};
-      let amountBRL = 0;
-      if (r.amountInCents && Number(r.amountInCents) > 0) {
-        amountBRL = Number(r.amountInCents) / 100;
-      } else if (car?.totalRateInBookingCurrency && !isNaN(parseFloat(car.totalRateInBookingCurrency))) {
-        amountBRL = parseFloat(car.totalRateInBookingCurrency);
-      } else if (car?.totalRateEstimate && car?.exchangeRate && !isNaN(parseFloat(car.totalRateEstimate)) && !isNaN(parseFloat(car.exchangeRate))) {
-        amountBRL = parseFloat(car.totalRateEstimate) * parseFloat(car.exchangeRate);
-      }
-      return {
-        amountBRL,
-        createdAt: r.createdAt,
-      };
-    });
+    const reservations = rawReservations
+      .map(r => {
+        let parsed: any = {};
+        try {
+          parsed = typeof r.customerData === 'string' ? JSON.parse(r.customerData) : r.customerData;
+        } catch (e) {}
+        const metrics = computeReservationMetrics(r, parsed);
+        return {
+          amountBRL: metrics.amountBRL,
+          isActive: metrics.isActive,
+          createdAt: r.createdAt,
+        };
+      })
+      .filter(r => r.isActive && r.amountBRL > 0);
 
     const now = new Date();
 

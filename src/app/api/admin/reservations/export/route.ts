@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
+import { computeReservationMetrics } from '@/lib/europcar/reservationMetrics';
 export const dynamic = 'force-dynamic';
 
 const ADMIN_EMAILS = ["grupomercatta@gmail.com", "matheus@grupomercatta.com.br", "matheusconti@gmail.com", "matheus@grupomercatta.com"];
@@ -213,37 +214,20 @@ export async function GET(req: Request) {
 
             const booking = parsed?.booking || {};
             const car = booking?.car || {};
-            const isPrepaid = res.status === "CONFIRMED_PREPAID";
             const opStatus = (res as any).operationalStatus || "R";
-            const isCancelled =
-               ["CANCELLED", "CANCELLED_GREENWAY", "ON_REQUEST_REJECTED"].includes(res.status) ||
-               ["CC", "CP", "TD"].includes(opStatus);
+            const metrics = computeReservationMetrics(res, parsed);
+            const totalBRLNum = metrics.amountBRL;
+            const totalEURNum = metrics.amountEUR;
 
-            let totalBRLNum = 0;
-            if (res.amountInCents && Number(res.amountInCents) > 0) {
-               totalBRLNum = Number(res.amountInCents) / 100;
-            } else if (car?.totalRateInBookingCurrency && !isNaN(parseFloat(car.totalRateInBookingCurrency))) {
-               totalBRLNum = parseFloat(car.totalRateInBookingCurrency);
-            } else if (car?.totalRateEstimate && car?.exchangeRate && !isNaN(parseFloat(car.totalRateEstimate)) && !isNaN(parseFloat(car.exchangeRate))) {
-               totalBRLNum = parseFloat(car.totalRateEstimate) * parseFloat(car.exchangeRate);
-            }
-
-            let totalEURNum = 0;
-            if (car?.totalRateEstimate && !isNaN(parseFloat(car.totalRateEstimate))) {
-               totalEURNum = parseFloat(car.totalRateEstimate);
-            } else if (totalBRLNum > 0 && car?.exchangeRate && parseFloat(car.exchangeRate) > 0) {
-               totalEURNum = totalBRLNum / parseFloat(car.exchangeRate);
-            }
-
-            if (isCancelled) {
+            if (metrics.isCancelled) {
                cancelledCount++;
                cancelledTotalEUR += totalEURNum;
                cancelledTotalBRL += totalBRLNum;
-            } else {
+            } else if (metrics.isActive) {
                activeCount++;
                activeTotalEUR += totalEURNum;
                activeTotalBRL += totalBRLNum;
-               if (isPrepaid) activePrepaidBRL += totalBRLNum;
+               if (metrics.isPrepaid) activePrepaidBRL += totalBRLNum;
                else activeCounterBRL += totalBRLNum;
             }
 
@@ -261,8 +245,8 @@ export async function GET(req: Request) {
                totalEURStr,
                "", // Comissão - a ser preenchido manualmente se necessário
                totalBRLStr,
-               isPrepaid && !isCancelled ? totalBRLStr : "",
-               !isPrepaid && !isCancelled ? totalBRLStr : "",
+               metrics.isPrepaid && !metrics.isCancelled ? totalBRLStr : "",
+               !metrics.isPrepaid && !metrics.isCancelled ? totalBRLStr : "",
                getPaymentMethodLabel(res, parsed),
                car?.exchangeRate ? parseFloat(car.exchangeRate).toFixed(4) : "",
                car?.exchangeRate ? "EUR/BRL" : "",
@@ -359,25 +343,14 @@ export async function GET(req: Request) {
             const booking = parsed?.booking || {};
             const car = booking?.car || {};
             const opStatus = (res as any).operationalStatus || "R";
-            const isCancelled =
-               ["CANCELLED", "CANCELLED_GREENWAY", "ON_REQUEST_REJECTED"].includes(res.status) ||
-               ["CC", "CP", "TD"].includes(opStatus);
+            const metrics = computeReservationMetrics(res, parsed);
+            const totalBRLNum = metrics.amountBRL;
+            const daysNum = metrics.days;
 
-            let totalBRLNum = 0;
-            if (res.amountInCents && Number(res.amountInCents) > 0) {
-               totalBRLNum = Number(res.amountInCents) / 100;
-            } else if (car?.totalRateInBookingCurrency && !isNaN(parseFloat(car.totalRateInBookingCurrency))) {
-               totalBRLNum = parseFloat(car.totalRateInBookingCurrency);
-            } else if (car?.totalRateEstimate && car?.exchangeRate && !isNaN(parseFloat(car.totalRateEstimate)) && !isNaN(parseFloat(car.exchangeRate))) {
-               totalBRLNum = parseFloat(car.totalRateEstimate) * parseFloat(car.exchangeRate);
-            }
-
-            const daysNum = booking?.days ? parseInt(booking.days, 10) : 0;
-
-            if (isCancelled) {
+            if (metrics.isCancelled) {
                cancelledCount++;
                cancelledTotalBRL += totalBRLNum;
-            } else {
+            } else if (metrics.isActive) {
                activeCount++;
                activeTotalBRL += totalBRLNum;
                activeTotalDays += daysNum;

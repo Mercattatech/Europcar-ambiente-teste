@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { computeReservationMetrics } from "@/lib/europcar/reservationMetrics";
 
 const OP_STATUS_CONFIG: Record<string, { label: string; description: string; color: string }> = {
    R:  { label: "R",  description: "On Request",       color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/40" },
@@ -32,69 +33,24 @@ function formatTimeBR(timeStr?: string): string {
 
 type ReportTab = "operational" | "financial";
 
-function getReservationMetrics(res: any, parsed: any) {
-   const booking = parsed?.booking || {};
-   const car = booking?.car || {};
-   const opStatus = res.operationalStatus || "R";
-
-   const isCancelled =
-      ["CANCELLED", "CANCELLED_GREENWAY", "ON_REQUEST_REJECTED"].includes(res.status) ||
-      ["CC", "CP", "TD"].includes(opStatus);
-
-   let amountBRL = 0;
-   if (res.amountInCents && Number(res.amountInCents) > 0) {
-      amountBRL = Number(res.amountInCents) / 100;
-   } else if (car?.totalRateInBookingCurrency && !isNaN(parseFloat(car.totalRateInBookingCurrency))) {
-      amountBRL = parseFloat(car.totalRateInBookingCurrency);
-   } else if (car?.totalRateEstimate && car?.exchangeRate && !isNaN(parseFloat(car.totalRateEstimate)) && !isNaN(parseFloat(car.exchangeRate))) {
-      amountBRL = parseFloat(car.totalRateEstimate) * parseFloat(car.exchangeRate);
-   }
-
-   let amountEUR = 0;
-   if (car?.totalRateEstimate && !isNaN(parseFloat(car.totalRateEstimate))) {
-      amountEUR = parseFloat(car.totalRateEstimate);
-   } else if (amountBRL > 0 && car?.exchangeRate && parseFloat(car.exchangeRate) > 0) {
-      amountEUR = amountBRL / parseFloat(car.exchangeRate);
-   }
-
-   const days = booking?.days ? parseInt(booking.days, 10) : 0;
-   const isPrepaid = res.status === "CONFIRMED_PREPAID";
-   const isCounter = res.status === "CONFIRMED_NON_PREPAID";
-
-   const pm = parsed?.paymentMethod || (parsed?.cieloPaymentId && res.status === 'PENDING_PIX' ? 'PIX' : null);
-   const isPixPaid = (res.status === 'CONFIRMED_PREPAID' || res.status === 'CONFIRMED' || res.status === 'ON_REQUEST') && pm === 'PIX';
-   const isPixPending = res.status === 'PENDING_PIX';
-   const isCreditCard = (res.status === 'CONFIRMED_PREPAID' && pm !== 'PIX') || pm === 'CREDIT';
-
-   return {
-      amountBRL,
-      amountEUR,
-      isCancelled,
-      isPrepaid,
-      isCounter,
-      isPixPaid,
-      isPixPending,
-      isCreditCard,
-      days,
-      opStatus,
-   };
-}
-
 function getPaymentBadgeInfo(res: any, metrics: any) {
    if (metrics.isCancelled) {
       return { label: "🚫 Cancelada", badgeClass: "bg-red-500/20 text-red-400 border border-red-500/30" };
    }
+   if (metrics.isPendingPix) {
+      return { label: "⏳ PIX Pendente", badgeClass: "bg-amber-500/20 text-amber-400 border border-amber-500/30" };
+   }
    if (metrics.isPixPaid) {
       return { label: "📱 PIX (Pago)", badgeClass: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" };
-   }
-   if (metrics.isPixPending) {
-      return { label: "⏳ PIX Pendente", badgeClass: "bg-amber-500/20 text-amber-400 border border-amber-500/30" };
    }
    if (metrics.isCreditCard) {
       return { label: "💳 Cartão Crédito", badgeClass: "bg-blue-500/20 text-blue-400 border border-blue-500/30" };
    }
    if (metrics.isCounter) {
       return { label: "🏢 Balcão", badgeClass: "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30" };
+   }
+   if (metrics.isVoucher) {
+      return { label: "📄 Voucher", badgeClass: "bg-purple-500/20 text-purple-400 border border-purple-500/30" };
    }
    return { label: STATUS_LABELS[res.status] || res.status || "—", badgeClass: "bg-gray-700/40 text-gray-400 border border-gray-600/30" };
 }
@@ -199,29 +155,54 @@ export default function PainelRelatorios() {
       try {
          parsed = typeof res.customerData === "string" ? JSON.parse(res.customerData) : res.customerData;
       } catch (e) {}
-      const metrics = getReservationMetrics(res, parsed);
+      const metrics = computeReservationMetrics(res, parsed);
       return { ...res, parsed, metrics };
    });
 
    // Totals calculated strictly from filtered reservations
    const totalFiltered = parsedReservations.length;
-   const activeReservations = parsedReservations.filter(r => !r.metrics.isCancelled);
+   const isPendingPixFilter = paymentStatusFilter === "PENDING_PIX";
+   const isCancelledFilter = paymentStatusFilter === "CANCELLED";
+
+   const activeReservations = parsedReservations.filter(r => r.metrics.isActive);
+   const pendingPixReservations = parsedReservations.filter(r => r.metrics.isPendingPix);
    const cancelledReservations = parsedReservations.filter(r => r.metrics.isCancelled);
 
-   const totalActiveBRL = activeReservations.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
-   const totalActiveEUR = activeReservations.reduce((sum, r) => sum + r.metrics.amountEUR, 0);
-   const totalActivePrepaidBRL = activeReservations.filter(r => r.metrics.isPrepaid).reduce((sum, r) => sum + r.metrics.amountBRL, 0);
-   const totalActivePixBRL = activeReservations.filter(r => r.metrics.isPixPaid).reduce((sum, r) => sum + r.metrics.amountBRL, 0);
-   const totalActiveCreditBRL = activeReservations.filter(r => r.metrics.isCreditCard).reduce((sum, r) => sum + r.metrics.amountBRL, 0);
-   const totalActiveCounterBRL = activeReservations.filter(r => r.metrics.isCounter).reduce((sum, r) => sum + r.metrics.amountBRL, 0);
-   const totalActiveDays = activeReservations.reduce((sum, r) => sum + r.metrics.days, 0);
+   // Target set to display in revenue cards:
+   // If user explicitly filtered by PENDING_PIX, show pending stats
+   // If user explicitly filtered by CANCELLED, show cancelled stats
+   // Otherwise (ALL, CONFIRMED, etc.), show active (realized) sales
+   const targetReservations = isPendingPixFilter
+      ? pendingPixReservations
+      : isCancelledFilter
+      ? cancelledReservations
+      : activeReservations;
 
-   const countActivePix = activeReservations.filter(r => r.metrics.isPixPaid).length;
-   const countActiveCredit = activeReservations.filter(r => r.metrics.isCreditCard).length;
-   const countActiveCounter = activeReservations.filter(r => r.metrics.isCounter).length;
+   const totalActiveBRL = targetReservations.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+   const totalActiveEUR = targetReservations.reduce((sum, r) => sum + r.metrics.amountEUR, 0);
+   const totalActiveDays = targetReservations.reduce((sum, r) => sum + r.metrics.days, 0);
+
+   const totalActivePixBRL = targetReservations
+      .filter(r => r.metrics.isPixPaid || (isPendingPixFilter && r.metrics.isPendingPix))
+      .reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+   const totalActiveCreditBRL = targetReservations
+      .filter(r => r.metrics.isCreditCard)
+      .reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+   const totalActiveCounterBRL = targetReservations
+      .filter(r => r.metrics.isCounter)
+      .reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+   const totalActiveVoucherBRL = targetReservations
+      .filter(r => r.metrics.isVoucher)
+      .reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+
+   const countActivePix = targetReservations.filter(r => r.metrics.isPixPaid || (isPendingPixFilter && r.metrics.isPendingPix)).length;
+   const countActiveCredit = targetReservations.filter(r => r.metrics.isCreditCard).length;
+   const countActiveCounter = targetReservations.filter(r => r.metrics.isCounter).length;
+   const countActiveVoucher = targetReservations.filter(r => r.metrics.isVoucher).length;
 
    const totalCancelledBRL = cancelledReservations.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
    const totalCancelledEUR = cancelledReservations.reduce((sum, r) => sum + r.metrics.amountEUR, 0);
+   const totalPendingPixBRL = pendingPixReservations.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
 
    const countMomentary = activeReservations.filter(r => ["R", "S", "CF"].includes(r.metrics.opStatus)).length;
    const countCheckedOut = activeReservations.filter(r => r.metrics.opStatus === "CO").length;
@@ -380,18 +361,30 @@ export default function PainelRelatorios() {
                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Total Filtradas</p>
                <p className="text-2xl font-black text-white mt-1">{totalFiltered}</p>
                <p className="text-[11px] text-gray-500 mt-1">
-                  <span className="text-emerald-400 font-bold">{activeReservations.length}</span> ativas · <span className="text-red-400 font-bold">{cancelledReservations.length}</span> canceladas
+                  <span className="text-emerald-400 font-bold">{activeReservations.length}</span> ativas
+                  {pendingPixReservations.length > 0 && (
+                     <> · <span className="text-amber-400 font-bold">{pendingPixReservations.length}</span> pend.</>
+                  )}
+                  {cancelledReservations.length > 0 && (
+                     <> · <span className="text-red-400 font-bold">{cancelledReservations.length}</span> canc.</>
+                  )}
                </p>
             </div>
 
-            {/* Card 2: Receita Ativa (BRL) - EXCLUI CANCELADAS */}
+            {/* Card 2: Receita Ativa (BRL) - EXCLUI CANCELADAS E PENDENTES */}
             <div className="bg-gray-900 border border-emerald-900/40 rounded-xl p-4 relative overflow-hidden">
                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Receita Ativa (BRL)</p>
-                  <span className="text-[9px] font-semibold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">Ativas</span>
+                  <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">
+                     {isPendingPixFilter ? "Receita Pendente (BRL)" : isCancelledFilter ? "Receita Cancelada (BRL)" : "Receita Ativa (BRL)"}
+                  </p>
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+                     isPendingPixFilter ? "bg-amber-500/20 text-amber-300" : isCancelledFilter ? "bg-red-500/20 text-red-300" : "bg-emerald-500/20 text-emerald-300"
+                  }`}>
+                     {isPendingPixFilter ? "PIX Pendente" : isCancelledFilter ? "Canceladas" : "Ativas"}
+                  </span>
                </div>
                <p className="text-2xl font-black text-emerald-400 mt-1">
-                  R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                </p>
                <div className="text-[10px] text-gray-400 mt-2 space-y-0.5 border-t border-gray-800/80 pt-1.5 font-medium">
                   <div className="flex justify-between items-center text-emerald-300">
@@ -406,6 +399,12 @@ export default function PainelRelatorios() {
                      <span>🏢 Balcão ({countActiveCounter}):</span>
                      <span>R$ {totalActiveCounterBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
                   </div>
+                  {countActiveVoucher > 0 && (
+                     <div className="flex justify-between items-center text-purple-300">
+                        <span>📄 Voucher ({countActiveVoucher}):</span>
+                        <span>R$ {totalActiveVoucherBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                     </div>
+                  )}
                </div>
             </div>
 
@@ -416,10 +415,10 @@ export default function PainelRelatorios() {
                   <span className="text-[9px] font-semibold bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded">Estimado</span>
                </div>
                <p className="text-2xl font-black text-blue-400 mt-1">
-                  € {totalActiveEUR.toFixed(2)}
+                  € {totalActiveEUR.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                </p>
                <p className="text-[10px] text-gray-500 mt-1">
-                  Ticket Médio: € {activeReservations.length > 0 ? (totalActiveEUR / activeReservations.length).toFixed(2) : "0.00"}
+                  Ticket Médio: € {targetReservations.length > 0 ? (totalActiveEUR / targetReservations.length).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0,00"}
                </p>
             </div>
 
@@ -445,6 +444,11 @@ export default function PainelRelatorios() {
                <p className="text-[10px] text-red-400/80 mt-1 font-medium">
                   R$ {totalCancelledBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} não somado
                </p>
+               {pendingPixReservations.length > 0 && !isPendingPixFilter && (
+                  <p className="text-[9px] text-amber-400/80 mt-0.5">
+                     + {pendingPixReservations.length} PIX pend. (R$ {totalPendingPixBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})
+                  </p>
+               )}
             </div>
          </div>
 
@@ -456,11 +460,11 @@ export default function PainelRelatorios() {
                      {activeTab === "operational" ? "📋 Relatório Operacional" : "💰 Relatório Financeiro"}
                   </p>
                   <p className="text-[10px] text-gray-500">
-                     Mostrando {parsedReservations.length} reservas filtradas ({activeReservations.length} ativas, {cancelledReservations.length} canceladas)
+                     Mostrando {parsedReservations.length} reservas filtradas ({activeReservations.length} ativas, {pendingPixReservations.length} pendentes, {cancelledReservations.length} canceladas)
                   </p>
                </div>
                <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
-                  Soma Ativa: R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  Soma {isPendingPixFilter ? "Pendente" : isCancelledFilter ? "Cancelada" : "Ativa"}: R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                </span>
             </div>
             <div className="overflow-x-auto">
@@ -558,12 +562,15 @@ export default function PainelRelatorios() {
                               </td>
                               <td className="px-4 py-3 text-xs text-gray-300" colSpan={2}>
                                  <span className="text-emerald-400">{activeReservations.length} ativas</span>
+                                 {pendingPixReservations.length > 0 && (
+                                    <span className="text-amber-400 ml-1.5">· {pendingPixReservations.length} pend.</span>
+                                 )}
                                  {cancelledReservations.length > 0 && (
-                                    <span className="text-red-400 ml-2">· {cancelledReservations.length} canceladas</span>
+                                    <span className="text-red-400 ml-1.5">· {cancelledReservations.length} canc.</span>
                                  )}
                               </td>
                               <td className="px-4 py-3 text-xs text-gray-400" colSpan={3}>
-                                 Total Diárias Ativas: <span className="text-white font-bold">{totalActiveDays} dias</span>
+                                 Total Diárias: <span className="text-white font-bold">{totalActiveDays} dias</span>
                               </td>
                               <td className="px-4 py-3 text-xs text-gray-400" colSpan={2}>
                                  {cancelledReservations.length > 0 ? (
@@ -701,17 +708,17 @@ export default function PainelRelatorios() {
                         <tfoot className="bg-gray-800/90 border-t-2 border-gray-700 text-white font-bold">
                            <tr>
                               <td className="px-3 py-3 text-xs uppercase text-gray-300" colSpan={4}>
-                                 TOTAL ATIVO / CONFIRMADO ({activeReservations.length} reservas)
+                                 TOTAL {isPendingPixFilter ? "PENDENTE" : isCancelledFilter ? "CANCELADO" : "ATIVO / CONFIRMADO"} ({targetReservations.length} reservas)
                               </td>
                               <td className="px-3 py-3 text-xs text-right font-black text-blue-400">
-                                 € {totalActiveEUR.toFixed(2)}
+                                 € {totalActiveEUR.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                               <td className="px-3 py-3 text-xs text-right font-black">
                                  <div className="text-emerald-400">
                                     R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                                  </div>
                                  <div className="text-[9px] text-gray-300 font-normal mt-0.5 space-y-0.5">
-                                    <div>📱 PIX: R$ {totalActivePixBRL.toFixed(2)} | 💳 Cartão: R$ {totalActiveCreditBRL.toFixed(2)} | 🏢 Balcão: R$ {totalActiveCounterBRL.toFixed(2)}</div>
+                                    <div>📱 PIX: R$ {totalActivePixBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} | 💳 Cartão: R$ {totalActiveCreditBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} | 🏢 Balcão: R$ {totalActiveCounterBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}{countActiveVoucher > 0 ? ` | 📄 Voucher: R$ ${totalActiveVoucherBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : ""}</div>
                                  </div>
                                  {cancelledReservations.length > 0 && (
                                     <div className="text-[9px] text-red-400 font-normal mt-0.5">

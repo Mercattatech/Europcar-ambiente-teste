@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Fragment } from "react";
+import { computeReservationMetrics } from "@/lib/europcar/reservationMetrics";
 
 // Status de pagamento (existentes)
 const PAYMENT_STATUS_OPTIONS = [
@@ -410,24 +411,15 @@ export default function PainelReservas() {
       }
    };
 
-   const getResBRL = (r: any) => {
-      if (r.amountInCents && Number(r.amountInCents) > 0) return Number(r.amountInCents) / 100;
+   const parsedReservations = reservations.map(r => {
       let parsed: any = {};
       try { parsed = typeof r.customerData === 'string' ? JSON.parse(r.customerData) : r.customerData; } catch(e){}
-      const car = parsed?.booking?.car || {};
-      if (car?.totalRateInBookingCurrency && !isNaN(parseFloat(car.totalRateInBookingCurrency))) {
-         return parseFloat(car.totalRateInBookingCurrency);
-      }
-      if (car?.totalRateEstimate && car?.exchangeRate && !isNaN(parseFloat(car.totalRateEstimate)) && !isNaN(parseFloat(car.exchangeRate))) {
-         return parseFloat(car.totalRateEstimate) * parseFloat(car.exchangeRate);
-      }
-      return 0;
-   };
+      const metrics = computeReservationMetrics(r, parsed);
+      return { ...r, parsed, metrics };
+   });
 
-   const isResCancelled = (r: any) => {
-      const op = r.operationalStatus || "R";
-      return ["CANCELLED", "CANCELLED_GREENWAY", "ON_REQUEST_REJECTED"].includes(r.status) || ["CC", "CP", "TD"].includes(op);
-   };
+   const isPendingPixFilter = statusFilter === "PENDING_PIX";
+   const isCancelledFilter = statusFilter === "CANCELLED" || statusFilter === "CANCELLED_GREENWAY";
 
    const counts: Record<string, number> = { ALL: reservations.length };
    reservations.forEach(r => {
@@ -445,10 +437,19 @@ export default function PainelReservas() {
       else opCounts.DONE++;
    });
 
-   const activeList = reservations.filter(r => !isResCancelled(r));
-   const cancelledList = reservations.filter(r => isResCancelled(r));
-   const totalActiveBRL = activeList.reduce((sum, r) => sum + getResBRL(r), 0);
-   const totalCancelledBRL = cancelledList.reduce((sum, r) => sum + getResBRL(r), 0);
+   const activeList = parsedReservations.filter(r => r.metrics.isActive);
+   const pendingPixList = parsedReservations.filter(r => r.metrics.isPendingPix);
+   const cancelledList = parsedReservations.filter(r => r.metrics.isCancelled);
+
+   const targetList = isPendingPixFilter
+      ? pendingPixList
+      : isCancelledFilter
+      ? cancelledList
+      : activeList;
+
+   const totalActiveBRL = targetList.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+   const totalCancelledBRL = cancelledList.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+   const totalPendingPixBRL = pendingPixList.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
 
    return (
       <div className="space-y-6">
@@ -772,14 +773,22 @@ export default function PainelReservas() {
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-3.5">
                <p className="text-[10px] font-bold text-gray-400 uppercase">Reservas Filtradas</p>
                <p className="text-xl font-black text-white mt-0.5">{reservations.length}</p>
-               <p className="text-[10px] text-gray-500 mt-0.5">{activeList.length} ativas · {cancelledList.length} canceladas</p>
+               <p className="text-[10px] text-gray-500 mt-0.5">
+                  <span className="text-emerald-400 font-bold">{activeList.length}</span> ativas
+                  {pendingPixList.length > 0 && <> · <span className="text-amber-400 font-bold">{pendingPixList.length}</span> pend.</>}
+                  {cancelledList.length > 0 && <> · <span className="text-red-400 font-bold">{cancelledList.length}</span> canc.</>}
+               </p>
             </div>
             <div className="bg-gray-900 border border-emerald-900/30 rounded-xl p-3.5">
-               <p className="text-[10px] font-bold text-emerald-400 uppercase">Receita Ativa (BRL)</p>
+               <p className="text-[10px] font-bold text-emerald-400 uppercase">
+                  {isPendingPixFilter ? "Receita Pendente (BRL)" : isCancelledFilter ? "Receita Cancelada (BRL)" : "Receita Ativa (BRL)"}
+               </p>
                <p className="text-xl font-black text-emerald-400 mt-0.5">
                   R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                </p>
-               <p className="text-[10px] text-gray-500 mt-0.5">Exclui canceladas</p>
+               <p className="text-[10px] text-gray-500 mt-0.5">
+                  {isPendingPixFilter ? "PIX pendente de pagamento" : isCancelledFilter ? "Reservas canceladas" : "Exclui canceladas e pendentes"}
+               </p>
             </div>
             <div className="bg-gray-900 border border-cyan-900/30 rounded-xl p-3.5">
                <p className="text-[10px] font-bold text-cyan-400 uppercase">Em Andamento (R/S/CF)</p>
@@ -789,7 +798,14 @@ export default function PainelReservas() {
             <div className="bg-gray-900 border border-red-900/30 rounded-xl p-3.5">
                <p className="text-[10px] font-bold text-red-400 uppercase">Canceladas</p>
                <p className="text-xl font-black text-red-400 mt-0.5">{cancelledList.length}</p>
-               <p className="text-[10px] text-red-400/80 mt-0.5">R$ {totalCancelledBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} não somado</p>
+               <p className="text-[10px] text-red-400/80 mt-0.5">
+                  R$ {totalCancelledBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} não somado
+                  {pendingPixList.length > 0 && !isPendingPixFilter && (
+                     <span className="block text-amber-400/80 mt-0.5">
+                        + {pendingPixList.length} PIX pend. (R$ {totalPendingPixBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})
+                     </span>
+                  )}
+               </p>
             </div>
          </div>
 
@@ -812,9 +828,7 @@ export default function PainelReservas() {
                   <tbody className="divide-y divide-gray-800/50">
                      {loading && (<tr><td colSpan={8} className="text-center py-10"><div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>)}
                      {!loading && reservations.length === 0 && (<tr><td colSpan={8} className="text-center py-10 text-gray-500">Nenhuma reserva encontrada.</td></tr>)}
-                     {!loading && reservations.map(res => {
-                        let parsed: any = {};
-                        try { parsed = typeof res.customerData === "string" ? JSON.parse(res.customerData) : res.customerData; } catch(e){}
+                     {!loading && parsedReservations.map(({ parsed, metrics, ...res }) => {
                         const isExpanded = expandedRow === res.id;
                         const opStatus = res.operationalStatus || "R";
                         const opConfig = OP_STATUS_CONFIG[opStatus] || OP_STATUS_CONFIG.R;
@@ -837,9 +851,9 @@ export default function PainelReservas() {
                               </td>
                               <td className="px-4 py-4">
                                  <div className="font-bold text-green-400">
-                                    {res.amountInCents ? `R$ ${(res.amountInCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : <span className="text-gray-600 text-xs">—</span>}
+                                    {metrics.amountBRL > 0 ? `R$ ${metrics.amountBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : <span className="text-gray-600 text-xs">—</span>}
                                  </div>
-                                 <div className="text-[10px] text-gray-600">{parsed?.booking?.days ? `${parsed.booking.days} dias` : ''}</div>
+                                 <div className="text-[10px] text-gray-600">{metrics.days ? `${metrics.days} dias` : ''}</div>
                               </td>
 
                               {/* STATUS OPERACIONAL */}
@@ -1054,8 +1068,8 @@ export default function PainelReservas() {
                                         </div>
                                         <div className="bg-gray-900 rounded-lg p-4 border border-gray-700/50 flex-1 min-w-[200px]">
                                            <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Valores e Pagamento</p>
-                                           <p className="text-gray-300"><strong>Total EUR:</strong> {parsed?.booking?.car?.totalRateEstimate ? `€ ${parseFloat(parsed.booking.car.totalRateEstimate).toFixed(2)}` : "—"}</p>
-                                           <p className="text-gray-300"><strong>Total BRL:</strong> {res.amountInCents ? `R$ ${(res.amountInCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : parsed?.booking?.car?.totalRateInBookingCurrency ? `R$ ${parseFloat(parsed.booking.car.totalRateInBookingCurrency).toFixed(2)}` : "—"}</p>
+                                           <p className="text-gray-300"><strong>Total EUR:</strong> {metrics.amountEUR > 0 ? `€ ${metrics.amountEUR.toFixed(2)}` : "—"}</p>
+                                           <p className="text-gray-300"><strong>Total BRL:</strong> {metrics.amountBRL > 0 ? `R$ ${metrics.amountBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "—"}</p>
                                            <p className="text-gray-300"><strong>Câmbio:</strong> {(() => {
                                               const totalEUR = parseFloat(parsed?.booking?.car?.totalRateEstimate || '0');
                                               const totalBRLraw = res.amountInCents ? res.amountInCents / 100 : parseFloat(parsed?.booking?.car?.totalRateInBookingCurrency || '0');
@@ -1150,28 +1164,31 @@ export default function PainelReservas() {
                            </td>
                            <td className="px-4 py-3.5 text-xs text-gray-400" colSpan={2}>
                               <span className="text-emerald-400">{activeList.length} ativas</span>
+                              {pendingPixList.length > 0 && (
+                                 <span className="text-amber-400 ml-1.5">· {pendingPixList.length} pend.</span>
+                              )}
                               {cancelledList.length > 0 && (
-                                 <span className="text-red-400 ml-2">· {cancelledList.length} canceladas</span>
+                                 <span className="text-red-400 ml-1.5">· {cancelledList.length} canc.</span>
                               )}
                            </td>
                            <td className="px-4 py-3.5 text-xs font-black">
                               <div className="text-emerald-400">
                                  R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                               </div>
-                              {cancelledList.length > 0 && (
+                              {cancelledList.length > 0 && !isCancelledFilter && (
                                  <div className="text-[10px] text-red-400 font-normal">
                                     (Canc: R$ {totalCancelledBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})
                                  </div>
                               )}
                            </td>
                            <td className="px-4 py-3.5 text-xs text-gray-400" colSpan={4}>
-                              {cancelledList.length > 0 ? (
+                              {cancelledList.length > 0 && !isCancelledFilter ? (
                                  <span className="text-red-400 text-[11px] font-normal">
                                     * Reservas canceladas foram excluídas do total de receita ativa.
                                  </span>
                               ) : (
                                  <span className="text-emerald-400 text-[11px] font-normal">
-                                    * Todas as reservas filtradas são ativas e válidas.
+                                    * Todas as {targetList.length} reservas filtradas são válidas.
                                  </span>
                               )}
                            </td>
