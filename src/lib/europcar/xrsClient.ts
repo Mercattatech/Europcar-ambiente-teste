@@ -218,18 +218,34 @@ function getXRSErrors(parsedData: any): any {
 // XRS Station lookup helpers
 // =============================
 
+export interface StationScheduleInterval {
+  open: string;
+  close: string;
+}
+
+export interface StationScheduleLunchBreak {
+  start: string;
+  end: string;
+}
+
 export interface StationScheduleHour {
   day: string;
+  dayCode?: string;
   dayNumber: number;
   open: string;
   close: string;
   isClosed: boolean;
+  intervals?: StationScheduleInterval[];
+  hasLunchBreak?: boolean;
+  lunchBreak?: StationScheduleLunchBreak | null;
+  display?: string;
 }
 
 export interface StationFeatureDetails {
   has247Return: boolean;
   hasOutOfHours: boolean;
   hasElectricVehicles: boolean;
+  hasLunchBreak?: boolean;
   hasShuttle?: boolean;
   hasDelivery?: boolean;
   hasCollection?: boolean;
@@ -265,6 +281,7 @@ export interface Station {
   has247Return?: boolean;
   hasOutOfHours?: boolean;
   hasElectricVehicles?: boolean;
+  hasLunchBreak?: boolean;
   features?: StationFeatureDetails;
 }
 

@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { callXRS } from '@/lib/europcar/xrsClient';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
+import { parseStationSchedule, parseOpeningHours, parseSpecialSchedule } from '@/lib/europcar/scheduleParser';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const stationCode = (searchParams.get('code') ?? '').trim().toUpperCase();
+  const stationCode = (searchParams.get('code') ?? searchParams.get('stationCode') ?? '').trim().toUpperCase();
 
   if (!stationCode) {
     return NextResponse.json({ error: 'Parâmetro code é obrigatório.' }, { status: 400 });
@@ -144,6 +145,9 @@ export async function GET(request: Request) {
       hours = parseOpeningHours(raw);
     }
 
+    const hasLunchBreak = hours.some(h => Boolean(h.hasLunchBreak));
+    const specialHours = parseSpecialSchedule(schedItems);
+
     // If station is open 24h every day, also flag has247Return
     const isAlwaysOpen247 =
       hours.length >= 7 &&
@@ -176,6 +180,8 @@ export async function GET(request: Request) {
       type:         attrs.prestige === 'Y' || areaType === 'T' ? 'airport' : 'city',
       leadTime:     attrs.leadTime      ?? '',
       hours,
+      hasLunchBreak,
+      specialHours,
       has247Return,
       hasOutOfHours,
       hasElectricVehicles,
@@ -183,6 +189,7 @@ export async function GET(request: Request) {
         has247Return,
         hasOutOfHours,
         hasElectricVehicles,
+        hasLunchBreak,
         hasShuttle,
         hasDelivery,
         hasCollection,
@@ -246,144 +253,3 @@ function sanitizeEmail(raw: string): string {
   return '';
 }
 
-// Order: Segunda a Domingo (standard Brazilian business week display)
-const DAY_ORDER = [
-  { dayNumber: 2, day: 'Seg' },
-  { dayNumber: 3, day: 'Ter' },
-  { dayNumber: 4, day: 'Qua' },
-  { dayNumber: 5, day: 'Qui' },
-  { dayNumber: 6, day: 'Sex' },
-  { dayNumber: 7, day: 'Sáb' },
-  { dayNumber: 1, day: 'Dom' },
-];
-
-/**
- * Parses schedule from XRS getStationSchedule response (<stationDaySched> items).
- */
-function parseStationSchedule(
-  schedItems: any[]
-): { day: string; dayNumber: number; open: string; close: string; isClosed: boolean }[] {
-  if (!schedItems || !schedItems.length) return [];
-
-  const generalScheds = schedItems.filter(s => {
-    const type = (s?.$?.schedType ?? s?.schedType ?? 'G').toUpperCase();
-    return type === 'G';
-  });
-
-  if (!generalScheds.length) return [];
-
-  return DAY_ORDER.map(({ dayNumber, day }) => {
-    const dayMatches = generalScheds.filter(s => {
-      const d = parseInt(s?.$?.dayNumber ?? s?.dayNumber ?? 0, 10);
-      return d === dayNumber;
-    });
-
-    // Prefer regular hours over after-hours item
-    const regular = dayMatches.find(s => (s?.$?.afterHours ?? s?.afterHours) !== 'Y');
-    const item = regular || dayMatches[0];
-
-    if (!item) {
-      return { day, dayNumber, open: '', close: '', isClosed: true };
-    }
-
-    const a = item.$ || item;
-    const isClosed = a.desc === 'CLOSED' || (!a.timeBegin && !a.timeEnd);
-    const open = formatTime(a.timeBegin || '');
-    const close = formatTime(a.timeEnd || '');
-
-    return {
-      day,
-      dayNumber,
-      open: isClosed ? '' : open,
-      close: isClosed ? '' : close,
-      isClosed,
-    };
-  });
-}
-
-/**
- * Fallback parser for older or alternative XRS opening hours structures.
- */
-function parseOpeningHours(raw: any): { day: string; dayNumber: number; open: string; close: string; isClosed: boolean }[] {
-  const result: { day: string; dayNumber: number; open: string; close: string; isClosed: boolean }[] = [];
-
-  // Structure A: <openingHoursList><openingHours day="MON" openTime="08:00" closeTime="20:00"/>
-  const listA = raw?.openingHoursList?.openingHours;
-  if (listA) {
-    const arr = Array.isArray(listA) ? listA : [listA];
-    for (const h of arr) {
-      const a = h.$ || h;
-      if (a.day || a.openTime) {
-        const open = formatTime(a.openTime ?? a.open ?? '');
-        const close = formatTime(a.closeTime ?? a.close ?? '');
-        const isClosed = !open || open === close || open === '00:00' && close === '00:00';
-        result.push({
-          day:       translateDay(a.day ?? a.dayOfWeek ?? ''),
-          dayNumber: getDayNumber(a.day ?? a.dayOfWeek ?? ''),
-          open:      isClosed ? '' : open,
-          close:     isClosed ? '' : close,
-          isClosed,
-        });
-      }
-    }
-    if (result.length) return result;
-  }
-
-  // Structure B: <scheduleList><schedule dayOfWeek="1" openTime="..." closeTime="..."/>
-  const listB = raw?.scheduleList?.schedule;
-  if (listB) {
-    const arr = Array.isArray(listB) ? listB : [listB];
-    for (const h of arr) {
-      const a = h.$ || h;
-      const open = formatTime(a.openTime ?? a.open ?? '');
-      const close = formatTime(a.closeTime ?? a.close ?? '');
-      const isClosed = !open || open === close;
-      result.push({
-        day:       translateDayNumber(String(a.dayOfWeek ?? a.day ?? '')),
-        dayNumber: parseInt(a.dayOfWeek ?? a.day ?? 0, 10),
-        open:      isClosed ? '' : open,
-        close:     isClosed ? '' : close,
-        isClosed,
-      });
-    }
-    if (result.length) return result;
-  }
-
-  return result;
-}
-
-const DAY_MAP: Record<string, string> = {
-  MON: 'Seg', TUE: 'Ter', WED: 'Qua', THU: 'Qui',
-  FRI: 'Sex', SAT: 'Sáb', SUN: 'Dom',
-  MONDAY: 'Seg', TUESDAY: 'Ter', WEDNESDAY: 'Qua', THURSDAY: 'Qui',
-  FRIDAY: 'Sex', SATURDAY: 'Sáb', SUNDAY: 'Dom',
-};
-
-const DAY_NUM_MAP: Record<string, string> = {
-  '1': 'Dom', '2': 'Seg', '3': 'Ter', '4': 'Qua',
-  '5': 'Qui', '6': 'Sex', '7': 'Sáb',
-};
-
-function translateDay(d: string): string {
-  return DAY_MAP[d.toUpperCase()] ?? d;
-}
-
-function translateDayNumber(n: string): string {
-  return DAY_NUM_MAP[n] ?? n;
-}
-
-function getDayNumber(d: string): number {
-  const map: Record<string, number> = {
-    MON: 2, TUE: 3, WED: 4, THU: 5, FRI: 6, SAT: 7, SUN: 1,
-    MONDAY: 2, TUESDAY: 3, WEDNESDAY: 4, THURSDAY: 5, FRIDAY: 6, SATURDAY: 7, SUNDAY: 1,
-  };
-  return map[d.toUpperCase()] ?? 0;
-}
-
-function formatTime(t: string): string {
-  if (!t) return '';
-  const clean = t.replace(':', '');
-  if (clean.length === 4) return `${clean.slice(0, 2)}:${clean.slice(2)}`;
-  if (clean.length === 3) return `0${clean.slice(0, 1)}:${clean.slice(1)}`;
-  return t;
-}

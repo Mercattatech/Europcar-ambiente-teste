@@ -543,6 +543,12 @@ export default function HeroSearchForm() {
                                     <span className="text-xs font-bold text-gray-700">{t('station.transferShuttle')}</span>
                                   </div>
                                 )}
+                                {Boolean(stationDetail?.hasLunchBreak ?? stationDetail?.features?.hasLunchBreak) && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-amber-500 text-sm shrink-0">🥪</span>
+                                    <span className="text-xs font-bold text-gray-700">{t('station.lunchBreak')}</span>
+                                  </div>
+                                )}
                               </div>
                             )}
 
@@ -562,14 +568,25 @@ export default function HeroSearchForm() {
                               ) : stationDetail?.hours?.length ? (
                                 <div className="flex flex-col gap-0 max-h-[160px] overflow-y-auto pr-1">
                                   {stationDetail.hours.map((h: any, i: number) => {
-                                    const isClosed = h.isClosed || !h.open || h.open === h.close || (h.open === '00:00' && h.close === '00:00');
+                                    const isClosed = h.isClosed || (!h.open && (!h.intervals || !h.intervals.length));
+                                    const hasMultipleIntervals = Boolean(h.intervals && h.intervals.length > 1);
                                     return (
-                                      <div key={i} className="flex justify-between items-center text-[11px] py-1 border-b border-gray-50 last:border-0">
+                                      <div key={i} className="flex justify-between items-start text-[11px] py-1 border-b border-gray-50 last:border-0">
                                         <span className="font-bold text-gray-700 w-12 shrink-0 uppercase">{h.day}:</span>
                                         {isClosed ? (
                                           <span className="text-red-500 font-bold">Fechado</span>
+                                        ) : hasMultipleIntervals ? (
+                                          <div className="flex flex-col items-end gap-0.5">
+                                            {h.intervals.map((inv: any, idx: number) => (
+                                              <span key={idx} className="text-gray-700 font-medium whitespace-nowrap">
+                                                {inv.open} - {inv.close}
+                                              </span>
+                                            ))}
+                                          </div>
                                         ) : (
-                                          <span className="text-gray-700 font-medium">{h.open} - {h.close}</span>
+                                          <span className="text-gray-700 font-medium">
+                                            {h.intervals?.[0] ? `${h.intervals[0].open} - ${h.intervals[0].close}` : `${h.open} - ${h.close}`}
+                                          </span>
                                         )}
                                       </div>
                                     );
@@ -577,12 +594,27 @@ export default function HeroSearchForm() {
                                 </div>
                               ) : hoveredStation.hours?.length ? (
                                 <div className="flex flex-col gap-0 max-h-[160px] overflow-y-auto pr-1">
-                                  {hoveredStation.hours.map((h: any, i: number) => (
-                                    <div key={i} className="flex justify-between items-center text-[11px] py-1 border-b border-gray-50 last:border-0">
-                                      <span className="font-bold text-gray-700 w-12 shrink-0 uppercase">{h.day}:</span>
-                                      <span className="text-gray-700 font-medium">{h.hours || (h.open ? `${h.open} - ${h.close}` : 'Consulte')}</span>
-                                    </div>
-                                  ))}
+                                  {hoveredStation.hours.map((h: any, i: number) => {
+                                    const hasMultipleIntervals = Boolean(h.intervals && h.intervals.length > 1);
+                                    return (
+                                      <div key={i} className="flex justify-between items-start text-[11px] py-1 border-b border-gray-50 last:border-0">
+                                        <span className="font-bold text-gray-700 w-12 shrink-0 uppercase">{h.day}:</span>
+                                        {h.isClosed ? (
+                                          <span className="text-red-500 font-bold">Fechado</span>
+                                        ) : hasMultipleIntervals ? (
+                                          <div className="flex flex-col items-end gap-0.5">
+                                            {h.intervals.map((inv: any, idx: number) => (
+                                              <span key={idx} className="text-gray-700 font-medium whitespace-nowrap">
+                                                {inv.open} - {inv.close}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <span className="text-gray-700 font-medium">{h.hours || (h.open ? `${h.open} - ${h.close}` : 'Consulte')}</span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               ) : (
                                 <p className="text-[11px] text-gray-400 italic">Consulte a loja.</p>
@@ -682,9 +714,15 @@ export default function HeroSearchForm() {
                               <span>Devolução fora do horário de funcionamento</span>
                             </div>
                           )}
+                          {Boolean(returnStationDetail?.hasLunchBreak ?? returnStationDetail?.features?.hasLunchBreak) && (
+                            <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-700 font-bold">
+                              <span className="text-sm shrink-0">🥪</span>
+                              <span>{t('station.lunchBreak')}</span>
+                            </div>
+                          )}
 
                           <div className="mt-4">
-                            <div className="flex items-center gap-1.5 mb-2"><svg className="w-3.5 h-3.5 text-[#e67e00]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span className="text-[10px] font-black text-gray-700 uppercase tracking-wider">Horário de Funcionamento</span></div>
+                            <div className="flex items-center gap-1.5 mb-2"><svg className="w-3.5 h-3.5 text-[#e67e00]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span className="text-[10px] font-black text-gray-700 uppercase tracking-wider">{t('station.operatingHours')}</span></div>
                             {loadingReturnDetail ? (
                               <div className="flex gap-1.5 items-center text-[11px] text-gray-400">
                                 <div className="w-3 h-3 border-2 border-[#e67e00] border-t-transparent rounded-full animate-spin"></div>
@@ -693,14 +731,25 @@ export default function HeroSearchForm() {
                             ) : returnStationDetail?.hours?.length ? (
                               <div className="flex flex-col gap-0.5 max-h-[160px] overflow-y-auto pr-1">
                                 {returnStationDetail.hours.map((h: any, i: number) => {
-                                  const isClosed = h.isClosed || !h.open || h.open === h.close || (h.open === '00:00' && h.close === '00:00');
+                                  const isClosed = h.isClosed || (!h.open && (!h.intervals || !h.intervals.length));
+                                  const hasMultipleIntervals = Boolean(h.intervals && h.intervals.length > 1);
                                   return (
-                                    <div key={i} className="flex text-xs w-full justify-between py-0.5 border-b border-gray-100 last:border-0">
+                                    <div key={i} className="flex text-xs w-full justify-between items-start py-0.5 border-b border-gray-100 last:border-0">
                                       <span className="font-bold text-gray-800 w-10 shrink-0 uppercase">{h.day}</span>
                                       {isClosed ? (
                                         <span className="text-red-500 font-bold">Fechado</span>
+                                      ) : hasMultipleIntervals ? (
+                                        <div className="flex flex-col items-end gap-0.5">
+                                          {h.intervals.map((inv: any, idx: number) => (
+                                            <span key={idx} className="text-gray-600 font-medium whitespace-nowrap">
+                                              {inv.open} – {inv.close}
+                                            </span>
+                                          ))}
+                                        </div>
                                       ) : (
-                                        <span className="text-gray-600 font-medium">{h.open} – {h.close}</span>
+                                        <span className="text-gray-600 font-medium">
+                                          {h.intervals?.[0] ? `${h.intervals[0].open} – ${h.intervals[0].close}` : `${h.open} – ${h.close}`}
+                                        </span>
                                       )}
                                     </div>
                                   );
@@ -708,12 +757,27 @@ export default function HeroSearchForm() {
                               </div>
                             ) : hoveredReturnStation.hours?.length ? (
                               <div className="flex flex-col gap-0.5 max-h-[160px] overflow-y-auto pr-1">
-                                {hoveredReturnStation.hours.map((h: any, i: number) => (
-                                  <div key={i} className="flex text-xs w-full justify-between py-0.5 border-b border-gray-100 last:border-0">
-                                    <span className="font-bold text-gray-800 w-10 shrink-0 uppercase">{h.day}</span>
-                                    <span className="text-gray-600 font-medium">{h.hours || (h.open ? `${h.open} – ${h.close}` : 'Consulte')}</span>
-                                  </div>
-                                ))}
+                                {hoveredReturnStation.hours.map((h: any, i: number) => {
+                                  const hasMultipleIntervals = Boolean(h.intervals && h.intervals.length > 1);
+                                  return (
+                                    <div key={i} className="flex text-xs w-full justify-between items-start py-0.5 border-b border-gray-100 last:border-0">
+                                      <span className="font-bold text-gray-800 w-10 shrink-0 uppercase">{h.day}</span>
+                                      {h.isClosed ? (
+                                        <span className="text-red-500 font-bold">Fechado</span>
+                                      ) : hasMultipleIntervals ? (
+                                        <div className="flex flex-col items-end gap-0.5">
+                                          {h.intervals.map((inv: any, idx: number) => (
+                                            <span key={idx} className="text-gray-600 font-medium whitespace-nowrap">
+                                              {inv.open} – {inv.close}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <span className="text-gray-600 font-medium">{h.hours || (h.open ? `${h.open} – ${h.close}` : 'Consulte')}</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             ) : (
                               <p className="text-[11px] text-gray-400 italic">Consulte a loja para informações de horário.</p>

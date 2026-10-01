@@ -91,6 +91,7 @@ export const translations = {
     'station.transferShuttle': 'Transfer / Shuttle',
     'station.operatingHours': 'Horário de atendimento',
     'station.closed': 'Fechado',
+    'station.lunchBreak': 'Possui intervalo de almoço',
 
     // ── Vehicles Page ──
     'vehicles.title': 'Escolha seu veículo',
@@ -285,6 +286,7 @@ export const translations = {
     'station.transferShuttle': 'Transfer / Shuttle',
     'station.operatingHours': 'Operating hours',
     'station.closed': 'Closed',
+    'station.lunchBreak': 'Lunch break closure',
 
     // ── Vehicles Page ──
     'vehicles.title': 'Choose your vehicle',
@@ -479,6 +481,7 @@ export const translations = {
     'station.transferShuttle': 'Transfer / Shuttle',
     'station.operatingHours': 'Horario de atención',
     'station.closed': 'Cerrado',
+    'station.lunchBreak': 'Cierre por almuerzo',
 
     // ── Vehicles Page ──
     'vehicles.title': 'Elige tu vehículo',

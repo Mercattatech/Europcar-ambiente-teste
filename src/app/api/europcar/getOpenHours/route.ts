@@ -1,12 +1,33 @@
 import { NextResponse } from 'next/server';
 import { callXRS } from '@/lib/europcar/xrsClient';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
+import { parseStationSchedule, parseSpecialSchedule } from '@/lib/europcar/scheduleParser';
 export const dynamic = 'force-dynamic';
+
+function processScheduleResponse(xrsResponse: any, stationCode: string) {
+  let schedItems =
+    xrsResponse?.message?.serviceResponse?.openHoursList?.stationDaySched ||
+    xrsResponse?.serviceResponse?.openHoursList?.stationDaySched ||
+    [];
+  if (!Array.isArray(schedItems)) schedItems = schedItems ? [schedItems] : [];
+
+  const hours = parseStationSchedule(schedItems);
+  const hasLunchBreak = hours.some(h => Boolean(h.hasLunchBreak));
+  const specialHours = parseSpecialSchedule(schedItems);
+
+  return {
+    ...xrsResponse,
+    stationCode,
+    hours,
+    hasLunchBreak,
+    specialHours,
+  };
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { stationCode } = body;
+    const stationCode = (body.stationCode || body.code || '').trim().toUpperCase();
 
     if (!stationCode) {
       return NextResponse.json({ error: 'Parâmetro stationCode é obrigatório.' }, { status: 400 });
@@ -34,7 +55,7 @@ export async function POST(request: Request) {
     };
 
     const xrsResponse = await callXRS(xmlRequest, config);
-    return NextResponse.json(xrsResponse);
+    return NextResponse.json(processScheduleResponse(xrsResponse, stationCode));
 
   } catch (error: any) {
     return NextResponse.json(
@@ -75,7 +96,7 @@ export async function GET(request: Request) {
     };
 
     const xrsResponse = await callXRS(xmlRequest, config);
-    return NextResponse.json(xrsResponse);
+    return NextResponse.json(processScheduleResponse(xrsResponse, stationCode));
 
   } catch (error: any) {
     return NextResponse.json(
