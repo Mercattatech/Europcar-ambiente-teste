@@ -1537,11 +1537,31 @@ export default function PainelRecusasLogs() {
                 {/* Lista de Ferramentas Expostas */}
                 <div className="bg-gray-950 border border-gray-800 p-4 rounded-2xl space-y-3">
                   <h4 className="font-bold text-white text-xs flex items-center justify-between">
-                    <span>🛠️ 6 Ferramentas (Tools) Nativas Expostas ao Claude:</span>
+                    <span>🛠️ Ferramentas (Tools) Nativas Expostas ao Claude / MCP:</span>
                     <span className="text-gray-500 text-[10px]">Model Context Protocol v2024-11-05</span>
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                     {[
+                      {
+                        name: "relatorio_vendas",
+                        desc: "Relatório de faturamento total, reservas, divisão Pix vs Cartão vs Balcão e ticket médio."
+                      },
+                      {
+                        name: "consultar_reserva",
+                        desc: "Busca completa de reserva por resNumber, OrderId, cliente ou status."
+                      },
+                      {
+                        name: "cancelar_reserva",
+                        desc: "Cancela no XRS Europcar, atualiza banco, cancela na Cielo e envia e-mail ao cliente."
+                      },
+                      {
+                        name: "alterar_reserva",
+                        desc: "Modifica datas, horários, estações ou categoria de veículo no XRS Europcar."
+                      },
+                      {
+                        name: "reenviar_email_confirmacao",
+                        desc: "Reenvia voucher oficial com proteções, valores e instruções ao cliente."
+                      },
                       {
                         name: "consultar_recusas_kpis",
                         desc: "Consulta perda total em R$, ticket médio, reversíveis e causas líderes em tempo real."
@@ -1563,8 +1583,16 @@ export default function PainelRecusasLogs() {
                         desc: "Redige mensagem empática e profissional para WhatsApp/E-mail oferecendo Pix."
                       },
                       {
-                        name: "consultar_reserva",
-                        desc: "Puxa dados da reserva no Europcar XRS (veículo, estações, datas e valores)."
+                        name: "consultar_cupons",
+                        desc: "Consulta cupons ativos, percentuais de desconto e limites de utilização."
+                      },
+                      {
+                        name: "criar_cupom",
+                        desc: "Cria um novo cupom de desconto promocional no sistema."
+                      },
+                      {
+                        name: "consultar_logs_sistema",
+                        desc: "Inspeciona requisições e respostas brutas da Cielo (LogCielo) e XRS (LogXRS)."
                       }
                     ].map((tool, idx) => (
                       <div key={idx} className="bg-gray-900/80 border border-gray-800/80 p-3 rounded-xl">
