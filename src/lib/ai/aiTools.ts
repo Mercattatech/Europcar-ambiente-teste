@@ -115,6 +115,37 @@ export const AI_TOOLS_DEFINITIONS: AIToolDefinition[] = [
       required: ['resNumber']
     }
   },
+  {
+    name: 'listar_reservas',
+    description: 'Lista as reservas criadas em um intervalo de datas (horário de Brasília), com filtros opcionais por status e forma de pagamento. Retorna por reserva: número, OrderId, data/hora de criação, estação de retirada, data de checkout (retirada), forma de pagamento, status e valor em R$, além do total somado.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        dataInicial: {
+          type: 'string',
+          description: 'Data inicial de criação da reserva, inclusiva (YYYY-MM-DD ou DD/MM/YYYY). Ex: 2026-09-25'
+        },
+        dataFinal: {
+          type: 'string',
+          description: 'Data final de criação da reserva, inclusiva (YYYY-MM-DD ou DD/MM/YYYY). Se omitida, usa a mesma da dataInicial (um único dia).'
+        },
+        status: {
+          type: 'string',
+          description: 'Filtrar por status (ex: CONFIRMED, CANCELLED, ON_REQUEST, PENDING, PAID). Busca parcial: "CONFIRMED" inclui CONFIRMED_PREPAID. Padrão: ALL'
+        },
+        paymentMethod: {
+          type: 'string',
+          enum: ['ALL', 'PIX', 'CREDIT', 'BALCAO', 'VOUCHER'],
+          description: 'Filtrar por forma de pagamento (padrão: ALL)'
+        },
+        limit: {
+          type: 'number',
+          description: 'Quantidade máxima de reservas a retornar (máximo 500, padrão: 200)'
+        }
+      },
+      required: ['dataInicial']
+    }
+  },
 
   // ── 2. RELATÓRIOS & ANALYTICS DE VENDAS ──
   {
@@ -126,7 +157,15 @@ export const AI_TOOLS_DEFINITIONS: AIToolDefinition[] = [
         period: {
           type: 'string',
           enum: ['today', 'yesterday', '7d', '30d', 'all'],
-          description: 'Período do relatório (padrão: "30d")'
+          description: 'Período do relatório (padrão: "30d"). Ignorado quando dataInicial é informada.'
+        },
+        dataInicial: {
+          type: 'string',
+          description: 'Data inicial personalizada, inclusiva (YYYY-MM-DD ou DD/MM/YYYY, horário de Brasília). Substitui "period".'
+        },
+        dataFinal: {
+          type: 'string',
+          description: 'Data final personalizada, inclusiva (YYYY-MM-DD ou DD/MM/YYYY). Se omitida, usa a mesma da dataInicial.'
         },
         paymentMethod: {
           type: 'string',
@@ -306,11 +345,19 @@ export const AI_TOOLS_DEFINITIONS: AIToolDefinition[] = [
         },
         search: {
           type: 'string',
-          description: 'Termo para busca dentro do payload ou resposta'
+          description: 'Termo para busca dentro do payload ou resposta (ex: número da reserva, OrderId, e-mail)'
+        },
+        dataInicial: {
+          type: 'string',
+          description: 'Data inicial dos logs, inclusiva (YYYY-MM-DD ou DD/MM/YYYY, horário de Brasília). Opcional.'
+        },
+        dataFinal: {
+          type: 'string',
+          description: 'Data final dos logs, inclusiva (YYYY-MM-DD ou DD/MM/YYYY). Se omitida, usa a mesma da dataInicial.'
         },
         limit: {
           type: 'number',
-          description: 'Quantidade máxima de logs a retornar (padrão: 10)'
+          description: 'Quantidade máxima de logs a retornar (padrão: 10, máximo 25)'
         }
       }
     }
@@ -332,6 +379,39 @@ function getPeriodDate(period?: string): Date | undefined {
     return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   }
   return undefined;
+}
+
+/**
+ * Converte "YYYY-MM-DD" ou "DD/MM/YYYY" em {y, m, d}.
+ */
+function parseDateInput(value: string): { y: number; m: number; d: number } | null {
+  const v = String(value || '').trim();
+  let match = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return { y: Number(match[1]), m: Number(match[2]), d: Number(match[3]) };
+  match = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (match) return { y: Number(match[3]), m: Number(match[2]), d: Number(match[1]) };
+  return null;
+}
+
+/**
+ * Intervalo [gte, lt) em UTC correspondente aos dias inteiros no horário de Brasília (UTC-3).
+ * Retorna undefined quando dataInicial não é informada.
+ */
+function getDateRange(dataInicial?: string, dataFinal?: string): { gte: Date; lt: Date } | undefined {
+  if (!dataInicial) return undefined;
+  const ini = parseDateInput(dataInicial);
+  if (!ini) throw new Error(`dataInicial inválida: "${dataInicial}". Use YYYY-MM-DD ou DD/MM/YYYY.`);
+  const fim = dataFinal ? parseDateInput(dataFinal) : ini;
+  if (!fim) throw new Error(`dataFinal inválida: "${dataFinal}". Use YYYY-MM-DD ou DD/MM/YYYY.`);
+
+  const gte = new Date(Date.UTC(ini.y, ini.m - 1, ini.d, 3, 0, 0));
+  const lt = new Date(Date.UTC(fim.y, fim.m - 1, fim.d + 1, 3, 0, 0));
+  if (lt <= gte) throw new Error('dataFinal deve ser igual ou posterior à dataInicial.');
+  return { gte, lt };
+}
+
+function formatDateTimeBR(date: Date): string {
+  return date.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 }
 
 /**
@@ -426,6 +506,70 @@ export async function executeAITool(toolName: string, args: Record<string, any>)
           responseXml: l.xmlResponse
         })),
         criadoEm: reserva.createdAt
+      };
+    }
+
+    case 'listar_reservas': {
+      const range = getDateRange(args.dataInicial, args.dataFinal);
+      if (!range) throw new Error('dataInicial é obrigatória (YYYY-MM-DD ou DD/MM/YYYY).');
+
+      const where: any = { createdAt: range };
+      const statusFilter = String(args.status || 'ALL').trim().toUpperCase();
+      if (statusFilter && statusFilter !== 'ALL') {
+        where.status = { contains: statusFilter, mode: 'insensitive' };
+      }
+
+      const reservations = await prisma.localReservation.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        select: {
+          resNumber: true,
+          merchantOrderId: true,
+          status: true,
+          operationalStatus: true,
+          amountInCents: true,
+          customerData: true,
+          createdAt: true
+        }
+      });
+
+      const methodFilter = String(args.paymentMethod || 'ALL').toUpperCase();
+      const limit = Math.min(500, Math.max(1, Number(args.limit) || 200));
+
+      const rows = reservations
+        .map(res => {
+          const cd: any = typeof res.customerData === 'string'
+            ? JSON.parse(res.customerData)
+            : res.customerData || {};
+          const booking = cd.booking || {};
+          return {
+            numeroReserva: res.resNumber || 'Pendente XRS',
+            orderId: res.merchantOrderId,
+            criadoEm: formatDateTimeBR(res.createdAt),
+            estacaoRetirada: booking.pickupStation || '-',
+            dataCheckout: booking.pickupDate || '-',
+            horaCheckout: booking.pickupTime || '-',
+            formaPagamento: String(cd.paymentMethod || 'UNKNOWN').toUpperCase(),
+            status: res.status,
+            statusOperacional: res.operationalStatus,
+            valorBRL: Number(((res.amountInCents || 0) / 100).toFixed(2))
+          };
+        })
+        .filter(r => methodFilter === 'ALL' || r.formaPagamento.includes(methodFilter));
+
+      const valorTotalBRL = rows.reduce((acc, r) => acc + r.valorBRL, 0);
+
+      return {
+        intervalo: {
+          dataInicial: args.dataInicial,
+          dataFinal: args.dataFinal || args.dataInicial,
+          fusoHorario: 'America/Sao_Paulo'
+        },
+        filtros: { status: statusFilter, formaPagamento: methodFilter },
+        totalEncontradas: rows.length,
+        totalRetornadas: Math.min(rows.length, limit),
+        valorTotalBRL: Number(valorTotalBRL.toFixed(2)),
+        reservas: rows.slice(0, limit)
       };
     }
 
@@ -678,9 +822,11 @@ export async function executeAITool(toolName: string, args: Record<string, any>)
     // 2. RELATÓRIOS & ANALYTICS DE VENDAS
     // ═══════════════════════════════════════════════════════════
     case 'relatorio_vendas': {
-      const since = getPeriodDate(args.period || '30d');
+      const customRange = getDateRange(args.dataInicial, args.dataFinal);
+      const since = customRange ? undefined : getPeriodDate(args.period || '30d');
       const where: any = {};
-      if (since) where.createdAt = { gte: since };
+      if (customRange) where.createdAt = customRange;
+      else if (since) where.createdAt = { gte: since };
 
       if (args.status && args.status !== 'ALL') {
         where.status = args.status;
@@ -764,7 +910,9 @@ export async function executeAITool(toolName: string, args: Record<string, any>)
       const avgTicket = activeCount > 0 ? totalAmountBRL / activeCount : 0;
 
       return {
-        periodo: args.period || '30d',
+        periodo: customRange
+          ? `${args.dataInicial} a ${args.dataFinal || args.dataInicial}`
+          : (args.period || '30d'),
         totalReservasCriadas: totalCount,
         faturamentoLiquidoBRL: Number(totalAmountBRL.toFixed(2)),
         ticketMedioBRL: Number(avgTicket.toFixed(2)),
@@ -1166,15 +1314,17 @@ export async function executeAITool(toolName: string, args: Record<string, any>)
     case 'consultar_logs_sistema': {
       const tipo = args.tipo || 'CIELO';
       const limit = Math.min(25, Math.max(1, args.limit || 10));
-      const termo = String(args.termo || args.query || args.resNumber || '').trim();
+      const termo = String(args.search || args.termo || args.query || args.resNumber || '').trim();
+      const logRange = getDateRange(args.dataInicial, args.dataFinal);
 
       if (tipo === 'XRS') {
-        const whereClause = termo ? {
+        const whereClause: any = termo ? {
           OR: [
             { xmlRequest: { contains: termo } },
             { xmlResponse: { contains: termo } }
           ]
         } : {};
+        if (logRange) whereClause.createdAt = logRange;
 
         const xrsLogs = await prisma.logXRS.findMany({
           where: whereClause,
@@ -1195,12 +1345,13 @@ export async function executeAITool(toolName: string, args: Record<string, any>)
         };
       }
 
-      const whereCielo = termo ? {
+      const whereCielo: any = termo ? {
         OR: [
           { payload: { contains: termo } },
           { response: { contains: termo } }
         ]
       } : {};
+      if (logRange) whereCielo.createdAt = logRange;
 
       const cieloLogs = await prisma.logCielo.findMany({
         where: whereCielo,
