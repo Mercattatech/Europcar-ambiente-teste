@@ -233,24 +233,33 @@ export async function POST(request: Request) {
       }
     }
 
-    // Save local reservation record
-    if (paymentData) {
+    // Save local reservation record — always persist, even without paymentData
+    if (resNumber) {
       const resNode =
         xrsResponse?.message?.serviceResponse?.reservation ||
         xrsResponse?.serviceResponse?.reservation;
       const xrsStatusCode = resNode?.$?.statusCode || 'S';
       const isOnRequest = xrsStatusCode === 'R';
 
+      let reservationStatus: string;
+      if (paymentData?.paid) {
+        reservationStatus = 'CONFIRMED_PREPAID';
+      } else if (isOnRequest) {
+        reservationStatus = 'ON_REQUEST';
+      } else {
+        reservationStatus = 'CONFIRMED_NON_PREPAID';
+      }
+
       await prisma.localReservation.create({
         data: {
-          resNumber: resNumber || `LOCAL_${Date.now()}`,
-          merchantOrderId: paymentData.merchantOrderId || `ORDER_${Date.now()}`,
+          resNumber,
+          merchantOrderId: paymentData?.merchantOrderId || `ORDER_${Date.now()}`,
           customerData: JSON.stringify({
             ...driverData,
             contractID: contractID || null,
             carCategory,
           }),
-          status: paymentData.paid ? 'CONFIRMED_PREPAID' : (isOnRequest ? 'ON_REQUEST' : 'CONFIRMED_NON_PREPAID'),
+          status: reservationStatus,
           operationalStatus: xrsStatusCode,
         }
       });
