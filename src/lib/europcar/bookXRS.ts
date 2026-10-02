@@ -47,7 +47,7 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
 <message>
 <serviceRequest serviceCode="getQuote">
 <serviceParameters>
-  <reservation carCategory="${escapeXml(carCategory)}"${contractID ? ` contractID="${escapeXml(contractID)}" type="C"` : ''} chargesDetail="TRE" rateId="${escapeXml(rateId)}">
+  <reservation carCategory="${escapeXml(carCategory)}"${contractID ? ` contractID="${escapeXml(contractID)}" type="C"` : ''} chargesDetail="TRE"${rateId ? ` rateId="${escapeXml(rateId)}"` : ''}>
     <checkout stationID="${escapeXml(pickupStation)}" date="${escapeXml(pickupDate)}" time="${escapeXml(bookingData.pickupTime || '1000')}"/>
     <checkin stationID="${escapeXml(returnStation)}" date="${escapeXml(returnDate)}" time="${escapeXml(bookingData.returnTime || '1000')}"/>
     ${paymentAttrs.meanOfPaymentXml}

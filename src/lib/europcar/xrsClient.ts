@@ -404,7 +404,10 @@ export interface ReadBookingResult {
   carCategory?: string;
   pickupStation?: string;
   pickupDate?: string;
+  pickupTime?: string;
+  returnStation?: string;
   returnDate?: string;
+  returnTime?: string;
   warnings?: any[];
   isRejected?: boolean;
   raw?: any;
@@ -415,6 +418,13 @@ export interface ReadBookingResult {
     currency?: string;
     bookingCurrency?: string;
     basePrice?: string;
+  };
+  driver?: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    country?: string;
   };
 }
 
@@ -484,10 +494,19 @@ export async function readBooking(resNumber: string): Promise<ReadBookingResult>
 
     const attrs = resNode.$ || resNode;
     const statusCode: string = (attrs.statusCode || '').toUpperCase();
-    const carCategory = attrs.carCategory || resNode.vehicleCategory?.$?.code || '';
-    const pickupStation = attrs.pickupStationCode || resNode.checkout?.$?.stationID || attrs.pickupStation || '';
-    const pickupDate = attrs.pickupDate || resNode.checkout?.$?.date || '';
-    const returnDate = attrs.returnDate || resNode.checkin?.$?.date || '';
+    const carCategory = attrs.carCategory || resNode.vehicleCategory?.$?.code || resNode.vehicleCategory?.code || '';
+    
+    // Checkout (retirada)
+    const checkoutNode = resNode.checkout?.$ || resNode.checkout || {};
+    const pickupStation = attrs.pickupStationCode || checkoutNode.stationID || attrs.pickupStation || '';
+    const pickupDate = attrs.pickupDate || checkoutNode.date || '';
+    const pickupTime = attrs.pickupTime || checkoutNode.time || '';
+
+    // Checkin (devolução)
+    const checkinNode = resNode.checkin?.$ || resNode.checkin || {};
+    const returnStation = attrs.returnStationCode || checkinNode.stationID || attrs.returnStation || pickupStation;
+    const returnDate = attrs.returnDate || checkinNode.date || '';
+    const returnTime = attrs.returnTime || checkinNode.time || '';
 
     // Extrair warningList retornado pelo XRS (ex: On-Request recusado pelo backoffice/estação)
     const warningList = resNode?.warningList?.warning ?? null;
@@ -508,6 +527,37 @@ export async function readBooking(resNumber: string): Promise<ReadBookingResult>
       basePrice: quoteNode.basePrice ? String(quoteNode.basePrice) : undefined,
     } : undefined;
 
+    // Driver / Cliente
+    const driverNode =
+      response?.message?.serviceResponse?.driver ||
+      response?.serviceResponse?.driver ||
+      resNode?.driver ||
+      resNode?.driverList?.driver;
+
+    let driver: ReadBookingResult['driver'] = undefined;
+    if (driverNode || attrs.driverFirstName || attrs.firstName) {
+      const dAttrs = driverNode?.$ || driverNode || {};
+      const dFirstName = dAttrs.firstName || attrs.driverFirstName || attrs.firstName || '';
+      const dLastName = dAttrs.lastName || attrs.driverLastName || attrs.lastName || '';
+      const dCountry = dAttrs.countryOfResidence || dAttrs.country || attrs.country || 'BR';
+
+      const addressList = driverNode?.addressList?.address || driverNode?.address;
+      const addr = Array.isArray(addressList) ? addressList[0] : addressList;
+      const emailObj = addr?.emails?.email || driverNode?.emails?.email || attrs.email;
+      const phoneObj = addr?.phones?.phone || driverNode?.phones?.phone || attrs.phone;
+
+      const email = (Array.isArray(emailObj) ? emailObj[0]?.$?.emailAddress || emailObj[0]?.emailAddress : (emailObj?.$?.emailAddress || emailObj?.emailAddress || (typeof emailObj === 'string' ? emailObj : ''))) || (attrs.email || '');
+      const phone = (Array.isArray(phoneObj) ? phoneObj[0]?.$?.phoneNumber || phoneObj[0]?.phoneNumber : (phoneObj?.$?.phoneNumber || phoneObj?.phoneNumber || (typeof phoneObj === 'string' ? phoneObj : ''))) || (attrs.phone || '');
+
+      driver = {
+        firstName: dFirstName || undefined,
+        lastName: dLastName || undefined,
+        email: email || undefined,
+        phone: phone || undefined,
+        country: dCountry || undefined,
+      };
+    }
+
     return {
       found: true,
       resNumber: attrs.resNumber || resNumber,
@@ -516,11 +566,15 @@ export async function readBooking(resNumber: string): Promise<ReadBookingResult>
       carCategory,
       pickupStation,
       pickupDate,
+      pickupTime,
+      returnStation,
       returnDate,
+      returnTime,
       warnings,
       isRejected,
       raw: resNode,
       quote,
+      driver,
     };
   } catch (err: any) {
     return {

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, Fragment } from "react";
 import { computeReservationMetrics } from "@/lib/europcar/reservationMetrics";
@@ -99,6 +99,210 @@ export default function PainelReservas() {
    const [syncLoading, setSyncLoading] = useState(false);
    const [syncResult, setSyncResult] = useState<any | null>(null);
    const [syncingSingle, setSyncingSingle] = useState<string | null>(null);
+
+   // ── Nova Reserva Manual ──
+   const [manualModalOpen, setManualModalOpen] = useState(false);
+   const [manualSaving, setManualSaving] = useState(false);
+   const [manualForm, setManualForm] = useState({
+      nome: '',
+      sobrenome: '',
+      email: '',
+      telefone: '',
+      cpf: '',
+      paisEmissao: 'BR',
+      pickupStation: '',
+      returnStation: '',
+      pickupDate: '',
+      pickupTime: '1000',
+      returnDate: '',
+      returnTime: '1000',
+      carCategory: 'EDMR',
+      carName: '',
+      amountBRL: '',
+      paymentMethod: 'BALCAO',
+      status: 'CONFIRMED_NON_PREPAID',
+      operationalStatus: 'CF',
+      sendToGW: false,
+   });
+
+   // ── Sincronizar / Importar por Nº do GreenWay ──
+   const [syncGWModalOpen, setSyncGWModalOpen] = useState(false);
+   const [syncGWResNumber, setSyncGWResNumber] = useState('');
+   const [syncGWLoading, setSyncGWLoading] = useState(false);
+   const [syncGWSaving, setSyncGWSaving] = useState(false);
+   const [syncGWData, setSyncGWData] = useState<any | null>(null);
+   const [syncGWEditForm, setSyncGWEditForm] = useState({
+      nome: '',
+      sobrenome: '',
+      email: '',
+      telefone: '',
+      cpf: '',
+      paisEmissao: 'BR',
+      pickupStation: '',
+      returnStation: '',
+      pickupDate: '',
+      pickupTime: '1000',
+      returnDate: '',
+      returnTime: '1000',
+      carCategory: '',
+      carName: '',
+      amountBRL: '',
+      paymentMethod: 'BALCAO',
+      operationalStatus: 'CF',
+      status: 'CONFIRMED_NON_PREPAID',
+   });
+
+   const handleOpenManualModal = () => {
+      setManualForm({
+         nome: '',
+         sobrenome: '',
+         email: '',
+         telefone: '',
+         cpf: '',
+         paisEmissao: 'BR',
+         pickupStation: '',
+         returnStation: '',
+         pickupDate: '',
+         pickupTime: '1000',
+         returnDate: '',
+         returnTime: '1000',
+         carCategory: 'EDMR',
+         carName: '',
+         amountBRL: '',
+         paymentMethod: 'BALCAO',
+         status: 'CONFIRMED_NON_PREPAID',
+         operationalStatus: 'CF',
+         sendToGW: false,
+      });
+      setManualModalOpen(true);
+   };
+
+   const handleSaveManual = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!manualForm.nome.trim() || !manualForm.sobrenome.trim() || !manualForm.email.trim()) {
+         return showToast('Preencha nome, sobrenome e e-mail do cliente.', 'error');
+      }
+      if (!manualForm.pickupStation.trim() || !manualForm.pickupDate || !manualForm.returnDate || !manualForm.carCategory.trim()) {
+         return showToast('Preencha os dados da locação (estação, datas e categoria).', 'error');
+      }
+
+      setManualSaving(true);
+      try {
+         const res = await fetch('/api/admin/reservas/cadastrar-manual', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(manualForm),
+         });
+         const data = await res.json();
+         if (!res.ok || data.error) {
+            showToast(`Erro ao cadastrar: ${data.error || 'Falha no servidor'}`, 'error');
+         } else {
+            if (data.gwSent) {
+               showToast(`✅ Reserva criada e enviada ao GreenWay! Nº ${data.gwResNumber}`, 'success');
+            } else if (data.gwError) {
+               showToast(`⚠️ Salva localmente, mas GW retornou: ${data.gwError}`, 'error');
+            } else {
+               showToast('✅ Reserva manual criada com sucesso!', 'success');
+            }
+            setManualModalOpen(false);
+            fetchReservations();
+         }
+      } catch (err: any) {
+         showToast(`Erro de conexão: ${err.message}`, 'error');
+      } finally {
+         setManualSaving(false);
+      }
+   };
+
+   const handleOpenSyncGWModal = () => {
+      setSyncGWResNumber('');
+      setSyncGWData(null);
+      setSyncGWModalOpen(true);
+   };
+
+   const handleSearchInGW = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!syncGWResNumber.trim()) {
+         return showToast('Digite o número da reserva no GreenWay', 'error');
+      }
+
+      setSyncGWLoading(true);
+      setSyncGWData(null);
+      try {
+         const res = await fetch('/api/admin/reservas/consultar-greenway', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ resNumber: syncGWResNumber.trim() }),
+         });
+         const data = await res.json();
+         if (!res.ok || data.error) {
+            showToast(`❌ ${data.error || 'Reserva não encontrada no GreenWay'}`, 'error');
+         } else {
+            setSyncGWData(data);
+            const d = data.data || {};
+            const quoteTotal = d.quote?.totalRateEstimateInBookingCurrency || d.quote?.totalRateEstimate || '';
+            setSyncGWEditForm({
+               nome: d.driver?.firstName || '',
+               sobrenome: d.driver?.lastName || '',
+               email: d.driver?.email || '',
+               telefone: d.driver?.phone || '',
+               cpf: '',
+               paisEmissao: d.driver?.country || 'BR',
+               pickupStation: d.pickupStation || '',
+               returnStation: d.returnStation || d.pickupStation || '',
+               pickupDate: d.pickupDateFormatted || (d.pickupDate?.length === 8 ? `${d.pickupDate.slice(0,4)}-${d.pickupDate.slice(4,6)}-${d.pickupDate.slice(6,8)}` : ''),
+               pickupTime: d.pickupTime || '1000',
+               returnDate: d.returnDateFormatted || (d.returnDate?.length === 8 ? `${d.returnDate.slice(0,4)}-${d.returnDate.slice(4,6)}-${d.returnDate.slice(6,8)}` : ''),
+               returnTime: d.returnTime || '1000',
+               carCategory: d.carCategory || '',
+               carName: d.carCategory || '',
+               amountBRL: quoteTotal,
+               paymentMethod: 'BALCAO',
+               operationalStatus: d.xrsStatusCode || 'CF',
+               status: 'CONFIRMED_NON_PREPAID',
+            });
+            showToast(`✅ Dados da reserva ${d.resNumber} carregados do GreenWay!`, 'success');
+         }
+      } catch (err: any) {
+         showToast(`Erro de conexão: ${err.message}`, 'error');
+      } finally {
+         setSyncGWLoading(false);
+      }
+   };
+
+   const handleSaveImportedFromGW = async () => {
+      if (!syncGWData?.data?.resNumber) return;
+      if (!syncGWEditForm.nome.trim() || !syncGWEditForm.sobrenome.trim() || !syncGWEditForm.email.trim()) {
+         return showToast('Por favor, preencha nome, sobrenome e e-mail do cliente.', 'error');
+      }
+
+      setSyncGWSaving(true);
+      try {
+         const payload = {
+            ...syncGWEditForm,
+            resNumber: syncGWData.data.resNumber,
+            overwriteIfExists: !!syncGWData.alreadyExistsLocally,
+         };
+         const res = await fetch('/api/admin/reservas/cadastrar-manual', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+         });
+         const data = await res.json();
+         if (!res.ok || data.error) {
+            showToast(`Erro ao cadastrar: ${data.error}`, 'error');
+         } else {
+            showToast(`✅ Reserva ${syncGWData.data.resNumber} cadastrada no sistema!`, 'success');
+            setSyncGWModalOpen(false);
+            setSyncGWData(null);
+            fetchReservations();
+         }
+      } catch (err: any) {
+         showToast(`Erro de conexão: ${err.message}`, 'error');
+      } finally {
+         setSyncGWSaving(false);
+      }
+   };
 
    const showToast = (message: string, type: "success" | "error" = "success") => {
       setToast({ message, type });
@@ -314,9 +518,9 @@ export default function PainelReservas() {
    // Reenvia a reserva ao GreenWay (XRS Europcar) manualmente.
    // Útil quando o pagamento foi aprovado mas o bookReservation falhou.
    const handleReenviarXRS = async (reservationId: string) => {
-      if (!confirm("Reenviar esta reserva ao GreenWay (Europcar)? Isso criará uma nova reserva no sistema deles.")) return;
+      if (!confirm("Enviar esta reserva ao GreenWay (Europcar)? Isso criará o registro oficial no sistema Europcar.")) return;
       try {
-         showToast("⏳ Reenviando ao GreenWay...");
+         showToast("⏳ Enviando ao GreenWay...");
          const res = await fetch('/api/admin/reservas/reenviar-xrs', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -675,6 +879,503 @@ export default function PainelReservas() {
             </div>
          )}
 
+         {/* ── Modal: Nova Reserva Manual ── */}
+         {manualModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setManualModalOpen(false)}>
+               <div className="bg-gray-900 border border-emerald-800/40 rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden my-8" onClick={e => e.stopPropagation()}>
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-emerald-950 via-gray-900 to-gray-900 px-6 py-4 flex items-center justify-between border-b border-emerald-800/40">
+                     <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-900/50 border border-emerald-700/50 flex items-center justify-center text-emerald-400">
+                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+                        </div>
+                        <div>
+                           <h2 className="text-white font-bold text-base">Nova Reserva Manual</h2>
+                           <p className="text-emerald-400/80 text-xs">Cadastre manualmente no sistema e envie ao GreenWay (GW)</p>
+                        </div>
+                     </div>
+                     <button onClick={() => setManualModalOpen(false)} className="text-gray-400 hover:text-white transition-colors">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                     </button>
+                  </div>
+
+                  {/* Body Form */}
+                  <form onSubmit={handleSaveManual} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+                     {/* 1. Cliente */}
+                     <div>
+                        <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                           <span>👤</span> Dados do Cliente
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Nome *</label>
+                              <input
+                                 type="text"
+                                 required
+                                 value={manualForm.nome}
+                                 onChange={e => setManualForm(p => ({ ...p, nome: e.target.value }))}
+                                 placeholder="Ex: Carlos"
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Sobrenome *</label>
+                              <input
+                                 type="text"
+                                 required
+                                 value={manualForm.sobrenome}
+                                 onChange={e => setManualForm(p => ({ ...p, sobrenome: e.target.value }))}
+                                 placeholder="Ex: Oliveira"
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">E-mail *</label>
+                              <input
+                                 type="email"
+                                 required
+                                 value={manualForm.email}
+                                 onChange={e => setManualForm(p => ({ ...p, email: e.target.value }))}
+                                 placeholder="cliente@email.com"
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Telefone / WhatsApp</label>
+                              <input
+                                 type="text"
+                                 value={manualForm.telefone}
+                                 onChange={e => setManualForm(p => ({ ...p, telefone: e.target.value }))}
+                                 placeholder="+55 11 99999-9999"
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">CPF / Documento</label>
+                              <input
+                                 type="text"
+                                 value={manualForm.cpf}
+                                 onChange={e => setManualForm(p => ({ ...p, cpf: e.target.value }))}
+                                 placeholder="000.000.000-00"
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">País Emissão</label>
+                              <input
+                                 type="text"
+                                 value={manualForm.paisEmissao}
+                                 onChange={e => setManualForm(p => ({ ...p, paisEmissao: e.target.value.toUpperCase() }))}
+                                 placeholder="BR"
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs font-mono uppercase focus:outline-none focus:border-emerald-500"
+                              />
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* 2. Locação */}
+                     <div className="border-t border-gray-800 pt-4">
+                        <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                           <span>🚗</span> Dados da Locação
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Estação Retirada *</label>
+                              <input
+                                 type="text"
+                                 required
+                                 value={manualForm.pickupStation}
+                                 onChange={e => {
+                                    const val = e.target.value.toUpperCase();
+                                    setManualForm(p => ({ ...p, pickupStation: val, returnStation: p.returnStation ? p.returnStation : val }));
+                                 }}
+                                 placeholder="Ex: LIST01 ou POAO03"
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs font-mono uppercase focus:outline-none focus:border-emerald-500"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Data Retirada *</label>
+                              <input
+                                 type="date"
+                                 required
+                                 value={manualForm.pickupDate}
+                                 onChange={e => setManualForm(p => ({ ...p, pickupDate: e.target.value }))}
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Horário Retirada</label>
+                              <select
+                                 value={manualForm.pickupTime}
+                                 onChange={e => setManualForm(p => ({ ...p, pickupTime: e.target.value }))}
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                              >
+                                 {['0800','0900','1000','1100','1200','1300','1400','1500','1600','1700','1800','1900','2000','2100','2200'].map(t => (
+                                    <option key={t} value={t}>{t.slice(0,2)}:{t.slice(2)}</option>
+                                 ))}
+                              </select>
+                           </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Estação Devolução *</label>
+                              <input
+                                 type="text"
+                                 required
+                                 value={manualForm.returnStation}
+                                 onChange={e => setManualForm(p => ({ ...p, returnStation: e.target.value.toUpperCase() }))}
+                                 placeholder="Ex: LIST01"
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs font-mono uppercase focus:outline-none focus:border-emerald-500"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Data Devolução *</label>
+                              <input
+                                 type="date"
+                                 required
+                                 value={manualForm.returnDate}
+                                 onChange={e => setManualForm(p => ({ ...p, returnDate: e.target.value }))}
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Horário Devolução</label>
+                              <select
+                                 value={manualForm.returnTime}
+                                 onChange={e => setManualForm(p => ({ ...p, returnTime: e.target.value }))}
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                              >
+                                 {['0800','0900','1000','1100','1200','1300','1400','1500','1600','1700','1800','1900','2000','2100','2200'].map(t => (
+                                    <option key={t} value={t}>{t.slice(0,2)}:{t.slice(2)}</option>
+                                 ))}
+                              </select>
+                           </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Categoria Veículo (ACRISS) *</label>
+                              <input
+                                 type="text"
+                                 required
+                                 value={manualForm.carCategory}
+                                 onChange={e => setManualForm(p => ({ ...p, carCategory: e.target.value.toUpperCase() }))}
+                                 placeholder="Ex: EDMR, CDMR, ECMR, IFAR"
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs font-mono uppercase focus:outline-none focus:border-emerald-500"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Nome / Modelo do Carro</label>
+                              <input
+                                 type="text"
+                                 value={manualForm.carName}
+                                 onChange={e => setManualForm(p => ({ ...p, carName: e.target.value }))}
+                                 placeholder="Ex: Fiat 500 ou similar"
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                              />
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* 3. Pagamento e Valores */}
+                     <div className="border-t border-gray-800 pt-4">
+                        <p className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                           <span>💳</span> Valores & Pagamento
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Valor Total (R$)</label>
+                              <input
+                                 type="number"
+                                 step="0.01"
+                                 min="0"
+                                 value={manualForm.amountBRL}
+                                 onChange={e => setManualForm(p => ({ ...p, amountBRL: e.target.value }))}
+                                 placeholder="Ex: 580.00"
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Forma de Pagamento</label>
+                              <select
+                                 value={manualForm.paymentMethod}
+                                 onChange={e => {
+                                    const pm = e.target.value;
+                                    setManualForm(p => ({
+                                       ...p,
+                                       paymentMethod: pm,
+                                       status: pm === 'BALCAO' ? 'CONFIRMED_NON_PREPAID' : (pm === 'PIX' ? 'PENDING_PIX' : 'CONFIRMED_PREPAID')
+                                    }));
+                                 }}
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                              >
+                                 <option value="BALCAO">🏪 Pagar no Balcão (NP)</option>
+                                 <option value="PIX">🔑 PIX</option>
+                                 <option value="CREDIT">💳 Cartão de Crédito Online</option>
+                                 <option value="VOUCHER">🎟️ Voucher / Faturado</option>
+                              </select>
+                           </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Status Operacional</label>
+                              <select
+                                 value={manualForm.operationalStatus}
+                                 onChange={e => setManualForm(p => ({ ...p, operationalStatus: e.target.value }))}
+                                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
+                              >
+                                 <option value="CF">CF — Confirmada (Backoffice)</option>
+                                 <option value="S">S — Sold (Confirmada)</option>
+                                 <option value="R">R — On Request (Sob Consulta)</option>
+                              </select>
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* 4. Enviar ao GW */}
+                     <div className="bg-emerald-950/40 border border-emerald-700/40 rounded-xl p-3.5 flex items-center justify-between gap-3">
+                        <div>
+                           <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                              <span>📤</span> Enviar imediatamente ao GreenWay (GW)
+                           </p>
+                           <p className="text-[11px] text-gray-400 mt-0.5">
+                              Chama o webservice da Europcar para gerar o número oficial de reserva no GreenWay agora.
+                           </p>
+                        </div>
+                        <input
+                           type="checkbox"
+                           checked={manualForm.sendToGW}
+                           onChange={e => setManualForm(p => ({ ...p, sendToGW: e.target.checked }))}
+                           className="w-5 h-5 accent-emerald-500 rounded cursor-pointer"
+                        />
+                     </div>
+
+                     {/* Footer buttons */}
+                     <div className="flex gap-3 pt-3">
+                        <button
+                           type="button"
+                           onClick={() => setManualModalOpen(false)}
+                           className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2.5 rounded-xl text-xs transition-colors"
+                        >
+                           Cancelar
+                        </button>
+                        <button
+                           type="submit"
+                           disabled={manualSaving}
+                           className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40"
+                        >
+                           {manualSaving ? (
+                              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> Salvando...</>
+                           ) : (
+                              <>💾 Salvar Reserva Manual</>
+                           )}
+                        </button>
+                     </div>
+                  </form>
+               </div>
+            </div>
+         )}
+
+         {/* ── Modal: Sincronizar por Nº do GreenWay (Importar) ── */}
+         {syncGWModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setSyncGWModalOpen(false)}>
+               <div className="bg-gray-900 border border-cyan-800/40 rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden my-8" onClick={e => e.stopPropagation()}>
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-cyan-950 via-gray-900 to-gray-900 px-6 py-4 flex items-center justify-between border-b border-cyan-800/40">
+                     <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-cyan-900/50 border border-cyan-700/50 flex items-center justify-center text-cyan-400">
+                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </div>
+                        <div>
+                           <h2 className="text-white font-bold text-base">Sincronizar por Nº do GreenWay</h2>
+                           <p className="text-cyan-400/80 text-xs">Digite o número da reserva no GW para consultar e cadastrar automaticamente</p>
+                        </div>
+                     </div>
+                     <button onClick={() => setSyncGWModalOpen(false)} className="text-gray-400 hover:text-white transition-colors">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                     </button>
+                  </div>
+
+                  {/* Search bar */}
+                  <div className="p-6 space-y-4">
+                     <form onSubmit={handleSearchInGW} className="flex gap-2">
+                        <div className="relative flex-1">
+                           <input
+                              type="text"
+                              value={syncGWResNumber}
+                              onChange={e => setSyncGWResNumber(e.target.value)}
+                              placeholder="Digite o número da reserva no GreenWay (ex: 1207745328)"
+                              className="w-full bg-gray-800 border border-cyan-700/60 rounded-xl px-4 py-3 text-white text-sm font-mono placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                           />
+                        </div>
+                        <button
+                           type="submit"
+                           disabled={syncGWLoading}
+                           className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-bold px-5 py-3 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-cyan-900/30 transition-all shrink-0"
+                        >
+                           {syncGWLoading ? (
+                              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> Buscando...</>
+                           ) : (
+                              <>🔍 Buscar no GW</>
+                           )}
+                        </button>
+                     </form>
+
+                     {/* Loading State */}
+                     {syncGWLoading && (
+                        <div className="py-8 text-center space-y-2">
+                           <div className="w-8 h-8 border-3 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto"/>
+                           <p className="text-xs text-cyan-300 font-medium">Consultando webservice GreenWay Europcar (search.searchbyid)...</p>
+                        </div>
+                     )}
+
+                     {/* Result Details */}
+                     {syncGWData && syncGWData.data && (
+                        <div className="space-y-4 pt-2">
+                           {/* Status banner */}
+                           <div className={`rounded-xl p-3.5 border flex items-center justify-between gap-3 ${syncGWData.alreadyExistsLocally ? 'bg-amber-950/40 border-amber-800/40 text-amber-200' : 'bg-emerald-950/40 border-emerald-800/40 text-emerald-200'}`}>
+                              <div>
+                                 <p className="text-xs font-bold">
+                                    {syncGWData.alreadyExistsLocally ? '⚠️ Reserva já cadastrada no sistema local' : '✅ Reserva encontrada no GreenWay com sucesso!'}
+                                 </p>
+                                 <p className="text-[11px] opacity-80 mt-0.5">
+                                    {syncGWData.alreadyExistsLocally
+                                       ? 'Ao salvar, você atualizará os dados locais com as informações retornadas pelo GreenWay.'
+                                       : 'Confira os dados abaixo e clique em cadastrar para registrar no sistema local.'}
+                                 </p>
+                              </div>
+                              <span className="font-mono font-bold text-xs px-2.5 py-1 rounded bg-black/40 border border-current">
+                                 GW: {syncGWData.data.xrsStatusCode} — {syncGWData.data.xrsStatus}
+                              </span>
+                           </div>
+
+                           {/* Summary Card */}
+                           <div className="bg-gray-800/70 border border-gray-700/60 rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                              <div>
+                                 <p className="text-[10px] text-gray-400 uppercase font-bold">Nº Reserva</p>
+                                 <p className="font-mono font-black text-white text-sm mt-0.5">{syncGWData.data.resNumber}</p>
+                              </div>
+                              <div>
+                                 <p className="text-[10px] text-gray-400 uppercase font-bold">Categoria</p>
+                                 <p className="font-mono font-black text-cyan-400 text-sm mt-0.5">{syncGWData.data.carCategory || '—'}</p>
+                              </div>
+                              <div>
+                                 <p className="text-[10px] text-gray-400 uppercase font-bold">Retirada</p>
+                                 <p className="font-semibold text-white mt-0.5">{syncGWData.data.pickupStation} · {syncGWData.data.pickupDateFormatted || syncGWData.data.pickupDate}</p>
+                              </div>
+                              <div>
+                                 <p className="text-[10px] text-gray-400 uppercase font-bold">Devolução</p>
+                                 <p className="font-semibold text-white mt-0.5">{syncGWData.data.returnStation} · {syncGWData.data.returnDateFormatted || syncGWData.data.returnDate}</p>
+                              </div>
+                           </div>
+
+                           {/* Editable Fields to Confirm */}
+                           <div className="bg-gray-800/40 border border-gray-700/40 rounded-xl p-4 space-y-3">
+                              <p className="text-[11px] font-bold text-gray-300 uppercase tracking-wider">Conferir e Completar Dados para Cadastro</p>
+                              
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                 <div>
+                                    <label className="block text-[10px] font-medium text-gray-400 mb-1">Nome do Cliente *</label>
+                                    <input
+                                       type="text"
+                                       value={syncGWEditForm.nome}
+                                       onChange={e => setSyncGWEditForm(p => ({ ...p, nome: e.target.value }))}
+                                       placeholder="Nome"
+                                       className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-500"
+                                    />
+                                 </div>
+                                 <div>
+                                    <label className="block text-[10px] font-medium text-gray-400 mb-1">Sobrenome *</label>
+                                    <input
+                                       type="text"
+                                       value={syncGWEditForm.sobrenome}
+                                       onChange={e => setSyncGWEditForm(p => ({ ...p, sobrenome: e.target.value }))}
+                                       placeholder="Sobrenome"
+                                       className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-500"
+                                    />
+                                 </div>
+                                 <div>
+                                    <label className="block text-[10px] font-medium text-gray-400 mb-1">E-mail *</label>
+                                    <input
+                                       type="email"
+                                       value={syncGWEditForm.email}
+                                       onChange={e => setSyncGWEditForm(p => ({ ...p, email: e.target.value }))}
+                                       placeholder="cliente@email.com"
+                                       className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-500"
+                                    />
+                                 </div>
+                                 <div>
+                                    <label className="block text-[10px] font-medium text-gray-400 mb-1">Telefone</label>
+                                    <input
+                                       type="text"
+                                       value={syncGWEditForm.telefone}
+                                       onChange={e => setSyncGWEditForm(p => ({ ...p, telefone: e.target.value }))}
+                                       placeholder="+55 11 99999-9999"
+                                       className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-500"
+                                    />
+                                 </div>
+                                 <div>
+                                    <label className="block text-[10px] font-medium text-gray-400 mb-1">Valor Total (R$)</label>
+                                    <input
+                                       type="number"
+                                       step="0.01"
+                                       value={syncGWEditForm.amountBRL}
+                                       onChange={e => setSyncGWEditForm(p => ({ ...p, amountBRL: e.target.value }))}
+                                       placeholder="0.00"
+                                       className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
+                                    />
+                                 </div>
+                                 <div>
+                                    <label className="block text-[10px] font-medium text-gray-400 mb-1">Forma de Pagamento</label>
+                                    <select
+                                       value={syncGWEditForm.paymentMethod}
+                                       onChange={e => {
+                                          const pm = e.target.value;
+                                          setSyncGWEditForm(p => ({
+                                             ...p,
+                                             paymentMethod: pm,
+                                             status: pm === 'BALCAO' ? 'CONFIRMED_NON_PREPAID' : (pm === 'PIX' ? 'PENDING_PIX' : 'CONFIRMED_PREPAID')
+                                          }));
+                                       }}
+                                       className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-500"
+                                    >
+                                       <option value="BALCAO">🏪 Pagar no Balcão (NP)</option>
+                                       <option value="PIX">🔑 PIX</option>
+                                       <option value="CREDIT">💳 Pago Online (Cartão)</option>
+                                       <option value="VOUCHER">🎟️ Voucher / Faturado</option>
+                                    </select>
+                                 </div>
+                              </div>
+                           </div>
+
+                           {/* Action button */}
+                           <div className="flex gap-3 pt-2">
+                              <button
+                                 type="button"
+                                 onClick={() => setSyncGWModalOpen(false)}
+                                 className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2.5 rounded-xl text-xs transition-colors"
+                              >
+                                 Cancelar
+                              </button>
+                              <button
+                                 type="button"
+                                 onClick={handleSaveImportedFromGW}
+                                 disabled={syncGWSaving}
+                                 className="flex-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-cyan-900/40"
+                              >
+                                 {syncGWSaving ? (
+                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> Cadastrando...</>
+                                 ) : (
+                                    <>📥 Cadastrar Reserva Automaticamente</>
+                                 )}
+                              </button>
+                           </div>
+                        </div>
+                     )}
+                  </div>
+               </div>
+            </div>
+         )}
+
          {toast && (
             <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-lg shadow-2xl font-bold text-sm animate-pulse ${toast.type === "success" ? "bg-green-600 text-white" : "bg-red-600 text-white"}`}>
                {toast.message}
@@ -686,28 +1387,46 @@ export default function PainelReservas() {
                <h1 className="text-2xl font-black text-white">Gestão de Reservas</h1>
                <p className="text-gray-400 text-sm mt-1">Todas as reservas do sistema — com controle de status operacional</p>
             </div>
-            <button
-               onClick={async () => {
-                  setSyncLoading(true);
-                  setSyncResult(null);
-                  try {
-                     const res = await fetch('/api/reservas/sync-greenway', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-                     const data = await res.json();
-                     setSyncResult(data);
-                     if (data.changes > 0) fetchReservations();
-                  } catch (e: any) { setSyncResult({ error: e.message }); }
-                  setSyncLoading(false);
-               }}
-               disabled={syncLoading}
-               className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-colors shrink-0"
-            >
-               {syncLoading ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-               ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-               )}
-               🔄 Sincronizar com Greenway
-            </button>
+            <div className="flex items-center gap-2.5 flex-wrap">
+               <button
+                  onClick={handleOpenManualModal}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-900/30 transition-all cursor-pointer"
+               >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+                  Nova Reserva Manual
+               </button>
+
+               <button
+                  onClick={handleOpenSyncGWModal}
+                  className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-cyan-900/30 transition-all cursor-pointer"
+               >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                  Sincronizar por Nº (GW)
+               </button>
+
+               <button
+                  onClick={async () => {
+                     setSyncLoading(true);
+                     setSyncResult(null);
+                     try {
+                        const res = await fetch('/api/reservas/sync-greenway', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+                        const data = await res.json();
+                        setSyncResult(data);
+                        if (data.changes > 0) fetchReservations();
+                     } catch (e: any) { setSyncResult({ error: e.message }); }
+                     setSyncLoading(false);
+                  }}
+                  disabled={syncLoading}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-colors shrink-0"
+               >
+                  {syncLoading ? (
+                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  )}
+                  🔄 Sincronizar com Greenway
+               </button>
+            </div>
          </div>
          {syncResult && (
             <div className={`rounded-xl p-3 text-xs font-medium ${syncResult.error ? 'bg-red-900/20 text-red-400 border border-red-800' : 'bg-green-900/20 text-green-400 border border-green-800'}`}>
@@ -837,8 +1556,16 @@ export default function PainelReservas() {
                            <Fragment key={res.id}>
                               <tr className="hover:bg-gray-800/30 transition-colors group">
                               <td className="px-4 py-4">
-                                 <div className="font-black text-white text-base">{res.resNumber || "—"}</div>
-                                 <div className="text-[10px] text-gray-600 font-mono">{res.merchantOrderId?.slice(0, 12)}...</div>
+                                 {res.resNumber && res.resNumber !== res.merchantOrderId ? (
+                                    <div className="font-black text-white text-base font-mono">{res.resNumber}</div>
+                                 ) : (
+                                    <div className="space-y-1">
+                                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-600/40">
+                                          ✍️ Manual (Sem GW)
+                                       </span>
+                                    </div>
+                                 )}
+                                 <div className="text-[10px] text-gray-500 font-mono mt-0.5">{res.merchantOrderId}</div>
                               </td>
                               <td className="px-4 py-4">
                                  <div className="font-bold text-white">{parsed?.nome || "—"} {parsed?.sobrenome || ""}</div>
@@ -924,9 +1651,9 @@ export default function PainelReservas() {
                                        )}
                                        {/* Botão Reenviar XRS — reserva sem resNumber válido no GreenWay */}
                                        {(!res.resNumber || res.resNumber === res.merchantOrderId || res.resNumber.length <= 5) && res.status !== 'CANCELLED' && (
-                                          <button onClick={() => handleReenviarXRS(res.id)} title="Reenviar esta reserva ao GreenWay (Europcar XRS)" className="text-[9px] bg-orange-600 hover:bg-orange-500 text-white px-2 py-1 rounded w-full flex justify-center items-center gap-1 shadow-sm transition-colors">
+                                          <button onClick={() => handleReenviarXRS(res.id)} title="Enviar esta reserva ao GreenWay (Europcar XRS)" className="text-[9px] bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold px-2 py-1.5 rounded w-full flex justify-center items-center gap-1.5 shadow-sm transition-all cursor-pointer">
                                              <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                                             Reenviar XRS
+                                             📤 Enviar ao GW
                                           </button>
                                        )}
                                     </div>
