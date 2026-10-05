@@ -160,8 +160,17 @@ export async function GET(request: Request) {
            const booking = parsedData.booking || {};
            const totalBRL = (cieloJson.Payment.Amount / 100).toFixed(2).replace('.', ',');
 
-           import('@/lib/emailService').then(({ sendTransactionalEmail }) => {
-              sendTransactionalEmail(parsedData.email, 'RESERVA_SUCESSO', {
+           const _ins: any[] = Array.isArray(booking.xrsInsurances) ? booking.xrsInsurances : [];
+           const _eq: any[] = Array.isArray(booking.xrsEquipment) ? booking.xrsEquipment : [];
+           const _listaProt = _ins.length > 0
+             ? _ins.map((ins: any) => `• ${ins.name || ins.code}${parseFloat(ins.priceBRL || 0) > 0 ? ` — R$ ${parseFloat(ins.priceBRL).toFixed(2).replace('.', ',')}` : ''}`).join('<br/>')
+             : 'Nenhuma proteção adicional selecionada';
+           const _listaExtras = _eq.length > 0
+             ? _eq.map((eq: any) => `• ${eq.icon || '📦'} ${eq.name || eq.code} ×${eq.qty || 1}`).join('<br/>')
+             : 'Nenhum acessório selecionado';
+
+           import('@/lib/emailService').then(async ({ sendTransactionalEmail }) => {
+              const _r = await sendTransactionalEmail(parsedData.email, 'RESERVA_SUCESSO', {
                  NOME: parsedData.nome || '',
                  SOBRENOME: parsedData.sobrenome || '',
                  EMAIL: parsedData.email || '',
@@ -186,10 +195,29 @@ export async function GET(request: Request) {
                  DATA_DEVOLUCAO: fmtDate(booking.returnDate || ''),
                  HORARIO_DEVOLUCAO: fmtTime(booking.returnDate || '') || booking.returnTime || '',
                  LOCAL_DEVOLUCAO: booking.returnStation || booking.pickupStation || '',
-                 LISTA_PROTECOES: '',
-                 LISTA_EXTRAS: '',
-              }).catch(console.error);
-           });
+                 LISTA_PROTECOES: _listaProt,
+                 LISTA_EXTRAS: _listaExtras,
+              });
+              if (!_r.success) {
+                 console.warn(`[pix-status] Template falhou (${_r.error}) — fallback hardcoded.`);
+                 const { sendBookingConfirmation } = await import('@/lib/email/sendBookingConfirmation');
+                 await sendBookingConfirmation({
+                   toEmail: parsedData.email,
+                   customerName: `${parsedData.nome || ''} ${parsedData.sobrenome || ''}`.trim(),
+                   resNumber,
+                   carName: booking.car?.carCategoryName || booking.car?.name || '',
+                   pickupStation: booking.pickupStation || '',
+                   returnStation: booking.returnStation || booking.pickupStation || '',
+                   pickupDate: booking.pickupDate || '',
+                   returnDate: booking.returnDate || '',
+                   paymentMethod: 'PIX',
+                   totalBRL: cieloJson.Payment.Amount / 100,
+                   isOnRequest: isBookingOnRequest,
+                   xrsEquipment: _eq,
+                   extras: _ins.map((i: any) => ({ code: i.code, name: i.name || i.code, qty: 1, priceBRL: parseFloat(i.priceBRL || 0) || 0 })),
+                 });
+              }
+           }).catch(console.error);
         }
      } catch(e){}
 

@@ -876,6 +876,12 @@ export async function POST(request: Request) {
               const qi = xrsInsArr.find((i: any) => i.code === code);
               return { code, name: qi?.name || code, qty, priceBRL: qi?.priceBRL || 0 };
             });
+          // Coberturas contratadas (pré-pago/ETO) enviadas só em xrsInsurances — inclui no e-mail
+          for (const ins of xrsInsArr) {
+            const code = typeof ins === 'string' ? ins : ins?.code;
+            if (!code || extrasArr.some((e: any) => e.code === code)) continue;
+            extrasArr.push({ code, name: ins?.name || code, qty: 1, priceBRL: parseFloat(ins?.priceBRL || 0) || 0 } as any);
+          }
 
           // Formata datas XRS (YYYYMMDD → DD/MM/YYYY)
           const fmtDate = (d: string) => d && d.length >= 8 ? `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}` : d || '';
@@ -979,10 +985,10 @@ export async function POST(request: Request) {
           const tplResult = await sendTransactionalEmail(customerData.email, trigger, emailVars);
           console.log(`[reservas] Email trigger=${trigger} isOnRequest=${isOnRequest} result=`, tplResult.success);
 
-          if (!tplResult.success && tplResult.error === 'Template não encontrado') {
-            // Fallback: nenhum template cadastrado no painel → usa template hardcoded
-            console.warn('[reservas] Template do painel não encontrado para RESERVA_SUCESSO — usando fallback hardcoded.');
-            sendBookingConfirmation({
+          if (!tplResult.success) {
+            // Fallback: template ausente ou envio falhou → usa template hardcoded
+            console.warn(`[reservas] Envio via template falhou (${tplResult.error}) — usando fallback hardcoded.`);
+            await sendBookingConfirmation({
               toEmail: customerData.email,
               customerName: `${customerData.nome} ${customerData.sobrenome}`,
               resNumber: finalResNumber,

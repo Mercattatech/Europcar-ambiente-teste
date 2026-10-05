@@ -277,7 +277,7 @@ export async function sendTestEmail(to: string): Promise<{ success: boolean; pro
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
   <div style="max-width:520px;margin:32px auto;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.08);">
-    <div style="background:#008d36;padding:28px 32px;text-align:center;">
+    <div style="background:#008d36;padding:28px 32px;text-align:center;border-bottom:5px solid #FFD800;">
       <div style="font-size:28px;font-weight:900;font-style:italic;color:#fff;letter-spacing:-1px;">Europcar</div>
       <div style="color:rgba(255,255,255,0.7);font-size:12px;margin-top:4px;">Teste de Configuração de E-mail</div>
     </div>

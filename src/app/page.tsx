@@ -111,7 +111,7 @@ export default function HomePage() {
         {/* Header Navbar */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 lg:px-6 flex justify-between items-center">
           {/* Logo */}
-          <a href="/" className="rounded-b-md overflow-hidden flex items-center justify-center">
+          <a href="/" className="flex items-center justify-center">
             <img src="/logo.jpg" alt="Europcar" className="h-[40px] md:h-[58px] object-contain" />
           </a>
 

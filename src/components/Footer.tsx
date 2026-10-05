@@ -56,7 +56,7 @@ export default function Footer() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-0 md:gap-8">
             {/* Col 1 - Logo + branding */}
             <div className="mb-6 md:mb-0 text-center md:text-left">
-              <img src="/logo.jpg" alt="Europcar" className="h-8 object-contain mb-4 brightness-200 mx-auto md:mx-0" />
+              <img src="/logo.jpg" alt="Europcar" className="h-8 object-contain mb-4 mx-auto md:mx-0" />
               <p className="text-xs leading-relaxed">
                 {t('footer.description')}
               </p>

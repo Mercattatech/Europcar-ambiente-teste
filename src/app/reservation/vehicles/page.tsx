@@ -2375,7 +2375,13 @@ function VehiclesContent() {
                           }).catch(() => {});
                         }
                       } catch {}
-                      window.location.href = "/checkout";
+                      {
+                        const qs = new URLSearchParams(searchParams.toString());
+                        if (selectedCar?.carCode) qs.set("car", String(selectedCar.carCode));
+                        if (selectedCar?.acrissCode) qs.set("acriss", String(selectedCar.acrissCode));
+                        if (selectedTariffType) qs.set("tariff", String(selectedTariffType));
+                        window.location.href = `/checkout?${qs.toString()}`;
+                      }
                     }}
                     className={`font-black py-3 px-4 md:px-6 rounded text-xs md:text-sm whitespace-nowrap transition-colors ${
                       (step3Error || loadingEquipment)
@@ -2484,7 +2490,13 @@ function VehiclesContent() {
                           }).catch(() => {});
                         }
                       } catch {}
-                      window.location.href = "/checkout";
+                      {
+                        const qs = new URLSearchParams(searchParams.toString());
+                        if (selectedCar?.carCode) qs.set("car", String(selectedCar.carCode));
+                        if (selectedCar?.acrissCode) qs.set("acriss", String(selectedCar.acrissCode));
+                        if (selectedTariffType) qs.set("tariff", String(selectedTariffType));
+                        window.location.href = `/checkout?${qs.toString()}`;
+                      }
                     }}
                     className="bg-[#008d36] hover:bg-[#007530] text-white font-black py-4 px-10 rounded-lg text-lg uppercase tracking-wide shadow-lg transition-colors"
                   >

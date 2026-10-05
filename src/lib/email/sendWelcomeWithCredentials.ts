@@ -39,7 +39,7 @@ export async function sendWelcomeWithCredentials({
 
           <!-- Header -->
           <tr>
-            <td style="background:#008d36;padding:28px 32px;text-align:center;">
+            <td style="background:#008d36;padding:28px 32px;text-align:center;border-bottom:5px solid #FFD800;">
               <img src="${siteUrl}/logo.jpg" alt="Europcar Brasil" width="140" style="height:auto;display:block;margin:0 auto;" />
             </td>
           </tr>

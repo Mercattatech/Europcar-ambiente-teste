@@ -75,7 +75,7 @@ export async function sendBookingConfirmation(data: BookingConfirmationData) {
   <div style="max-width:600px;margin:32px auto;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.08);">
 
     <!-- Header -->
-    <div style="background:#008d36;padding:28px 32px;text-align:center;">
+    <div style="background:#008d36;padding:28px 32px;text-align:center;border-bottom:5px solid #FFD800;">
       <div style="font-size:32px;font-weight:900;font-style:italic;color:#fff;letter-spacing:-1px;">Europcar</div>
       <div style="color:rgba(255,255,255,0.7);font-size:13px;margin-top:4px;">europcar.com.br</div>
     </div>
