@@ -70,26 +70,40 @@ export function extractSnapshotFromXrsReservation(raw: any): XrsSnapshot {
   };
 
   // ── Proteções ──────────────────────────────────────────────
+  // No XML do XRS, quote.insuranceList traz TODAS as proteções DISPONÍVEIS para a categoria:
+  //   type="I" → já incluída na tarifa (contratada, preço 0)
+  //   type="O" → opcional; só foi CONTRATADA se existir uma chargeLine com auxK = código
+  //   type="M" → obrigatória
   const insNodes = [
     ...toArray(raw.insuranceList?.insurance),
     ...toArray(raw.quote?.insuranceList?.insurance),
   ];
+  const chargeCodes = new Set<string>();
+  for (const cl of toArray(raw.quote?.chargeList?.chargeLine ?? raw.chargeList?.chargeLine)) {
+    const k = String((cl?.$ || cl || {}).auxK || '').trim().toUpperCase();
+    if (k) chargeCodes.add(k);
+  }
+  const NOT_PROTECTION = /FEE|TAX|VAT|^LAF$|^APF|^APT|^APS|^ASF|^YSC|^HS|RELOC|ONEWAY|DELIVER|COLLECT/;
   const seenIns = new Set<string>();
   for (const node of insNodes) {
     const a = node?.$ || node || {};
     const code = String(a.code || '').trim().toUpperCase();
     if (!code || seenIns.has(code)) continue;
-    const type = String(a.type || '').toUpperCase(); // M=obrigatória, I=incluída, O=opcional
+    const type = String(a.type || '').toUpperCase();
     const isKnownProtection = PROTECTION_CODES.has(code);
-    // Taxas/sobretaxas (aeroporto, alta temporada, LAF...) não são proteções
-    if (!isKnownProtection && !(type === 'O' || type === 'I')) continue;
-    if (!isKnownProtection && /FEE|TAX|VAT|^LAF$|^APF|^APT|^APS|^ASF|^YSC|^HS|RELOC|ONEWAY|DELIVER|COLLECT/.test(code)) continue;
+    // Taxas/sobretaxas (aeroporto, alta temporada, LAF, one-way...) não são proteções
+    if (!isKnownProtection && NOT_PROTECTION.test(code)) continue;
+    // Contratada?
+    const selected = type === 'I' || chargeCodes.has(code) || String(a.includedInTotal || '').toUpperCase() === 'Y';
+    if (!selected) continue;
+    // Código desconhecido só entra se foi de fato cobrado
+    if (!isKnownProtection && !chargeCodes.has(code)) continue;
     if (!isInTotal(a)) continue;
     seenIns.add(code);
     snapshot.insurances.push({
       code,
       name: INSURANCE_NAMES_PT[code] || String(a.descr || '').trim() || code,
-      priceBRL: num(a.rentalPriceInBookingCurrencyAI) || num(a.priceInBookingCurrency),
+      priceBRL: type === 'I' ? 0 : (num(a.rentalPriceInBookingCurrencyAI) || num(a.priceInBookingCurrency)),
     });
   }
 
@@ -126,7 +140,7 @@ export function extractSnapshotFromXrsReservation(raw: any): XrsSnapshot {
     const exch = num(q.exchangeRate) || (totalLocal > 0 && totalBooking > 0 ? totalBooking / totalLocal : 0);
     snapshot.quote = {
       currency: q.currency ? String(q.currency).toUpperCase() : undefined,
-      bookingCurrency: q.bookingCurrency ? String(q.bookingCurrency).toUpperCase() : undefined,
+      bookingCurrency: (q.bookingCurrency || q.bookingCurrencyOfTotalRateEstimate) ? String(q.bookingCurrency || q.bookingCurrencyOfTotalRateEstimate).toUpperCase() : undefined,
       totalLocal,
       totalBooking,
       exchangeRate: exch,
