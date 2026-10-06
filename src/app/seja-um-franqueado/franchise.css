@@ -117,3 +117,9 @@
 @media(max-width:680px){
   .fr .fr-thanks-card{padding:32px 20px}
 }
+
+/* ── Botões de envio (site + WhatsApp) ── */
+.fr .fr-submit-row{display:flex;flex-wrap:wrap;gap:12px}
+.fr .fr-submit-row .fr-btn{flex:1 1 220px}
+.fr .fr-whats{background:#25d366;color:#fff;gap:8px}
+.fr .fr-whats:hover{background:#1ebe5b}

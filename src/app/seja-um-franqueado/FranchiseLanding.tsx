@@ -8,6 +8,9 @@ const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL
 const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 const pct = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
 
+// WhatsApp da equipe de expansão (formato internacional, só dígitos)
+const WHATSAPP_NUMBER = "5511966306951";
+
 interface SimInput { fleet: number; occupancy: number; ticket: number; vehicleCost: number }
 
 // Premissas do simulador (mantidas exatamente como na proposta comercial)
@@ -120,12 +123,19 @@ export default function FranchiseLanding() {
 
   const set = (k: keyof SimInput) => (v: number) => setSim((s) => ({ ...s, [k]: v }));
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  /**
+   * Envia os dados do formulário ao webhook (via /api/franquia/lead).
+   * channel "site"     → botão "Enviar interesse"
+   * channel "whatsapp" → botão "Enviar pelo WhatsApp" (mesmos dados, mesmo webhook; depois abre o WhatsApp)
+   */
+  async function send(form: HTMLFormElement, channel: "site" | "whatsapp") {
     if (status.kind === "sending") return;
-    const form = e.currentTarget;
     const fd = new FormData(form);
     const params = new URLSearchParams(window.location.search);
+    const val = (k: string) => String(fd.get(k) ?? "").trim();
+
+    // O WhatsApp precisa ser aberto DENTRO do clique (senão o navegador bloqueia o pop-up)
+    const waWindow = channel === "whatsapp" ? window.open("", "_blank") : null;
 
     setStatus({ kind: "sending", msg: "Enviando…" });
     try {
@@ -133,15 +143,17 @@ export default function FranchiseLanding() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: fd.get("name"),
-          email: fd.get("email"),
-          phone: fd.get("phone"),
-          city: fd.get("city"),
-          capital: fd.get("capital"),
-          rental: fd.get("rental"),
-          message: fd.get("message"),
-          website: fd.get("website"), // honeypot
+          channel,
+          name: val("name"),
+          email: val("email"),
+          phone: val("phone"),
+          city: val("city"),
+          capital: val("capital"),
+          rental: val("rental"),
+          message: val("message"),
+          website: val("website"), // honeypot
           simulation: sim,
+          pageUrl: window.location.href,
           utm: {
             source: params.get("utm_source") || "",
             medium: params.get("utm_medium") || "",
@@ -151,12 +163,51 @@ export default function FranchiseLanding() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error || "Não foi possível enviar agora.");
+
+      let target = "/seja-um-franqueado/obrigado";
+      if (channel === "whatsapp") {
+        const text = [
+          "Novo interessado na franquia Europcar",
+          "",
+          `Nome: ${val("name")}`,
+          `E-mail: ${val("email")}`,
+          `WhatsApp: ${val("phone")}`,
+          `Cidade: ${val("city")}`,
+          `Capital: ${val("capital")}`,
+          `Já possui locadora: ${val("rental")}`,
+          `Mensagem: ${val("message") || "-"}`,
+          "",
+          "Simulação:",
+          `Frota: ${sim.fleet} | Ocupação: ${sim.occupancy}% | Ticket: ${money.format(sim.ticket)} | Capital/veículo: ${money.format(sim.vehicleCost)}`,
+        ].join("\n");
+        const waUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+        if (waWindow) {
+          waWindow.location.href = waUrl;
+        } else {
+          // Pop-up bloqueado: a página de obrigado oferece o botão para continuar no WhatsApp
+          try { sessionStorage.setItem("franquia_wa_url", waUrl); } catch { /* ignora */ }
+          target += "?canal=whatsapp";
+        }
+      }
+
       form.reset();
       setStatus({ kind: "ok", msg: "Enviado! Redirecionando…" });
-      router.push("/seja-um-franqueado/obrigado");
+      router.push(target);
     } catch (err: any) {
+      waWindow?.close();
       setStatus({ kind: "err", msg: err?.message || "Não foi possível enviar agora. Tente novamente." });
     }
+  }
+
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    send(e.currentTarget, "site");
+  }
+
+  function onWhatsapp(e: React.MouseEvent<HTMLButtonElement>) {
+    const form = e.currentTarget.form;
+    if (!form || !form.reportValidity()) return; // mostra os avisos de campos obrigatórios
+    send(form, "whatsapp");
   }
 
   return (
@@ -307,9 +358,17 @@ export default function FranchiseLanding() {
             <label className="fr-full"><span>Mensagem opcional</span><textarea name="message" rows={4} maxLength={1000} /></label>
             {/* Honeypot anti-robô: invisível para pessoas */}
             <input className="fr-hp" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" />
-            <button className="fr-btn fr-primary fr-full" type="submit" disabled={status.kind === "sending"}>
-              {status.kind === "sending" ? "Enviando…" : "Enviar interesse"}
-            </button>
+            <div className="fr-submit-row fr-full">
+              <button className="fr-btn fr-primary" type="submit" disabled={status.kind === "sending"}>
+                {status.kind === "sending" ? "Enviando…" : "Enviar interesse"}
+              </button>
+              <button className="fr-btn fr-whats" type="button" onClick={onWhatsapp} disabled={status.kind === "sending"}>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                  <path d="M12.04 2a9.9 9.9 0 0 0-8.46 15.02L2 22l5.1-1.34A9.9 9.9 0 1 0 12.04 2zm5.8 14.1c-.25.7-1.45 1.34-2 1.4-.52.06-1.17.08-1.9-.12-.44-.14-1-.33-1.73-.64-3.04-1.3-5.02-4.35-5.17-4.55-.15-.2-1.23-1.63-1.23-3.1 0-1.48.77-2.2 1.04-2.5.27-.3.6-.37.8-.37h.58c.18 0 .43-.07.67.5.25.6.85 2.07.92 2.22.08.15.13.33.03.52-.1.2-.15.32-.3.5-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.3.77 1.26 1.65 2.04 1.13 1 2.09 1.32 2.39 1.47.3.15.47.12.65-.07.17-.2.75-.87.95-1.17.2-.3.4-.25.67-.15.27.1 1.73.82 2.03.97.3.15.5.22.57.35.08.12.08.72-.17 1.42z"/>
+                </svg>
+                Enviar pelo WhatsApp
+              </button>
+            </div>
             <p className={`fr-status ${status.kind === "ok" ? "fr-ok" : status.kind === "err" ? "fr-err" : ""}`} role="status" aria-live="polite">
               {status.msg}
             </p>

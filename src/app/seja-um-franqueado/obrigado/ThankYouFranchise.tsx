@@ -9,6 +9,21 @@ const SECONDS = 10;
 export default function ThankYouFranchise() {
   const [left, setLeft] = useState(SECONDS);
   const [paused, setPaused] = useState(false);
+  const [waUrl, setWaUrl] = useState<string | null>(null);
+
+  // Fallback: popup do WhatsApp bloqueado no envio → oferece o link e pausa o redirecionamento
+  useEffect(() => {
+    try {
+      const canal = new URLSearchParams(window.location.search).get("canal");
+      const url = sessionStorage.getItem("franquia_wa_url");
+      if (canal === "whatsapp" && url && url.startsWith("https://wa.me/")) {
+        setWaUrl(url);
+        setPaused(true);
+      }
+    } catch {
+      /* ignora */
+    }
+  }, []);
 
   // Contagem regressiva → redireciona para o site da Europcar
   useEffect(() => {
@@ -57,6 +72,11 @@ export default function ThankYouFranchise() {
               : `Você será levado ao site da Europcar em ${left}s…`}
           </p>
           <div className="fr-actions fr-center">
+            {waUrl && (
+              <a className="fr-btn fr-whats" href={waUrl} target="_blank" rel="noopener noreferrer">
+                Continuar no WhatsApp
+              </a>
+            )}
             <a className="fr-btn fr-primary" href={SITE_URL}>Ir para o site da Europcar agora</a>
             <button className="fr-btn fr-darkbtn" type="button" onClick={() => setPaused((p) => !p)}>
               {paused ? "Retomar redirecionamento" : "Permanecer nesta página"}

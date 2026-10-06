@@ -5,14 +5,15 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/franquia/lead
  *
- * Recebe o formulário da landing "Seja um franqueado" e envia o lead ao CRM
- * (Mercatta Growth → /api/v1/broker/storefront, action=create_lead).
- *
- * A chave do CRM fica SOMENTE no servidor (CRM_STOREFRONT_API_KEY) — nunca vai ao navegador.
+ * Recebe os dados da landing "Seja um franqueado" e envia ao webhook do n8n (Mercatta Growth).
+ * É a MESMA rota e o MESMO payload para os dois canais:
+ *   - channel = "site"      → botão "Enviar interesse"
+ *   - channel = "whatsapp"  → botão "Enviar pelo WhatsApp"
+ * O n8n identifica a origem pelo campo `channel` (e pelas tags/`source`).
  */
 
-const CRM_URL =
-  process.env.CRM_STOREFRONT_URL || 'https://growth.grupomercatta.com.br/api/v1/broker/storefront';
+const WEBHOOK_URL =
+  process.env.FRANQUIA_WEBHOOK_URL || 'https://n8nwebhook.mercattatech.com.br/webhook/mercatta-growth-web';
 
 // Anti-abuso simples (em memória): máx. 5 envios por IP a cada 10 min
 const WINDOW_MS = 10 * 60 * 1000;
@@ -42,12 +43,6 @@ function normalizePhone(raw: string): string {
 const HOT_CAPITAL = ['R$ 2,5 mi a R$ 5 mi', 'Acima de R$ 5 mi'];
 
 export async function POST(req: Request) {
-  const apiKey = process.env.CRM_STOREFRONT_API_KEY;
-  if (!apiKey) {
-    console.error('[franquia/lead] CRM_STOREFRONT_API_KEY não configurada');
-    return NextResponse.json({ error: 'Serviço temporariamente indisponível.' }, { status: 500 });
-  }
-
   const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown';
   if (tooMany(ip)) {
     return NextResponse.json({ error: 'Muitas tentativas. Tente novamente em alguns minutos.' }, { status: 429 });
@@ -63,6 +58,7 @@ export async function POST(req: Request) {
   // Honeypot: robôs preenchem; fingimos sucesso e descartamos
   if (clean(body?.website)) return NextResponse.json({ ok: true });
 
+  const channel = clean(body?.channel, 20) === 'whatsapp' ? 'whatsapp' : 'site';
   const name = clean(body?.name, 120);
   const email = clean(body?.email, 160).toLowerCase();
   const phone = normalizePhone(clean(body?.phone, 40));
@@ -78,61 +74,62 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'E-mail inválido.' }, { status: 400 });
   }
 
-  const sim = body?.simulation && typeof body.simulation === 'object' ? body.simulation : null;
-  const simText = sim
-    ? `Simulação: frota ${Number(sim.fleet) || '-'} | ocupação ${Number(sim.occupancy) || '-'}% | ticket R$ ${Number(sim.ticket) || '-'} | capital/veículo R$ ${Number(sim.vehicleCost) || '-'}`
-    : '';
+  const s = body?.simulation && typeof body.simulation === 'object' ? body.simulation : null;
+  const simulation = s
+    ? {
+        fleet: Number(s.fleet) || null,
+        occupancy: Number(s.occupancy) || null,
+        ticket: Number(s.ticket) || null,
+        vehicleCost: Number(s.vehicleCost) || null,
+      }
+    : null;
 
-  const tags = ['franquia', 'expansao-2030'];
+  const tags = ['franquia', 'expansao-2030', `canal: ${channel}`];
   if (capital) tags.push(`capital: ${capital}`);
   if (rental) tags.push(`locadora: ${rental}`);
   if (HOT_CAPITAL.includes(capital)) tags.push('hot');
 
-  const notes = [
-    `Cidade de interesse: ${city}`,
-    capital && `Capital para investimento: ${capital}`,
-    rental && `Já possui locadora: ${rental}`,
-    message && `Mensagem: ${message}`,
-    simText,
-  ].filter(Boolean).join('\n');
-
-  const base = {
+  // Payload IDÊNTICO para site e WhatsApp (só muda `channel`)
+  const payload = {
     action: 'create_lead',
+    event: 'franquia_lead',
+    channel,
     name,
     email,
     phone,
-    source: clean(body?.utm?.source, 60) || 'site_europcar_franquia',
+    city,
+    address: city,
+    capital,
+    possui_locadora: rental,
+    message,
+    simulation,
+    source: clean(body?.utm?.source, 60) || (channel === 'whatsapp' ? 'site_europcar_franquia_whatsapp' : 'site_europcar_franquia'),
     medium: clean(body?.utm?.medium, 60) || 'landing_page',
     campaign: clean(body?.utm?.campaign, 80) || 'expansao_2030',
-    address: city,
     tags,
+    page_url: clean(body?.pageUrl, 300),
+    created_at: new Date().toISOString(),
   };
 
-  const send = (payload: Record<string, unknown>) =>
-    fetch(CRM_URL, {
+  try {
+    const res = await fetch(WEBHOOK_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
       cache: 'no-store',
       signal: AbortSignal.timeout(15000),
     });
 
-  try {
-    // 1ª tentativa: com observações (cidade/capital/mensagem/simulação) como campo extra
-    let res = await send({ ...base, notes, message: notes });
-    // Se o CRM rejeitar campos desconhecidos, reenvia só com o contrato documentado
-    if (res.status === 400 || res.status === 422) res = await send(base);
-
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
-      console.error(`[franquia/lead] CRM respondeu ${res.status}: ${txt.slice(0, 300)}`);
+      console.error(`[franquia/lead] Webhook respondeu ${res.status}: ${txt.slice(0, 300)}`);
       return NextResponse.json({ error: 'Não foi possível enviar agora. Tente novamente.' }, { status: 502 });
     }
 
-    console.log(`[franquia/lead] Lead enviado ao CRM: ${email} (${city})`);
+    console.log(`[franquia/lead] Lead enviado ao webhook (${channel}): ${email} (${city})`);
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error('[franquia/lead] Falha ao chamar o CRM:', err?.message || err);
+    console.error('[franquia/lead] Falha ao chamar o webhook:', err?.message || err);
     return NextResponse.json({ error: 'Não foi possível enviar agora. Tente novamente.' }, { status: 502 });
   }
 }
