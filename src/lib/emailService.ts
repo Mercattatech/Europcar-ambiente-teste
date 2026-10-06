@@ -183,7 +183,14 @@ export async function sendEmail(fromEmail: string, to: string, subject: string, 
 
   if (provider === 'SMTP') {
     // Try SMTP first
-    const smtpResult = await sendViaSmtp(fromEmail, to, subject, html);
+    let smtpResult = await sendViaSmtp(fromEmail, to, subject, html);
+    if (!smtpResult.success && smtpResult.error !== 'SMTP não configurado') {
+      // Provedores SMTP costumam recusar envios em rajada (confirmação + senha para o mesmo
+      // cliente em sequência). Uma nova tentativa após uma pequena pausa resolve a maioria.
+      console.warn(`[Email] SMTP falhou (${smtpResult.error}). Nova tentativa em 2s...`);
+      await new Promise((r) => setTimeout(r, 2000));
+      smtpResult = await sendViaSmtp(fromEmail, to, subject, html);
+    }
     if (smtpResult.success) {
       return { success: true, provider: 'SMTP' };
     }
@@ -249,8 +256,14 @@ export async function sendTransactionalEmail(to: string, trigger: string, dataVa
         return normalized in normalizedVars ? normalizedVars[normalized] : _match;
       });
 
-    const parsedHtml    = replaceVars(template.html);
-    const parsedSubject = replaceVars(template.subject);
+    // Blocos condicionais {{#VAR}}...{{/VAR}}: o conteúdo só é mantido se VAR existir e não for vazia.
+    // Resolvidos ANTES da substituição simples (ex: estimativa em reais só para moeda estrangeira).
+    const resolveConditionals = (text: string) =>
+      text.replace(/\{\{#([^}]+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_m, rawKey: string, inner: string) =>
+        normalizedVars[normalizeVarKey(rawKey)] ? inner : '');
+
+    const parsedHtml    = replaceVars(resolveConditionals(template.html));
+    const parsedSubject = replaceVars(resolveConditionals(template.subject));
 
     const result = await sendEmail(fromEmail, to, parsedSubject, parsedHtml);
 

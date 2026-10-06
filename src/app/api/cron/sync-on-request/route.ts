@@ -61,14 +61,18 @@ export async function GET(req: Request) {
         if (isConfirmed) {
           await prisma.localReservation.update({ where: { id: reserva.id }, data: { status: targetStatus, operationalStatus: statusCode || 'CF' } });
           const totalBRL = reserva.amountInCents ? reserva.amountInCents / 100 : 0;
-          const cv = buildEmailCurrencyVars(totalBRL, booking.pickupStation, parseFloat(car.exchangeRate||'1'), car.currency||'BRL');
           const { sendTransactionalEmail } = await import('@/lib/emailService');
+          // Variáveis completas (inclui LISTA_PROTECOES/LISTA_EXTRAS — proteções/franquias e acessórios
+          // contratados). Antes essas listas não eram enviadas e o template exibia o texto cru.
+          const { buildReservationEmailVars } = await import('@/lib/email/reservationEmailVars');
+          const built = buildReservationEmailVars({
+            customerData: parsedData,
+            resNumber: reserva.resNumber || '',
+            amountInCents: reserva.amountInCents,
+            paymentMethod: isPrepaid ? (parsedData.paymentMethod || 'CREDIT') : (parsedData.paymentMethod || 'BALCAO'),
+          });
           const emailVars = {
-            NOME: parsedData.nome||'', SOBRENOME: parsedData.sobrenome||'', EMAIL: parsedData.email||'',
-            NUMERO_RESERVA: reserva.resNumber||'', CARRO: car.carCategoryName||car.name||'',
-            DATA_RETIRADA: fmtDate(booking.pickupDate||''), LOCAL_RETIRADA: booking.pickupStation||'',
-            DATA_DEVOLUCAO: fmtDate(booking.returnDate||''), LOCAL_DEVOLUCAO: booking.returnStation||booking.pickupStation||'',
-            VALOR_TOTAL: cv.VALOR_TOTAL, VALOR_LOCAL: cv.VALOR_LOCAL, VALOR_BRL: cv.VALOR_BRL, MOEDA: cv.MOEDA,
+            ...built.vars,
             FORMA_PAGAMENTO: isPrepaid ? 'Pago Online (Cielo)' : (parsedData.paymentMethod || 'Pagar no Balcão'),
           };
           let sent = await sendTransactionalEmail(parsedData.email, 'RESERVA_CONFIRMADA', emailVars);
@@ -90,6 +94,8 @@ export async function GET(req: Request) {
               paymentMethod: isPrepaid ? 'CREDIT' : 'BALCAO',
               totalBRL: totalBRL,
               isOnRequest: false,
+              xrsEquipment: built.lists.equipment,
+              extras: built.lists.extras,
             });
           }
           console.log(`[sync-on-request] CONFIRMADA: ${reserva.resNumber} (${targetStatus})`);

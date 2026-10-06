@@ -124,7 +124,12 @@ export async function sendWelcomeWithCredentials({
       if (configFrom?.value_ptBR) fromEmail = configFrom.value_ptBR;
     } catch { /* fallback to default */ }
 
-    await sendEmail(fromEmail, toEmail, subject, html);
+    const result = await sendEmail(fromEmail, toEmail, subject, html);
+    if (result.success) {
+      console.log(`[sendWelcomeWithCredentials] ✅ Senha enviada via ${result.provider} para ${toEmail}`);
+    } else {
+      console.error(`[sendWelcomeWithCredentials] ❌ Falha ao enviar senha para ${toEmail}: ${result.error}`);
+    }
   } catch (err) {
     // Never throw — e-mail failure should not block the reservation confirmation
     console.error('[sendWelcomeWithCredentials] Falha ao enviar e-mail de boas-vindas:', err);

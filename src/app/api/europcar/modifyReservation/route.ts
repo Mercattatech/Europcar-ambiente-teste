@@ -170,6 +170,8 @@ export async function POST(request: Request) {
             }
             const valorTotalM = localCurM === 'BRL' ? valorLocalM : `${valorLocalM} (≈ ${valorBRLM})`;
             const fmtPagM: Record<string,string> = { BALCAO:'Pagamento no Balcão', PIX:'PIX', CREDIT:'Cartão de Crédito', VOUCHER:'Voucher ETO (Faturado)' };
+            const { buildExtrasListVars } = await import('@/lib/email/reservationEmailVars');
+            const modLists = buildExtrasListVars(cd);
             await sendTransactionalEmail(cd.email, 'RESERVA_ALTERADA', {
               NOME: cd.nome || cd.firstName || '',
               SOBRENOME: cd.sobrenome || cd.lastName || '',
@@ -188,9 +190,10 @@ export async function POST(request: Request) {
               VALOR_BRL: valorBRLM,
               VALOR_TOTAL: valorTotalM,
               MOEDA: localCurM,
+              MOEDA_ESTRANGEIRA: localCurM !== 'BRL' ? '1' : '',
               FORMA_PAGAMENTO: fmtPagM[cd.paymentMethod || ''] || cd.paymentMethod || '',
-              LISTA_PROTECOES: '',
-              LISTA_EXTRAS: '',
+              LISTA_PROTECOES: modLists.LISTA_PROTECOES,
+              LISTA_EXTRAS: modLists.LISTA_EXTRAS,
             });
           }
         }

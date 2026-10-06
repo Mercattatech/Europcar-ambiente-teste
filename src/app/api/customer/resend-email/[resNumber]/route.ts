@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
+import { buildExtrasListVars } from '@/lib/email/reservationEmailVars';
 export const dynamic = 'force-dynamic';
 
 /**
@@ -106,23 +107,11 @@ export async function POST(
     return s.length >= 4 ? `${s.slice(0,2)}:${s.slice(2,4)}` : t;
   }
 
-  // Proteções (extras = seguros/proteções contratadas: LDW, TPL, etc.)
-  const xrsInsArr: any[] = cd?.xrsInsurances || [];
-  const extrasArr = Object.entries(extrasMap)
-    .filter(([, v]: any) => (v as number) > 0)
-    .map(([code, qty]: any) => {
-      const qi = xrsInsArr.find((i: any) => i.code === code);
-      return { code, name: qi?.name || code, qty, priceBRL: qi?.priceBRL || 0 };
-    });
-  const listaProtecoes = extrasArr.length > 0
-    ? extrasArr.map(ex => `• 🛡️ ${ex.name || ex.code} ×${ex.qty}${ex.priceBRL > 0 ? ` — R$ ${parseFloat(String(ex.priceBRL)).toFixed(2).replace('.', ',')}` : ''}`).join('<br/>')
-    : 'Nenhuma proteção adicional selecionada';
-
-  // Acessórios (xrsEquipment = equipamentos: GPS, cadeirinha, etc.)
-  const equipArr: any[] = Array.isArray(xrsEquipment) ? xrsEquipment : [];
-  const listaExtras = equipArr.length > 0
-    ? equipArr.map((eq: any) => `• ${eq.icon || '📦'} ${eq.name || eq.code} ×${eq.qty || 1}${eq.priceBRL ? ` — R$ ${parseFloat(eq.priceBRL).toFixed(2).replace('.', ',')} /dia` : ''}`).join('<br/>')
-    : 'Nenhum acessório selecionado';
+  // Proteções/franquias e acessórios — helper único (lê topo do customerData, booking e mapa extras)
+  const extraLists = buildExtrasListVars(cd);
+  const extrasArr = extraLists.extras;
+  const listaProtecoes = extraLists.LISTA_PROTECOES;
+  const listaExtras = extraLists.LISTA_EXTRAS;
 
   const fmtPagamento: Record<string, string> = {
     CREDIT:  'Cartão de Crédito',
@@ -143,6 +132,7 @@ export async function POST(
     VALOR_LOCAL:       _currVars.VALOR_LOCAL,
     VALOR_BRL:         _currVars.VALOR_BRL,
     MOEDA:             _currVars.MOEDA,
+    MOEDA_ESTRANGEIRA: _currVars.MOEDA !== 'BRL' ? '1' : '',
     FORMA_PAGAMENTO:   fmtPagamento[paymentMethod] || paymentMethod,
     CARRO:             car?.carCategoryName || car?.carCategorySample || car?.name || '',
     CATEGORIA_CARRO:   car?.carCategoryCode || car?.acrissCode || '',
@@ -174,7 +164,7 @@ export async function POST(
       paymentMethod,
       totalBRL:      amountBRL,
       isOnRequest:   reservation.operationalStatus === 'R',
-      xrsEquipment:  xrsEquipment,
+      xrsEquipment:  extraLists.equipment,
       extras:        extrasArr,
     });
   }

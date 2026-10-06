@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { sendTransactionalEmail } from '@/lib/emailService';
+import { sendReservationConfirmationEmail } from '@/lib/email/sendReservationConfirmationEmail';
+import { ensureGuestAccountAndWelcome } from '@/lib/guestAccount';
+import { acquirePixLock, releasePixLock } from '@/lib/pixLock';
 import { executeXRSBooking } from '@/lib/europcar/bookXRS';
 
 export const dynamic = 'force-dynamic';
@@ -14,9 +16,12 @@ export async function GET() {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
+      // Somente PENDING_PIX: reservas ON_REQUEST já foram criadas no XRS (têm número real) e são
+      // acompanhadas por cron/sync-on-request. Incluí-las aqui re-reservava no XRS toda vez que o
+      // cartão/PIX constava como pago, gerando reserva duplicada e e-mail "confirmado" indevido.
       const pendingReservations = await prisma.localReservation.findMany({
          where: { 
-            status: { in: ['PENDING_PIX', 'ON_REQUEST'] },
+            status: 'PENDING_PIX',
             createdAt: { gte: yesterday }
          }
       });
@@ -65,78 +70,97 @@ export async function GET() {
             
             // ═══ PIX PAID ═══
             if (cieloJson.Payment && (cieloJson.Payment.Status === 2 || cieloJson.Payment.Status === 1)) {
-               let resNumber = reserva.merchantOrderId;
-               try {
-                  const { resNumber: europcarResNumber } = await executeXRSBooking({
-                      bookingData: parsedData.booking,
-                      customerData: parsedData,
-                      paymentData: { method: 'PIX', amountInCents: reserva.amountInCents, merchantOrderId: reserva.merchantOrderId },
-                      xrsEquipment: parsedData.booking?.xrsEquipment || [],
-                  });
-                  if (europcarResNumber) resNumber = europcarResNumber;
-               } catch (e: any) {
-                  console.error("SYNC-PIX: Error executing XRS Booking", e.message);
+               // Lock em memória compartilhado com /api/reservas/pix-status: o polling do checkout
+               // pode estar processando esta mesma reserva neste instante (XRS demora vários segundos).
+               const lockKey = `pix:${reserva.id}`;
+               if (!acquirePixLock(lockKey)) {
+                  results.push({ id: reserva.id, orderId: reserva.merchantOrderId, status: 'PROCESSING_ELSEWHERE' });
+                  continue;
                }
-               
-               await prisma.localReservation.update({
-                  where: { id: reserva.id },
-                  data: {
-                     resNumber,
-                     status: 'CONFIRMED_PREPAID'
+               try {
+                  // Reconsulta com o lock: outra execução pode ter concluído enquanto consultávamos a Cielo.
+                  const fresh = await prisma.localReservation.findUnique({ where: { id: reserva.id } });
+                  if (fresh && fresh.status !== 'PENDING_PIX') {
+                     results.push({ id: reserva.id, orderId: reserva.merchantOrderId, status: 'ALREADY_PROCESSED' });
+                     continue;
                   }
-               });
 
-               // Disparar Email
-               if (parsedData?.email) {
+                  let resNumber = reserva.merchantOrderId;
+                  let isBookingOnRequest = false;
+                  let xrsStatus = 'S';
                   try {
-                     const fmtDate = (d: string) => d && d.length >= 8 ? `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}` : d || '';
-                     const booking = parsedData.booking || {};
-                     const totalBRL = (cieloJson.Payment.Amount / 100).toFixed(2).replace('.', ',');
-                     await sendTransactionalEmail(parsedData.email, 'RESERVA_SUCESSO', {
-                        NOME: parsedData.nome || '',
-                        SOBRENOME: parsedData.sobrenome || '',
-                        EMAIL: parsedData.email || '',
-                        TELEFONE: parsedData.telefone || '',
-                        CPF: parsedData.cpf || '',
-                        NUMERO_RESERVA: resNumber,
-                        VALOR_TOTAL: `R$ ${totalBRL}`,
-                        FORMA_PAGAMENTO: 'PIX',
-                        CARRO: booking.car?.carCategoryName || booking.car?.name || '',
-                        CATEGORIA_CARRO: booking.car?.acrissCode || booking.carCategory || '',
-                        DATA_RETIRADA: fmtDate(booking.pickupDate || ''),
-                        LOCAL_RETIRADA: booking.pickupStation || '',
-                        DATA_DEVOLUCAO: fmtDate(booking.returnDate || ''),
-                        LOCAL_DEVOLUCAO: booking.returnStation || booking.pickupStation || '',
-                        LISTA_PROTECOES: '',
-                        LISTA_EXTRAS: '',
+                     const xrsRes = await executeXRSBooking({
+                         bookingData: parsedData.booking,
+                         customerData: parsedData,
+                         paymentData: { method: 'PIX', amountInCents: reserva.amountInCents, merchantOrderId: reserva.merchantOrderId },
+                         // Proteções/franquias e acessórios contratados precisam ir para o XRS também.
+                         xrsEquipment: parsedData.xrsEquipment || parsedData.booking?.xrsEquipment || [],
+                         xrsInsurances: parsedData.xrsInsurances || parsedData.booking?.xrsInsurances || [],
                      });
-                  } catch (e) {
-                     console.error("Erro ao enviar email PIX Sincronizado:", e);
+                     if (xrsRes.resNumber) {
+                        resNumber = xrsRes.resNumber;
+                        isBookingOnRequest = !!xrsRes.isOnRequest;
+                        xrsStatus = xrsRes.xrsStatusCode || (isBookingOnRequest ? 'R' : 'S');
+                     }
+                  } catch (e: any) {
+                     console.error("SYNC-PIX: Error executing XRS Booking", e.message);
                   }
-               }
 
-               // ── WhatsApp: PIX_AGRADECIMENTO ──
-               try {
-                  const booking = parsedData.booking || {};
-                  const totalBRL = `R$ ${(cieloJson.Payment.Amount / 100).toFixed(2).replace('.', ',')}`;
-                  import('@/lib/whatsapp/whatsappService').then(({ sendWhatsappTrigger }) => {
-                     sendWhatsappTrigger('PIX_AGRADECIMENTO', {
-                        NOME: parsedData.nome || '',
-                        SOBRENOME: parsedData.sobrenome || '',
-                        NUMERO_RESERVA: resNumber,
-                        VALOR_TOTAL: totalBRL,
-                        CARRO: booking.car?.carCategoryName || booking.car?.name || '',
-                        DATA_RETIRADA: booking.pickupDate || '',
-                        DATA_DEVOLUCAO: booking.returnDate || '',
-                        LOCAL_RETIRADA: booking.pickupStation || '',
-                        LOCAL_DEVOLUCAO: booking.returnStation || booking.pickupStation || '',
-                     }, parsedData.telefone || undefined);
+                  const updatedCustomerData = { ...parsedData, paymentMethod: 'PIX', cieloPaymentId: paymentId };
+                  await prisma.localReservation.update({
+                     where: { id: reserva.id },
+                     data: {
+                        resNumber,
+                        status: isBookingOnRequest ? 'ON_REQUEST' : 'CONFIRMED_PREPAID',
+                        operationalStatus: xrsStatus,
+                        customerData: JSON.stringify(updatedCustomerData),
+                     }
                   });
-               } catch (waErr) {
-                  console.error('[sync-pix] WhatsApp agradecimento falhou:', waErr);
-               }
 
-               results.push({ id: reserva.id, orderId: reserva.merchantOrderId, status: 'PAID' });
+                  // Disparar Email — mesmas variáveis dos demais fluxos (inclui proteções/franquias e
+                  // acessórios; antes este cron enviava LISTA_PROTECOES/LISTA_EXTRAS vazias).
+                  // A conta de convidado (com a senha) só é criada depois da confirmação.
+                  if (parsedData?.email) {
+                     try {
+                        await sendReservationConfirmationEmail({
+                           customerData: updatedCustomerData,
+                           resNumber,
+                           amountInCents: cieloJson.Payment.Amount ?? reserva.amountInCents,
+                           paymentMethod: 'PIX',
+                           isOnRequest: isBookingOnRequest,
+                           source: 'cron/sync-pix',
+                        });
+                        await ensureGuestAccountAndWelcome({ customerData: updatedCustomerData, resNumber });
+                     } catch (e) {
+                        console.error("Erro ao enviar email PIX Sincronizado:", e);
+                     }
+                  }
+
+                  // ── WhatsApp: PIX_AGRADECIMENTO ──
+                  try {
+                     const booking = parsedData.booking || {};
+                     const totalBRL = `R$ ${(cieloJson.Payment.Amount / 100).toFixed(2).replace('.', ',')}`;
+                     import('@/lib/whatsapp/whatsappService').then(({ sendWhatsappTrigger }) => {
+                        sendWhatsappTrigger('PIX_AGRADECIMENTO', {
+                           NOME: parsedData.nome || '',
+                           SOBRENOME: parsedData.sobrenome || '',
+                           NUMERO_RESERVA: resNumber,
+                           VALOR_TOTAL: totalBRL,
+                           CARRO: booking.car?.carCategoryName || booking.car?.name || '',
+                           DATA_RETIRADA: booking.pickupDate || '',
+                           DATA_DEVOLUCAO: booking.returnDate || '',
+                           LOCAL_RETIRADA: booking.pickupStation || '',
+                           LOCAL_DEVOLUCAO: booking.returnStation || booking.pickupStation || '',
+                        }, parsedData.telefone || undefined);
+                     });
+                  } catch (waErr) {
+                     console.error('[sync-pix] WhatsApp agradecimento falhou:', waErr);
+                  }
+
+                  results.push({ id: reserva.id, orderId: reserva.merchantOrderId, status: 'PAID' });
+               } finally {
+                  releasePixLock(lockKey);
+               }
 
             // ═══ PIX STILL PENDING ═══
             } else {

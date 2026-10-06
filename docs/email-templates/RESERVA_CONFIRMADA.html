@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reserva {{NUMERO_RESERVA}} confirmada — Europcar Brasil</title>
+<style>
+@media only screen and (max-width:620px){
+.col{display:block !important;width:100% !important;max-width:100% !important;}
+.px{padding-left:20px !important;padding-right:20px !important;}
+.h1{font-size:22px !important;}
+.money{font-size:20px !important;}
+}
+</style>
+<!--[if mso]><style>body,table,td,a{font-family:Arial,Helvetica,sans-serif !important;}</style><![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#eef1ed;-webkit-text-size-adjust:100%;">
+<span style="display:none;font-size:1px;color:#eef1ed;max-height:0;overflow:hidden;">Reserva {{NUMERO_RESERVA}} confirmada &bull; {{CARRO}} &bull; Retirada em {{LOCAL_RETIRADA}} em {{DATA_RETIRADA}}</span>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#eef1ed;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:600px;background-color:#ffffff;border:1px solid #dfe4dd;border-radius:10px;overflow:hidden;">
+
+<!-- HEADER -->
+<tr>
+  <td style="background-color:#008d36;padding:22px 28px;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr>
+        <td align="left" style="font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:28px;color:#ffffff;font-weight:900;font-style:italic;letter-spacing:-0.5px;">Europcar</td>
+        <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;color:#b3dfc0;">Confirmação de reserva</td>
+      </tr>
+    </table>
+  </td>
+</tr>
+
+<!-- STATUS BANNER -->
+<tr>
+  <td style="background-color:#006b29;padding:18px 28px;font-family:Arial,Helvetica,sans-serif;text-align:center;">
+    <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:18px;color:#ffffff;font-weight:bold;">&#x2705; Sua reserva está confirmada!</p>
+    <p style="margin:6px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#b3dfc0;">Apresente este e-mail na estação de retirada junto com a CNH (Carteira Nacional de Habilitação) ou a PID (Permissão Internacional para Dirigir), quando necessária.</p>
+  </td>
+</tr>
+
+<!-- INTRO -->
+<tr>
+  <td class="px" style="padding:24px 28px 8px 28px;font-family:Arial,Helvetica,sans-serif;">
+    <p class="h1" style="margin:0 0 6px 0;font-size:24px;line-height:30px;color:#1f2421;font-weight:bold;">Olá, {{NOME}}!</p>
+    <p style="margin:0;font-size:14px;line-height:22px;color:#525c54;">Boa notícia: a sua reserva, que estava em análise, foi <strong>confirmada</strong> pela Europcar e a sua locação está garantida. Confira todos os detalhes abaixo.</p>
+  </td>
+</tr>
+
+<!-- CARD RESUMO -->
+<tr>
+  <td class="px" style="padding:16px 28px 4px 28px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #dfe4dd;border-radius:10px;overflow:hidden;background-color:#f7f9f6;">
+      <!-- Número reserva -->
+      <tr>
+        <td colspan="2" style="padding:16px 20px;border-bottom:1px solid #dfe4dd;font-family:Arial,Helvetica,sans-serif;text-align:center;background-color:#f0faf2;">
+          <p style="margin:0 0 4px 0;font-size:11px;letter-spacing:1.2px;color:#6d7a70;font-weight:bold;">NÚMERO DA RESERVA</p>
+          <p style="margin:0;font-size:28px;line-height:34px;color:#008d36;font-weight:900;letter-spacing:3px;">{{NUMERO_RESERVA}}</p>
+        </td>
+      </tr>
+      <!-- Retirada | Devolução -->
+      <tr>
+        <td class="col" width="272" valign="top" style="width:272px;padding:16px 20px;border-bottom:1px solid #dfe4dd;border-right:1px solid #dfe4dd;font-family:Arial,Helvetica,sans-serif;">
+          <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:1.2px;color:#008d36;font-weight:bold;">RETIRADA</p>
+          <p style="margin:0 0 4px 0;font-size:15px;color:#1f2421;font-weight:bold;">{{DATA_RETIRADA}} &middot; {{HORARIO_RETIRADA}}</p>
+          <p style="margin:0;font-size:13px;color:#6d7a70;">{{LOCAL_RETIRADA}}</p>
+        </td>
+        <td class="col" width="272" valign="top" style="width:272px;padding:16px 20px;border-bottom:1px solid #dfe4dd;font-family:Arial,Helvetica,sans-serif;">
+          <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:1.2px;color:#008d36;font-weight:bold;">DEVOLUÇÃO</p>
+          <p style="margin:0 0 4px 0;font-size:15px;color:#1f2421;font-weight:bold;">{{DATA_DEVOLUCAO}} &middot; {{HORARIO_DEVOLUCAO}}</p>
+          <p style="margin:0;font-size:13px;color:#6d7a70;">{{LOCAL_DEVOLUCAO}}</p>
+        </td>
+      </tr>
+      <!-- Veículo | Valor -->
+      <tr>
+        <td class="col" width="272" valign="top" style="width:272px;padding:16px 20px;font-family:Arial,Helvetica,sans-serif;">
+          <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:1.2px;color:#6d7a70;font-weight:bold;">VEÍCULO</p>
+          <p style="margin:0 0 4px 0;font-size:15px;color:#1f2421;font-weight:bold;">{{CARRO}}</p>
+          <p style="margin:0;font-size:13px;color:#6d7a70;">{{CATEGORIA_CARRO}}</p>
+        </td>
+        <td class="col" width="272" valign="top" bgcolor="#008d36" style="width:272px;padding:16px 20px;background-color:#008d36;font-family:Arial,Helvetica,sans-serif;">
+          <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:1.2px;color:#b3dfc0;font-weight:bold;">VALOR TOTAL</p>
+          <p class="money" style="margin:0;font-size:20px;color:#ffffff;font-weight:bold;">{{VALOR_LOCAL}}</p>
+          {{#MOEDA_ESTRANGEIRA}}<p style="margin:4px 0 0 0;font-size:12px;color:#b3dfc0;">(&asymp; {{VALOR_BRL}})</p>{{/MOEDA_ESTRANGEIRA}}
+        </td>
+      </tr>
+    </table>
+  </td>
+</tr>
+
+<!-- DADOS DA RESERVA -->
+<tr>
+  <td class="px" style="padding:26px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">Dados da reserva</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #dfe4dd;">
+      <tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Condutor principal</td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{NOME}} {{SOBRENOME}}</td>
+      </tr>
+      <tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Número da reserva</td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{NUMERO_RESERVA}}</td>
+      </tr>
+      <tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Forma de pagamento</td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{FORMA_PAGAMENTO}}</td>
+      </tr>
+      <tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Valor total</td>
+        <td valign="top" style="padding:10px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{VALOR_TOTAL}}</td>
+      </tr>
+    </table>
+  </td>
+</tr>
+
+<!-- INFORMAÇÕES DO ALUGUEL -->
+<tr>
+  <td class="px" style="padding:26px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">Informações do aluguel</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr>
+        <td class="col" width="272" valign="top" style="width:272px;padding:0 10px 0 0;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f7f9f6;border:1px solid #dfe4dd;border-radius:8px;">
+            <tr><td style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;">
+              <p style="margin:0 0 8px 0;font-size:11px;letter-spacing:1.2px;color:#008d36;font-weight:bold;">LEVANTAMENTO</p>
+              <p style="margin:0 0 4px 0;font-size:14px;color:#1f2421;font-weight:bold;">{{DATA_RETIRADA}} &agrave;s {{HORARIO_RETIRADA}}</p>
+              <p style="margin:0;font-size:13px;color:#3d463f;">{{LOCAL_RETIRADA}}</p>
+            </td></tr>
+          </table>
+        </td>
+        <td class="col" width="272" valign="top" style="width:272px;padding:0;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f7f9f6;border:1px solid #dfe4dd;border-radius:8px;">
+            <tr><td style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;">
+              <p style="margin:0 0 8px 0;font-size:11px;letter-spacing:1.2px;color:#008d36;font-weight:bold;">DEVOLUÇÃO</p>
+              <p style="margin:0 0 4px 0;font-size:14px;color:#1f2421;font-weight:bold;">{{DATA_DEVOLUCAO}} &agrave;s {{HORARIO_DEVOLUCAO}}</p>
+              <p style="margin:0;font-size:13px;color:#3d463f;">{{LOCAL_DEVOLUCAO}}</p>
+            </td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </td>
+</tr>
+
+<!-- VEÍCULO -->
+<tr>
+  <td class="px" style="padding:26px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">Veículo</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #dfe4dd;">
+      <tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Descrição / Exemplo</td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{CARRO}}</td>
+      </tr>
+      <tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Categoria (ACRISS)</td>
+        <td valign="top" style="padding:10px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{CATEGORIA_CARRO}}</td>
+      </tr>
+    </table>
+  </td>
+</tr>
+
+<!-- PREÇO -->
+<tr>
+  <td class="px" style="padding:26px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">Resumo de preço</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #dfe4dd;border-radius:8px;">
+      <tr>
+        <td valign="top" style="padding:14px 18px;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1f2421;font-weight:bold;">Total da reserva</td>
+        <td align="right" valign="top" style="padding:14px 18px;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1f2421;font-weight:bold;">{{VALOR_LOCAL}}{{#MOEDA_ESTRANGEIRA}}<br><span style="font-weight:normal;font-size:12px;color:#6d7a70;">(&asymp; {{VALOR_BRL}})</span>{{/MOEDA_ESTRANGEIRA}}</td>
+      </tr>
+      <tr>
+        <td valign="top" style="padding:12px 18px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Forma de pagamento</td>
+        <td align="right" valign="top" style="padding:12px 18px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;">{{FORMA_PAGAMENTO}}</td>
+      </tr>
+    </table>
+    {{#MOEDA_ESTRANGEIRA}}<p style="margin:8px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8a948c;font-style:italic;">Valor na moeda local garantido. Estimativa em reais apenas para referência.</p>{{/MOEDA_ESTRANGEIRA}}
+  </td>
+</tr>
+
+<!-- PROTEÇÕES E EXTRAS -->
+<tr>
+  <td class="px" style="padding:26px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">Incluídos na reserva</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f7f9f6;border:1px solid #dfe4dd;border-radius:8px;">
+      <tr><td style="padding:18px 20px;font-family:Arial,Helvetica,sans-serif;">
+        <p style="margin:0 0 8px 0;font-size:13px;font-weight:bold;color:#1f2421;">Proteções selecionadas:</p>
+        <p style="margin:0 0 16px 0;font-size:13px;line-height:22px;color:#3d463f;">{{LISTA_PROTECOES}}</p>
+        <p style="margin:0 0 8px 0;font-size:13px;font-weight:bold;color:#1f2421;">Acessórios e equipamentos:</p>
+        <p style="margin:0;font-size:13px;line-height:22px;color:#3d463f;">{{LISTA_EXTRAS}}</p>
+      </td></tr>
+    </table>
+  </td>
+</tr>
+
+<!-- ALERTA DOCUMENTOS -->
+<tr>
+  <td class="px" style="padding:24px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-left:3px solid #008d36;background-color:#f2f7f2;">
+      <tr><td style="padding:14px 16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#3d463f;">
+        Na retirada apresente este e-mail (reserva <strong>{{NUMERO_RESERVA}}</strong>), documento de identidade, carteira de habilitação válida e cartão de crédito em nome do condutor principal.
+      </td></tr>
+    </table>
+  </td>
+</tr>
+
+<!-- ORIENTAÇÕES PARA RETIRADA -->
+<tr>
+  <td class="px" style="padding:26px 28px 2px 28px;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 14px 0;padding:12px 16px;background-color:#008d36;border-radius:6px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:21px;font-weight:bold;color:#ffffff;">01   Sua reserva</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:22px;font-weight:bold;color:#1f2421;">Informações importantes</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;">Os itens incluídos nesta reserva são suficientes para a retirada do veículo. No entanto, a EUROPCAR poderá oferecer serviços opcionais adicionais, como upgrades de categoria, proteções complementares e acessórios. A contratação desses serviços é totalmente opcional e não constitui requisito para a retirada do veículo. Caso opte por contratá-los, os respectivos valores serão de sua responsabilidade e deverão ser pagos diretamente à EUROPCAR.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;">No momento da retirada, acompanhe a vistoria do veículo e, sempre que possível, registre fotos do estado geral do veículo, eventuais avarias existentes e do painel (incluindo o nível de combustível e a quilometragem). Esses registros poderão ser úteis em caso de dúvidas futuras.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;">Leia atentamente o <strong>Contrato de Locação</strong> antes de assiná-lo. Nele constam as condições específicas da sua locação, incluindo coberturas contratadas, responsabilidades do locatário e eventuais cobranças aplicáveis.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;">Antes de assinar qualquer documento, confirme cuidadosamente todos os serviços contratados, valores, coberturas, franquias e demais informações apresentadas pela EUROPCAR.</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:2px 0 14px 0;background-color:#f2f7f2;border-left:3px solid #008d36;"><tr><td style="padding:13px 16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;"><strong>Travessia de Fronteiras:</strong> caso pretenda viajar para outro país com o veículo, informe todos os países que serão visitados antes da retirada. A circulação internacional está sujeita à autorização prévia da EUROPCAR, podendo haver restrições, requisitos específicos e cobranças adicionais.</td></tr></table>
+  </td>
+</tr>
+<tr>
+  <td class="px" style="padding:26px 28px 2px 28px;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 14px 0;padding:12px 16px;background-color:#008d36;border-radius:6px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:21px;font-weight:bold;color:#ffffff;">02   Horário e comparecimento</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:22px;font-weight:bold;color:#1f2421;">Prazo para retirada do veículo</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;"><strong>Tolerância para retirada:</strong> A tolerância para retirada do veículo poderá variar de 29 a 59 minutos, conforme o país, a estação de locação e as condições da reserva. Para sua segurança, consulte os Termos e Condições aplicáveis ao destino da locação ou entre em contato com nossa Central de Atendimento antes da viagem.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;"><strong>Reservas em aeroportos:</strong> Quando o número do voo for informado corretamente no momento da reserva, a Europcar acompanhará o horário previsto de chegada do voo. Nesses casos, a tolerância para retirada será considerada a partir da chegada da aeronave, acrescida de um período razoável para desembarque e deslocamento até a loja, sempre respeitando o horário de funcionamento da estação.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;"><strong>Recomendação:</strong> Ao realizar sua reserva, programe o horário de retirada considerando o tempo necessário para desembarque, imigração (quando aplicável), retirada de bagagens e deslocamento até o balcão da Europcar. Isso contribuirá para uma experiência mais tranquila e evitará que a reserva seja caracterizada como <strong>No-Show (não comparecimento)</strong>.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;"><strong>Requisitos para retirada:</strong> Para a liberação do veículo, o locatário deverá apresentar a documentação exigida, atender aos requisitos de idade e habilitação, possuir um cartão de crédito físico, em nome do motorista principal, com limite disponível para a caução, além de cumprir as demais políticas e condições da Europcar. O não atendimento a qualquer desses requisitos poderá resultar na recusa da locação (Turn Down), conforme previsto nos Termos e Condições.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;"><strong>Retirada antecipada:</strong> O veículo será disponibilizado a partir do horário confirmado na reserva. Solicitações de retirada antes desse horário estarão sujeitas à disponibilidade da loja e da categoria reservada, não sendo possível garantir o atendimento antecipado.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;"><strong>Importante:</strong> As políticas de tolerância, No-Show, horários de funcionamento e requisitos de retirada podem variar de acordo com o país e a estação de locação. Em caso de dúvida, consulte os Termos e Condições da sua reserva ou entre em contato com a Central de Atendimento Europcar antes da retirada.</p>
+  </td>
+</tr>
+<tr>
+  <td class="px" style="padding:26px 28px 2px 28px;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 14px 0;padding:12px 16px;background-color:#008d36;border-radius:6px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:21px;font-weight:bold;color:#ffffff;">03   Checklist</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:22px;font-weight:bold;color:#1f2421;">Principais itens para retirada</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:2px 0 14px 0;background-color:#f2f7f2;border-left:3px solid #008d36;"><tr><td style="padding:13px 16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;"><strong>Carteira de Habilitação</strong><br>O locatário e qualquer condutor adicional deverão apresentar a habilitação original, física e válida, emitida pelo país de origem e compatível com a categoria do veículo locado. Em alguns países, documentos digitais, cópias, fotografias ou impressões poderão não ser aceitos. Para evitar imprevistos, recomendamos sempre portar a habilitação física original.</td></tr></table>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:2px 0 14px 0;background-color:#f2f7f2;border-left:3px solid #008d36;"><tr><td style="padding:13px 16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;"><strong>Permissão Internacional para Dirigir (PID)</strong><br>Em alguns países, a apresentação da Permissão Internacional para Dirigir (PID) é obrigatória para a retirada do veículo. Países como Itália, Alemanha, Emirados Árabes Unidos, Japão, Áustria, entre outros, podem exigir esse documento para motoristas habilitados no Brasil ou em determinados países de origem. A exigência poderá variar conforme a legislação local e a nacionalidade do condutor. Recomendamos consultar os Termos e Condições da reserva ou nossa Central de Atendimento antes da viagem. A emissão e apresentação da PID são de responsabilidade exclusiva do condutor, e sua ausência poderá impedir a retirada do veículo.</td></tr></table>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:2px 0 14px 0;background-color:#f2f7f2;border-left:3px solid #008d36;"><tr><td style="padding:13px 16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;"><strong>Documento de Identificação</strong><br>O motorista principal deverá apresentar um documento oficial de identificação válido. Nas locações internacionais, normalmente será exigida a apresentação de um passaporte válido, podendo haver requisitos adicionais conforme a legislação do país de locação.</td></tr></table>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:2px 0 14px 0;background-color:#f2f7f2;border-left:3px solid #008d36;"><tr><td style="padding:13px 16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;"><strong>Cartão de Crédito</strong><br>O motorista principal deverá apresentar à Europcar um cartão de crédito físico, de sua titularidade, emitido por instituição financeira, com o nome do titular impresso de forma legível e limite suficiente para a realização da caução (pré-autorização) e cobertura de eventuais despesas adicionais da locação. Nas locações internacionais, o cartão deverá estar habilitado para uso no exterior. Durante o período da locação, poderão ser cobrados nesse cartão valores referentes à caução, combustível, pedágios, multas, diárias adicionais, acessórios, proteções e demais serviços contratados. Como regra geral, não são aceitos cartões pré-pagos, virtuais ou emitidos em nome de terceiros. Algumas estações poderão restringir o uso de cartões emitidos por bancos digitais ou aceitar apenas determinadas bandeiras. Recomendamos consultar previamente nossa Central de Atendimento ou a estação de retirada.</td></tr></table>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;"><strong>Importante:</strong> Os documentos e requisitos para retirada do veículo poderão variar de acordo com o país, a estação de locação e a categoria do veículo reservada. Para sua segurança, consulte os Termos e Condições da reserva ou entre em contato com a Central de Atendimento da Europcar antes da viagem.</p>
+  </td>
+</tr>
+<tr>
+  <td class="px" style="padding:26px 28px 2px 28px;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 14px 0;padding:12px 16px;background-color:#008d36;border-radius:6px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:21px;font-weight:bold;color:#ffffff;">04   Regras aplicáveis</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:22px;font-weight:bold;color:#1f2421;">Termos, condições e responsabilidades</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;">Este voucher reúne as principais informações relacionadas à sua reserva e tem caráter exclusivamente informativo. Ele não substitui os Termos e Condições da Locação nem o Contrato de Locação, os quais contêm todas as regras, direitos, obrigações, limitações e requisitos aplicáveis à locação, podendo variar conforme o país, a estação de retirada, a categoria do veículo e a tarifa contratada.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;">Antes da viagem, recomendamos a leitura completa dos Termos e Condições.</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:2px 0 14px 0;background-color:#f2f7f2;border-left:3px solid #008d36;"><tr><td style="padding:13px 16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;"><a href="https://www.europcar.com/terms-and-conditions" style="color:#008d36;text-decoration:underline;font-weight:bold;">Consultar Termos e Condições</a></td></tr></table>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;">É de responsabilidade do locatário conhecer e cumprir a legislação vigente, os requisitos para condução de veículos, as normas de trânsito e as políticas aplicáveis ao país ou aos países onde a locação será realizada, incluindo, quando aplicável, exigências relacionadas à documentação, Permissão Internacional para Dirigir (PID), circulação entre fronteiras, equipamentos obrigatórios, pedágios, restrições locais e demais requisitos legais.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;">Nas locações internacionais, o Contrato de Locação será emitido pela empresa responsável pela operação no país de retirada, sendo regido pela legislação local. O contrato poderá ser disponibilizado no idioma oficial do país de locação ou em outro idioma adotado pela operação local, não havendo obrigatoriedade de emissão em português.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;">Ao retirar o veículo e assinar o Contrato de Locação, o locatário declara estar ciente e de acordo com os termos, condições e responsabilidades nele estabelecidos.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;">Eventuais informações não contempladas neste voucher, bem como eventuais omissões, simplificações ou resumos aqui apresentados, não eximem o locatário da responsabilidade de conhecer, compreender e cumprir as disposições constantes dos Termos e Condições e do Contrato de Locação, que prevalecerão sobre este documento sempre que aplicável.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;">Em caso de divergência entre as informações constantes neste voucher, nos Termos e Condições e no Contrato de Locação emitido pela estação de retirada, prevalecerão as disposições do Contrato de Locação e da legislação vigente no país onde a locação for realizada.</p>
+    <p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:21px;color:#3d463f;">Em caso de dúvidas antes da viagem, nossa Central de Atendimento estará à disposição para orientá-lo sobre os principais requisitos da sua locação.</p>
+  </td>
+</tr>
+
+<!-- SUPORTE -->
+<tr>
+  <td class="px" style="padding:22px 28px 28px 28px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#525c54;">
+    Dúvidas? Acesse <a href="https://europcar.com.br/reservas" style="color:#008d36;text-decoration:underline;">europcar.com.br/reservas</a> para gerenciar sua reserva.
+  </td>
+</tr>
+
+<!-- FOOTER -->
+<tr>
+  <td style="background-color:#1f2421;padding:20px 28px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;color:#b6bfb8;">
+    Europcar Brasil &mdash; europcar.com.br<br>
+    Você recebeu este e-mail porque efetuou uma reserva em nosso site.<br>
+    Este é um e-mail automático, por favor não responda.
+  </td>
+</tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

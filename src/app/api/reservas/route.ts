@@ -3,21 +3,13 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import prisma from '@/lib/prisma';
 import { callXRS, DEFAULT_POA_CID } from '@/lib/europcar/xrsClient';
-import { sendBookingConfirmation } from '@/lib/email/sendBookingConfirmation';
-import { sendWelcomeWithCredentials } from '@/lib/email/sendWelcomeWithCredentials';
+import { ensureGuestAccountAndWelcome } from '@/lib/guestAccount';
 import { consultarBin, guessBrandByFirstDigit, mapBrandToCardIssuer, zeroAuthCard, voidCieloPayment } from '@/lib/cielo/cieloClient';
 import { buildReservationPaymentAttrs, buildCreateVoucherXml, CID_TO_BA } from '@/lib/europcar/paymentMapping';
 import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 import { getReservationErrorMessage } from '@/lib/cms/reservationErrors';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { registerFailedTransaction } from '@/lib/rejectionService';
-import bcrypt from 'bcryptjs';
-
-/** Gera senha aleatória legível de 12 caracteres */
-function generateTemporaryPassword(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$!';
-  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-}
 
 export const dynamic = 'force-dynamic';
 
@@ -868,142 +860,31 @@ export async function POST(request: Request) {
       if (finalResNumber && paymentData.method !== 'PIX') {
         // Send HTML confirmation email with booking details
         try {
-          const xrsInsArr: any[] = Array.isArray(xrsInsurances) ? xrsInsurances : [];
-          const extrasMap = bookingData.extras || {};
-          const extrasArr = Object.entries(extrasMap)
-            .filter(([, v]: any) => v > 0)
-            .map(([code, qty]: any) => {
-              const qi = xrsInsArr.find((i: any) => i.code === code);
-              return { code, name: qi?.name || code, qty, priceBRL: qi?.priceBRL || 0 };
-            });
-          // Coberturas contratadas (pré-pago/ETO) enviadas só em xrsInsurances — inclui no e-mail
-          for (const ins of xrsInsArr) {
-            const code = typeof ins === 'string' ? ins : ins?.code;
-            if (!code || extrasArr.some((e: any) => e.code === code)) continue;
-            extrasArr.push({ code, name: ins?.name || code, qty: 1, priceBRL: parseFloat(ins?.priceBRL || 0) || 0 } as any);
-          }
-
-          // Formata datas XRS (YYYYMMDD → DD/MM/YYYY)
-          const fmtDate = (d: string) => d && d.length >= 8 ? `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}` : d || '';
-          // Extrai horário se presente (YYYYMMDDTHHMM → HH:MM ou HHMM → HH:MM)
-          const fmtTime = (d: string) => {
-            if (!d) return '';
-            const tIdx = d.indexOf('T');
-            if (tIdx >= 0) { const t = d.slice(tIdx+1); return t.length >= 4 ? `${t.slice(0,2)}:${t.slice(2,4)}` : t; }
-            return '';
+          // Mesmo objeto que foi gravado em LocalReservation.customerData: a montagem das listas
+          // de proteções (franquias) e acessórios fica centralizada em reservationEmailVars.
+          const emailCustomerData = {
+            ...safeCustomerData,
+            booking: bookingData,
+            xrsInsurances: Array.isArray(xrsInsurances) ? xrsInsurances : [],
+            xrsEquipment: Array.isArray(xrsEquipment) ? xrsEquipment : [],
+            paymentMethod: paymentData.method,
           };
 
-          // Monta listas HTML de proteções e extras para o template
-          const listaProtecoes = extrasArr.length > 0
-            ? extrasArr.map(ex => `• ${ex.name || ex.code} ×${ex.qty}${ex.priceBRL > 0 ? ` — R$ ${ex.priceBRL.toFixed(2).replace('.', ',')}` : ''}`).join('<br/>')
-            : 'Nenhuma proteção adicional selecionada';
-
-          const equipArr: any[] = Array.isArray(xrsEquipment) ? xrsEquipment : [];
-          const listaExtras = equipArr.length > 0
-            ? equipArr.map(eq => `• ${eq.icon || '📦'} ${eq.name || eq.code} ×${eq.qty || 1}${eq.priceBRL ? ` — R$ ${parseFloat(eq.priceBRL).toFixed(2).replace('.', ',')} /dia` : ''}`).join('<br/>')
-            : 'Nenhum acessório selecionado';
-
-          const fmtPagamento: Record<string, string> = { BALCAO: 'Pagamento no Balcão', PIX: 'PIX', CREDIT: 'Cartão de Crédito', VOUCHER: 'Voucher ETO (Faturado)' };
-          const pickupDateRaw = bookingData.pickupDate || '';
-          const returnDateRaw = bookingData.returnDate || '';
-
-          // ── Moeda do e-mail: usa a moeda da estação de retirada ──────────────
-          // Para TODOS os métodos de pagamento em estações internacionais:
-          // o e-mail mostra o TOTAL COMPLETO na moeda de destino + estimativa BRL.
-          // (Para CREDIT/PIX o cliente paga parte online e parte no balcão —
-          //  o total de referência é sempre veículo + proteções + equipamentos)
-          const { buildEmailCurrencyVars } = await import('@/lib/receiptLocales');
-          const _exchangeRate  = parseFloat(bookingData.car?.exchangeRate || '0');
-          const _carCurrency   = bookingData.car?.currency || null;
-
-          // Veículo BRL (total do período, inclui sobretaxa de aeroporto)
-          const _vehicleBRL = parseFloat(
-            bookingData.car?.totalRateEstimateInBookingCurrency ||
-            bookingData.car?.totalRateEstimate || '0'
-          );
-          // Proteções selecionadas
-          const _insBRL = (Array.isArray(xrsInsurances) ? xrsInsurances : [])
-            .reduce((s: number, ins: any) => s + parseFloat(ins.priceBRL || 0), 0);
-          // Equipamentos selecionados
-          const _bookingDays = calculateRentalDays({
-            pickupDate: bookingData.pickupDate,
-            pickupTime: bookingData.pickupTime || '1000',
-            returnDate: bookingData.returnDate,
-            returnTime: bookingData.returnTime || '1000',
-            station: bookingData.pickupStation,
-            country: bookingData.stationCountry || bookingData.driverCountry || customerData.pais,
-            apiDuration: bookingData.duration || bookingData.car?.duration,
-          });
-          const _equipBRL = (Array.isArray(xrsEquipment) ? xrsEquipment : [])
-            .reduce((s: number, eq: any) => {
-              const t = parseFloat(eq.totalBRL || 0);
-              const d = parseFloat(eq.priceBRL || 0);
-              return s + (t > 0 ? t : d * _bookingDays) * (eq.qty || 1);
-            }, 0);
-          // Total completo (fallback para amountInCents se não tiver dados do booking)
-          const _totalBRLForEmail = (_vehicleBRL + _insBRL + _equipBRL) ||
-            ((paymentData.amountInCents || 0) / 100);
-
-          const _currencyVars = buildEmailCurrencyVars(
-            _totalBRLForEmail,
-            bookingData.pickupStation,
-            _exchangeRate,
-            _carCurrency,
-          );
-          const valorTotalEmail = _currencyVars.VALOR_TOTAL;
-
-          // Monta dicionário completo de variáveis para o template do painel
-          const emailVars: Record<string, string> = {
-            NOME: customerData.nome || '',
-            SOBRENOME: customerData.sobrenome || '',
-            EMAIL: customerData.email || '',
-            TELEFONE: customerData.telefone || '',
-            CPF: customerData.cpf || '',
-            NUMERO_RESERVA: finalResNumber,
-            VALOR_TOTAL:   _currencyVars.VALOR_TOTAL,
-            VALOR_LOCAL:   _currencyVars.VALOR_LOCAL,
-            VALOR_BRL:     _currencyVars.VALOR_BRL,
-            MOEDA:         _currencyVars.MOEDA,
-            FORMA_PAGAMENTO: fmtPagamento[paymentData.method] || paymentData.method || '',
-            CARRO: bookingData.car?.carCategoryName || bookingData.car?.name || '',
-            CATEGORIA_CARRO: bookingData.car?.acrissCode || bookingData.carCategory || '',
-            DATA_RETIRADA: fmtDate(pickupDateRaw),
-            HORARIO_RETIRADA: fmtTime(pickupDateRaw) || bookingData.pickupTime || '',
-            LOCAL_RETIRADA: bookingData.pickupStation || '',
-            DATA_DEVOLUCAO: fmtDate(returnDateRaw),
-            HORARIO_DEVOLUCAO: fmtTime(returnDateRaw) || bookingData.returnTime || '',
-            LOCAL_DEVOLUCAO: bookingData.returnStation || bookingData.pickupStation || '',
-            LISTA_PROTECOES: listaProtecoes,
-            LISTA_EXTRAS: listaExtras,
-            ITENS_SOB_CONSULTA: onRequestItems.map((i: any) => i.description || i.code).join(', ') || '',
-          };
-
-          // Tenta enviar usando o template do painel
           // On-request → RESERVA_SOB_SOLICITACAO; BALCÃO ou pré-pago → RESERVA_SUCESSO
-          const trigger = isOnRequest ? 'RESERVA_SOB_SOLICITACAO' : 'RESERVA_SUCESSO';
-          const { sendTransactionalEmail } = await import('@/lib/emailService');
-          const tplResult = await sendTransactionalEmail(customerData.email, trigger, emailVars);
-          console.log(`[reservas] Email trigger=${trigger} isOnRequest=${isOnRequest} result=`, tplResult.success);
-
-          if (!tplResult.success) {
-            // Fallback: template ausente ou envio falhou → usa template hardcoded
-            console.warn(`[reservas] Envio via template falhou (${tplResult.error}) — usando fallback hardcoded.`);
-            await sendBookingConfirmation({
-              toEmail: customerData.email,
-              customerName: `${customerData.nome} ${customerData.sobrenome}`,
-              resNumber: finalResNumber,
-              carName: bookingData.car?.carCategoryName || bookingData.car?.name || '',
-              pickupStation: bookingData.pickupStation || '',
-              returnStation: bookingData.returnStation || bookingData.pickupStation || '',
-              pickupDate: bookingData.pickupDate || '',
-              returnDate: bookingData.returnDate || '',
-              paymentMethod: paymentData.method,
-              totalBRL: (paymentData.amountInCents || 0) / 100,
-              isOnRequest,
-              xrsEquipment: Array.isArray(xrsEquipment) ? xrsEquipment : [],
-              extras: extrasArr,
-            });
-          }
+          // (com fallback hardcoded se o template/provedor falhar)
+          const { sendReservationConfirmationEmail } = await import('@/lib/email/sendReservationConfirmationEmail');
+          const emailOk = await sendReservationConfirmationEmail({
+            customerData: emailCustomerData,
+            resNumber: finalResNumber,
+            amountInCents: paymentData.amountInCents,
+            paymentMethod: paymentData.method,
+            isOnRequest,
+            extraVars: {
+              ITENS_SOB_CONSULTA: onRequestItems.map((i: any) => i.description || i.code).join(', ') || '',
+            },
+            source: 'reservas',
+          });
+          console.log(`[reservas] Email de confirmação isOnRequest=${isOnRequest} enviado=`, emailOk);
         } catch (emailErr) {
           console.error('[reservas] Error sending booking confirmation:', emailErr);
         }
@@ -1034,47 +915,17 @@ export async function POST(request: Request) {
       }
 
       // 5. Auto-criação de conta para clientes sem login (guest checkout)
-      // Cria uma conta se o e-mail informado ainda não existe no banco.
+      // Cria uma conta se o e-mail informado ainda não existe no banco e envia a senha.
+      // Roda SEMPRE depois do e-mail de confirmação (o cliente recebe a reserva primeiro).
+      // PIX: a conta é criada somente quando o pagamento é confirmado (pix-status / cron sync-pix),
+      // porque aqui a reserva ainda não está confirmada.
       // Nunca bloqueia a reserva — erros são apenas logados.
       let accountCreated = false;
-      if (customerData.email?.trim()) {
-        try {
-          const existingUser = await prisma.user.findUnique({
-            where: { email: customerData.email.trim().toLowerCase() },
-            select: { id: true },
-          });
-
-          if (!existingUser) {
-            const tempPassword = generateTemporaryPassword();
-            const hashedPassword = await bcrypt.hash(tempPassword, 10);
-            const fullName = `${customerData.nome || ''} ${customerData.sobrenome || ''}`.trim();
-
-            await prisma.user.create({
-              data: {
-                name: fullName,
-                email: customerData.email.trim().toLowerCase(),
-                password: hashedPassword,
-                phone: customerData.telefone || null,
-                cpf: customerData.cpf?.replace(/\D/g, '').slice(0, 11) || null,
-                role: 'USER',
-                status: 'ACTIVE',
-              },
-            });
-
-            accountCreated = true;
-            console.log(`[reservas] ✅ Conta criada automaticamente para ${customerData.email} (reserva ${finalResNumber})`);
-
-            // Envia e-mail de boas-vindas com credenciais (não bloqueia em caso de falha)
-            sendWelcomeWithCredentials({
-              toEmail: customerData.email.trim(),
-              firstName: customerData.nome || fullName,
-              password: tempPassword,
-              resNumber: finalResNumber || undefined,
-            }).catch(err => console.error('[reservas] Falha ao enviar e-mail de boas-vindas:', err));
-          }
-        } catch (accountErr: any) {
-          console.error('[reservas] Falha ao criar conta automática:', accountErr.message);
-        }
+      if (paymentData.method !== 'PIX' && customerData.email?.trim()) {
+        accountCreated = await ensureGuestAccountAndWelcome({
+          customerData,
+          resNumber: finalResNumber,
+        });
       }
 
       return NextResponse.json({

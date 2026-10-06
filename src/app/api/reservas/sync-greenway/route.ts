@@ -279,20 +279,30 @@ export async function POST(req: Request) {
               );
               const fmtDate = (d: string) => (d && d.length >= 8 ? `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : d || '');
 
+              // Listas de proteções/franquias e acessórios contratados (antes não eram enviadas
+              // neste fluxo e o template exibia o texto cru {{LISTA_PROTECOES}}).
+              const { buildExtrasListVars } = await import('@/lib/email/reservationEmailVars');
+              const extraLists = buildExtrasListVars({ ...parsedCustomerData, booking: bookingData });
+
               const emailVars: Record<string, string> = {
                 NOME: customerName,
                 SOBRENOME: customerLastName,
                 EMAIL: customerEmail,
+                TELEFONE: parsedCustomerData.telefone || '',
+                CPF: parsedCustomerData.cpf || '',
                 NUMERO_RESERVA: res.resNumber || '',
                 CARRO: car.carCategoryName || car.name || xrs.carCategory || '',
                 DATA_RETIRADA: fmtDate(bookingData.pickupDate || xrs.pickupDate || ''),
                 LOCAL_RETIRADA: bookingData.pickupStation || xrs.pickupStation || '',
                 DATA_DEVOLUCAO: fmtDate(bookingData.returnDate || xrs.returnDate || ''),
                 LOCAL_DEVOLUCAO: bookingData.returnStation || bookingData.pickupStation || xrs.pickupStation || '',
+                LISTA_PROTECOES: extraLists.LISTA_PROTECOES,
+                LISTA_EXTRAS: extraLists.LISTA_EXTRAS,
                 VALOR_TOTAL: cv.VALOR_TOTAL,
                 VALOR_LOCAL: cv.VALOR_LOCAL,
                 VALOR_BRL: cv.VALOR_BRL,
                 MOEDA: cv.MOEDA,
+                MOEDA_ESTRANGEIRA: cv.MOEDA !== 'BRL' ? '1' : '',
                 FORMA_PAGAMENTO: isPrepaid ? 'Pago Online (Cielo)' : 'Pagar no Balcão',
                 STATUS: 'Confirmada',
                 MENSAGEM: 'Sua reserva On Request foi CONFIRMADA pela Europcar! Sua locação está garantida.',
@@ -317,6 +327,8 @@ export async function POST(req: Request) {
                   paymentMethod: isPrepaid ? 'CREDIT' : 'BALCAO',
                   totalBRL: totalBRL,
                   isOnRequest: false,
+                  xrsEquipment: extraLists.equipment,
+                  extras: extraLists.extras,
                 });
               }
             } catch (emailErr: any) {

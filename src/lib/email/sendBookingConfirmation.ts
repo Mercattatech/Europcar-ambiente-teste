@@ -49,7 +49,7 @@ async function getFromEmail(): Promise<string> {
   return process.env.RESEND_FROM_EMAIL || 'nao-responda@europcar.com.br';
 }
 
-export async function sendBookingConfirmation(data: BookingConfirmationData) {
+export async function sendBookingConfirmation(data: BookingConfirmationData): Promise<boolean> {
   const fromEmail = await getFromEmail();
 
   const {
@@ -199,8 +199,10 @@ export async function sendBookingConfirmation(data: BookingConfirmationData) {
     } else {
       console.error(`[email] ❌ Falha ao enviar confirmação para ${toEmail}: ${result.error}`);
     }
+    return !!result.success;
   } catch (error: any) {
     // Non-blocking: log but don't throw — reservation is already confirmed
     console.error(`[email] Exceção ao enviar confirmação para ${toEmail}:`, error.message);
+    return false;
   }
 }
