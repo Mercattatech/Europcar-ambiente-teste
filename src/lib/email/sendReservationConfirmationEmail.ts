@@ -10,6 +10,7 @@
 import { sendTransactionalEmail } from '@/lib/emailService';
 import { sendBookingConfirmation } from '@/lib/email/sendBookingConfirmation';
 import { buildReservationEmailVars } from '@/lib/email/reservationEmailVars';
+import { fetchXrsSnapshot } from '@/lib/email/xrsReservationSnapshot';
 
 export interface SendReservationConfirmationParams {
   /** customerData no mesmo formato salvo na LocalReservation (com .booking, .xrsInsurances...) */
@@ -37,12 +38,19 @@ export async function sendReservationConfirmationEmail(p: SendReservationConfirm
   let built: ReturnType<typeof buildReservationEmailVars> | null = null;
 
   try {
+    // XML da reserva no XRS (fonte da verdade). Timeout de 6s: nunca atrasa/bloqueia o e-mail.
+    const xrs = await Promise.race([
+      fetchXrsSnapshot(p.resNumber),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
+    ]).catch(() => null);
+
     built = buildReservationEmailVars({
       customerData: cd,
       resNumber: p.resNumber,
       amountInCents: p.amountInCents,
       paymentMethod: p.paymentMethod,
       extraVars: p.extraVars,
+      xrs,
     });
 
     const r = await sendTransactionalEmail(to, trigger, built.vars);

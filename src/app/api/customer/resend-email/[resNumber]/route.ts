@@ -3,7 +3,8 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
-import { buildExtrasListVars } from '@/lib/email/reservationEmailVars';
+import { buildExtrasListVars, buildDestinationCurrencyVars } from '@/lib/email/reservationEmailVars';
+import { fetchXrsSnapshot } from '@/lib/email/xrsReservationSnapshot';
 export const dynamic = 'force-dynamic';
 
 /**
@@ -84,15 +85,9 @@ export async function POST(
   const amountBRL = (_vehicleBRL2 + _insBRL + _eqBRL) || _baseAmountBRL;
   const finalResNumber = reservation.resNumber || reservation.merchantOrderId || resNumber;
 
-  // Valor na moeda da estação de retirada (+ estimativa BRL)
-  const { buildEmailCurrencyVars } = await import('@/lib/receiptLocales');
-  const _resExchangeRate = parseFloat(car?.exchangeRate || '0');
-  const _currVars = buildEmailCurrencyVars(
-    amountBRL,
-    booking?.pickupStation || null,
-    _resExchangeRate,
-    car?.currency || null,
-  );
+  // Valor na moeda da estação de retirada (+ estimativa BRL) — câmbio do car ou da cotação no XRS
+  const xrsSnap = await fetchXrsSnapshot(reservation.resNumber);
+  const _currVars = buildDestinationCurrencyVars(amountBRL, booking, car, xrsSnap);
   const valorTotal = _currVars.VALOR_TOTAL;
 
   function fmtDate(d?: string) {
@@ -108,7 +103,10 @@ export async function POST(
   }
 
   // Proteções/franquias e acessórios — helper único (lê topo do customerData, booking e mapa extras)
-  const extraLists = buildExtrasListVars(cd);
+  const extraLists = buildExtrasListVars(
+    cd,
+    xrsSnap ? { xrsInsurances: xrsSnap.insurances, xrsEquipment: xrsSnap.equipment } : undefined,
+  );
   const extrasArr = extraLists.extras;
   const listaProtecoes = extraLists.LISTA_PROTECOES;
   const listaExtras = extraLists.LISTA_EXTRAS;
@@ -132,7 +130,7 @@ export async function POST(
     VALOR_LOCAL:       _currVars.VALOR_LOCAL,
     VALOR_BRL:         _currVars.VALOR_BRL,
     MOEDA:             _currVars.MOEDA,
-    MOEDA_ESTRANGEIRA: _currVars.MOEDA !== 'BRL' ? '1' : '',
+    MOEDA_ESTRANGEIRA: _currVars.MOEDA_ESTRANGEIRA,
     FORMA_PAGAMENTO:   fmtPagamento[paymentMethod] || paymentMethod,
     CARRO:             car?.carCategoryName || car?.carCategorySample || car?.name || '',
     CATEGORIA_CARRO:   car?.carCategoryCode || car?.acrissCode || '',

@@ -614,6 +614,8 @@ export function getCurrencyFromStation(stationCode?: string | null): string | nu
     BGY: 'EUR', CTA: 'EUR', PMO: 'EUR', PSA: 'EUR', BLQ: 'EUR',
     FLR: 'EUR', TRN: 'EUR', GOA: 'EUR', VRN: 'EUR', BRI: 'EUR',
     OLB: 'EUR', CAG: 'EUR',
+    // Prefixos de CIDADE (ex.: ROML01 = Roma, MILL01 = Milão, PARL01 = Paris)
+    ROM: 'EUR', MIL: 'EUR', PAR: 'EUR', LON: 'GBP', VEN: 'EUR',
     // Suíça → CHF
     ZRH: 'CHF', GVA: 'CHF', BSL: 'CHF', BRN: 'CHF', LGN: 'CHF',
     // Reino Unido → GBP

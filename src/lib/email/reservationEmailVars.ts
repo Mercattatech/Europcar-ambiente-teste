@@ -17,6 +17,7 @@
  */
 import { buildEmailCurrencyVars } from '@/lib/receiptLocales';
 import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
+import { INSURANCE_NAMES_PT, type XrsSnapshot } from '@/lib/email/xrsReservationSnapshot';
 
 // Mesmos códigos de proteção usados em bookXRS.ts / reservas/route.ts
 export const INSURANCE_CODES = [
@@ -127,7 +128,12 @@ export function resolveReservationExtras(
     }
   }
 
-  return { extras: [...insMap.values()], equipment: [...eqMap.values()] };
+  // Nome amigável (PT) quando só temos o código
+  const extras = [...insMap.values()].map((e) =>
+    (!e.name || e.name === e.code) && INSURANCE_NAMES_PT[e.code] ? { ...e, name: INSURANCE_NAMES_PT[e.code] } : e,
+  );
+
+  return { extras, equipment: [...eqMap.values()] };
 }
 
 /** Converte as listas em HTML simples (<br/>) para os placeholders do template. */
@@ -175,8 +181,33 @@ const PAYMENT_LABEL: Record<string, string> = {
 };
 
 /**
+ * Valor na moeda de destino (ex.: € 421,50) + valor pago em Real.
+ *
+ * Moeda local: car.currency → moeda da cotação no XRS → moeda da estação de retirada.
+ * (NÃO usar bookingCurrency: é a moeda de PAGAMENTO — BRL — e fazia o e-mail sair só em R$.)
+ * Câmbio: car.exchangeRate → câmbio da cotação lida no XRS.
+ */
+export function buildDestinationCurrencyVars(
+  totalBRL: number,
+  booking: any,
+  car: any,
+  xrs?: XrsSnapshot | null,
+) {
+  const isForeign = (c?: string | null) => !!c && c.length === 3 && c.toUpperCase() !== 'BRL';
+  const hint = [car?.currency, xrs?.quote?.currency].find(isForeign) || null;
+  const rate = num(car?.exchangeRate) || num(xrs?.quote?.exchangeRate);
+  const cv = buildEmailCurrencyVars(totalBRL, booking?.pickupStation, rate, hint ? hint.toUpperCase() : null);
+  return { ...cv, MOEDA_ESTRANGEIRA: cv.MOEDA !== 'BRL' ? '1' : '' };
+}
+
+/**
  * Monta o dicionário COMPLETO de variáveis dos templates de reserva a partir do
  * customerData salvo na LocalReservation (ou do objeto equivalente em memória).
+ *
+ * `xrs` (opcional): snapshot do XML da reserva no XRS (fetchXrsSnapshot). Quando informado,
+ * proteções/acessórios do XRS são somados aos dados locais e a cotação do XRS completa
+ * moeda/câmbio se o car salvo localmente não os tiver.
+ * `preferPaidAmount`: usa amountInCents (valor realmente pago) como total em R$.
  */
 export function buildReservationEmailVars(params: {
   customerData: any;
@@ -184,13 +215,15 @@ export function buildReservationEmailVars(params: {
   amountInCents?: number | null;
   paymentMethod?: string;
   extraVars?: Record<string, string>;
+  xrs?: XrsSnapshot | null;
+  preferPaidAmount?: boolean;
 }) {
   const cd = params.customerData || {};
   const booking = cd.booking || {};
   const car = booking.car || {};
   const paymentMethod = params.paymentMethod || cd.paymentMethod || 'CREDIT';
 
-  const lists = buildExtrasListVars(cd);
+  const lists = buildExtrasListVars(cd, params.xrs ? { xrsInsurances: params.xrs.insurances, xrsEquipment: params.xrs.equipment } : undefined);
 
   // Total completo = veículo + proteções + acessórios (fallback: valor cobrado)
   let days = 1;
@@ -209,14 +242,12 @@ export function buildReservationEmailVars(params: {
   const vehicleBRL = num(car.totalRateEstimateInBookingCurrency || car.totalRateEstimate);
   const insBRL = lists.extras.reduce((s, e) => s + e.priceBRL, 0);
   const equipBRL = lists.equipment.reduce((s, e) => s + (e.totalBRL > 0 ? e.totalBRL : e.priceBRL * days) * (e.qty || 1), 0);
-  const totalBRL = (vehicleBRL + insBRL + equipBRL) || ((params.amountInCents || 0) / 100);
+  const paidBRL = (params.amountInCents || 0) / 100;
+  const totalBRL = params.preferPaidAmount && paidBRL > 0
+    ? paidBRL
+    : ((vehicleBRL + insBRL + equipBRL) || paidBRL);
 
-  const cv = buildEmailCurrencyVars(
-    totalBRL,
-    booking.pickupStation,
-    num(car.exchangeRate),
-    car.currency || null,
-  );
+  const cv = buildDestinationCurrencyVars(totalBRL, booking, car, params.xrs);
 
   const vars: Record<string, string> = {
     NOME: cd.nome || cd.firstName || '',
@@ -230,7 +261,7 @@ export function buildReservationEmailVars(params: {
     VALOR_BRL: cv.VALOR_BRL,
     MOEDA: cv.MOEDA,
     // '1' só quando a moeda NÃO é BRL — usado em {{#MOEDA_ESTRANGEIRA}}...{{/MOEDA_ESTRANGEIRA}}
-    MOEDA_ESTRANGEIRA: cv.MOEDA !== 'BRL' ? '1' : '',
+    MOEDA_ESTRANGEIRA: cv.MOEDA_ESTRANGEIRA,
     FORMA_PAGAMENTO: PAYMENT_LABEL[paymentMethod] || paymentMethod || '',
     CARRO: car.carCategoryName || car.carCategorySample || car.name || '',
     CATEGORIA_CARRO: car.acrissCode || car.carCategoryCode || booking.carCategory || '',

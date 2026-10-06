@@ -157,44 +157,19 @@ export async function POST(request: Request) {
 
           // Send modification email
           if (cd.email) {
-            const modCar = cd.booking?.car || {};
-            const fmtDM = (d: string) => d && d.length >= 8 ? `${d.slice(6,8)}/${d.slice(4,6)}/${d.slice(0,4)}` : d || '';
-            const fmtTM = (t: string) => /^\d{4}$/.test(t) ? `${t.slice(0,2)}:${t.slice(2,4)}` : '';
-            const amtBRLM = (await prisma.localReservation.findFirst({ where: { resNumber }, select: { amountInCents: true } }))?.amountInCents || 0;
-            const valorBRLM = `R$ ${(amtBRLM / 100).toFixed(2).replace('.',',')}`;
-            const rawAmtM = parseFloat(modCar?.totalRateEstimate || modCar?.total || '0');
-            const localCurM = (modCar?.bookingCurrencyOfTotalRateEstimate || modCar?.currency || 'BRL').toUpperCase();
-            let valorLocalM = valorBRLM;
-            if (localCurM !== 'BRL' && rawAmtM > 0) {
-              try { valorLocalM = new Intl.NumberFormat('pt-BR',{style:'currency',currency:localCurM}).format(rawAmtM); } catch { valorLocalM = `${localCurM} ${rawAmtM.toFixed(2)}`; }
-            }
-            const valorTotalM = localCurM === 'BRL' ? valorLocalM : `${valorLocalM} (≈ ${valorBRLM})`;
-            const fmtPagM: Record<string,string> = { BALCAO:'Pagamento no Balcão', PIX:'PIX', CREDIT:'Cartão de Crédito', VOUCHER:'Voucher ETO (Faturado)' };
-            const { buildExtrasListVars } = await import('@/lib/email/reservationEmailVars');
-            const modLists = buildExtrasListVars(cd);
-            await sendTransactionalEmail(cd.email, 'RESERVA_ALTERADA', {
-              NOME: cd.nome || cd.firstName || '',
-              SOBRENOME: cd.sobrenome || cd.lastName || '',
-              EMAIL: cd.email || '',
-              TELEFONE: cd.telefone || '',
-              NUMERO_RESERVA: resNumber,
-              CARRO: modCar.carCategoryName || modCar.carCategorySample || modCar.name || '',
-              CATEGORIA_CARRO: modCar.carCategoryCode || modCar.acrissCode || '',
-              DATA_RETIRADA: fmtDM(cd.booking?.pickupDate || pickupDate || ''),
-              HORARIO_RETIRADA: fmtTM(cd.booking?.pickupTime || pickupTime || ''),
-              LOCAL_RETIRADA: cd.booking?.pickupStation || pickupStationID || '',
-              DATA_DEVOLUCAO: fmtDM(cd.booking?.returnDate || returnDate || ''),
-              HORARIO_DEVOLUCAO: fmtTM(cd.booking?.returnTime || returnTime || ''),
-              LOCAL_DEVOLUCAO: cd.booking?.returnStation || returnStationID || cd.booking?.pickupStation || '',
-              VALOR_LOCAL: valorLocalM,
-              VALOR_BRL: valorBRLM,
-              VALOR_TOTAL: valorTotalM,
-              MOEDA: localCurM,
-              MOEDA_ESTRANGEIRA: localCurM !== 'BRL' ? '1' : '',
-              FORMA_PAGAMENTO: fmtPagM[cd.paymentMethod || ''] || cd.paymentMethod || '',
-              LISTA_PROTECOES: modLists.LISTA_PROTECOES,
-              LISTA_EXTRAS: modLists.LISTA_EXTRAS,
+            // XML da reserva no XRS (fonte da verdade): proteções/acessórios contratados + câmbio
+            const { fetchXrsSnapshot } = await import('@/lib/email/xrsReservationSnapshot');
+            const { buildReservationEmailVars } = await import('@/lib/email/reservationEmailVars');
+            const xrsSnap = await fetchXrsSnapshot(resNumber);
+            const { vars: modVars } = buildReservationEmailVars({
+              customerData: cd,
+              resNumber,
+              amountInCents: localRes.amountInCents || 0,
+              paymentMethod: cd.paymentMethod,
+              xrs: xrsSnap,
+              preferPaidAmount: true, // R$ = valor realmente pago
             });
+            await sendTransactionalEmail(cd.email, 'RESERVA_ALTERADA', modVars);
           }
         }
       } catch (syncErr: any) {

@@ -4,6 +4,7 @@ import { checkAdmin } from '@/lib/checkAdmin';
 import { getReceiptLocale, getCurrencyFromStation } from '@/lib/receiptLocales';
 import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 import { buildExtrasListVars } from '@/lib/email/reservationEmailVars';
+import { fetchXrsSnapshot } from '@/lib/email/xrsReservationSnapshot';
 export const dynamic = 'force-dynamic';
 
 
@@ -88,8 +89,12 @@ export async function POST(
     return '';
   };
 
-  // Proteções/franquias e acessórios — helper único (lê topo do customerData, booking e mapa extras)
-  const extraLists = buildExtrasListVars(cd);
+  // Proteções/franquias e acessórios — dados locais + XML da reserva no XRS (fonte da verdade)
+  const xrsSnap = await fetchXrsSnapshot(reservation.resNumber);
+  const extraLists = buildExtrasListVars(
+    cd,
+    xrsSnap ? { xrsInsurances: xrsSnap.insurances, xrsEquipment: xrsSnap.equipment } : undefined,
+  );
   const extrasArr = extraLists.extras;
   const listaProtecoes = extraLists.LISTA_PROTECOES;
   const listaExtras = extraLists.LISTA_EXTRAS;
@@ -131,26 +136,26 @@ export async function POST(
   const amountBRL = (_vehicleBRL2 + _insBRL + _eqBRL) || _baseAmountBRL;
 
   // ── Moeda local da reserva ─────────────────────────────────────────────
-  // Prioridade (da mais confiável para a menos):
-  //   1. bookingCurrencyOfTotalRateEstimate do car (campo XRS direto)
-  //   2. currency do car
-  //   3. ESTAÇÃO de retirada (prefixo IATA → moeda)  ← principal fallback
-  //      Resolve o problema de booking.country ser a NACIONALIDADE do cliente
-  //      (ex: cliente BR que aluga em Lisboa → OPO/LIS → EUR, não BRL)
+  // Prioridade:
+  //   1. currency do car (moeda da estação, ex.: EUR)
+  //   2. moeda da cotação lida no XRS
+  //   3. ESTAÇÃO de retirada (prefixo → moeda)
   //   4. Locale do país → último recurso
+  // (bookingCurrencyOfTotalRateEstimate NÃO entra: é a moeda de PAGAMENTO — BRL —
+  //  e fazia o e-mail sair só em R$.)
   const localeLookup    = getReceiptLocale(country);
   const stationCurrency = getCurrencyFromStation(booking?.pickupStation);
-  const rawCurrency     = (
-    car?.bookingCurrencyOfTotalRateEstimate ||
-    car?.currency ||
-    ''
-  ).toUpperCase().trim();
-  const localCurrency = (rawCurrency && rawCurrency.length === 3)
+  const isForeignCur = (c?: string) => !!c && c.length === 3 && c.toUpperCase() !== 'BRL';
+  const rawCurrency = [car?.currency, xrsSnap?.quote?.currency].find(isForeignCur)?.toUpperCase().trim() || '';
+  const localCurrency = rawCurrency
     ? rawCurrency
     : (stationCurrency || localeLookup.currency);
     // ex: OPOT01→EUR | ZRHT01→CHF | GRUG01→BRL
 
-  // Valor na moeda local
+  // Câmbio: car → cotação do XRS
+  const exchRate = parseFloat(car?.exchangeRate || '0') || xrsSnap?.quote?.exchangeRate || 0;
+
+  // Valor na moeda local (rawAmount = total do veículo na moeda local, fallback)
   const rawAmount = parseFloat(
     car?.totalRateEstimate ||
     car?.total ||
@@ -160,7 +165,19 @@ export async function POST(
 
   // Admin pode sobrescrever moeda e valor via body do request
   const finalCurrency = overrideCurrency || localCurrency;
-  const finalAmount   = overrideAmount   || rawAmount;
+  const finalAmount   = overrideAmount   || 0;
+
+  const fmtLocal = (value: number) => {
+    try {
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: finalCurrency,
+        minimumFractionDigits: finalCurrency === 'JPY' || finalCurrency === 'KRW' ? 0 : 2,
+      }).format(value);
+    } catch {
+      return `${finalCurrency} ${value.toFixed(2)}`;
+    }
+  };
 
   // Valor local + estimativa BRL para templates de e-mail
   const _valorBRL = `R$ ${amountBRL.toFixed(2).replace('.', ',')}`;
@@ -169,32 +186,16 @@ export async function POST(
     const brlAmt = overrideAmount || amountBRL;
     _valorLocal = `R$ ${brlAmt.toFixed(2).replace('.', ',')}`;
   } else if (finalAmount > 0) {
-    try {
-      _valorLocal = new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: finalCurrency,
-        minimumFractionDigits: finalCurrency === 'JPY' || finalCurrency === 'KRW' ? 0 : 2,
-      }).format(finalAmount);
-    } catch {
-      _valorLocal = `${finalCurrency} ${finalAmount.toFixed(2)}`;
-    }
+    _valorLocal = fmtLocal(finalAmount);
+  } else if (exchRate > 0) {
+    // Converte o total (R$) pela taxa de câmbio da reserva
+    _valorLocal = fmtLocal(amountBRL / exchRate);
+  } else if (xrsSnap?.quote && xrsSnap.quote.totalLocal > 0) {
+    _valorLocal = fmtLocal(xrsSnap.quote.totalLocal);
+  } else if (rawAmount > 0) {
+    _valorLocal = fmtLocal(rawAmount);
   } else {
-    // Sem valor local — converte via taxa de câmbio se disponível
-    const exchRate = parseFloat(car?.exchangeRate || '0');
-    if (exchRate > 0) {
-      const converted = amountBRL / exchRate;
-      try {
-        _valorLocal = new Intl.NumberFormat('pt-BR', {
-          style: 'currency',
-          currency: finalCurrency,
-          minimumFractionDigits: 2,
-        }).format(converted);
-      } catch {
-        _valorLocal = `${finalCurrency} ${converted.toFixed(2)}`;
-      }
-    } else {
-      _valorLocal = `${finalCurrency} (ref. ${_valorBRL})`;
-    }
+    _valorLocal = `${finalCurrency} (ref. ${_valorBRL})`;
   }
   // VALOR_TOTAL: moeda local + estimativa BRL (para estações internacionais)
   const valorTotal = finalCurrency === 'BRL'
@@ -227,7 +228,7 @@ export async function POST(
   };
 
   // ── Determina qual trigger/template usar ──
-  const VALID_TRIGGERS = ['RESERVA_SUCESSO', 'CANCELAMENTO', 'RESERVA_SOB_SOLICITACAO'];
+  const VALID_TRIGGERS = ['RESERVA_SUCESSO', 'CANCELAMENTO', 'RESERVA_SOB_SOLICITACAO', 'RESERVA_ALTERADA', 'RESERVA_CONFIRMADA'];
   const trigger = VALID_TRIGGERS.includes(requestedTrigger) ? requestedTrigger : 'RESERVA_SUCESSO';
 
   const { sendTransactionalEmail } = await import('@/lib/emailService');
