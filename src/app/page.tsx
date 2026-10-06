@@ -74,6 +74,7 @@ export default function HomePage() {
                 { href: "/promocoes", label: t('menu.promotions'), icon: "🏷️" },
                 { href: "/filiais", label: t('menu.branches'), icon: "📍" },
                 { href: "/frota", label: t('menu.fleet'), icon: "🚙" },
+                { href: "/seja-um-franqueado", label: "Seja um franqueado", icon: "🤝" },
                 { href: "https://www.europcar.com/en-us/loyalty-program", label: t('menu.loyalty'), icon: "⭐", external: true },
                 { href: "https://www.europcar.com/pt-br/contact-us", label: t('menu.help'), icon: "❓", external: true },
               ].map((link) => (
@@ -139,6 +140,12 @@ export default function HomePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Ajuda
+            </a>
+            <a
+              href="/seja-um-franqueado"
+              className="bg-[#ffcc00] hover:bg-yellow-400 text-gray-900 font-black text-xs px-4 py-2 rounded transition-colors whitespace-nowrap"
+            >
+              Seja um franqueado
             </a>
 
           </div>
@@ -322,6 +329,23 @@ export default function HomePage() {
               </ul>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Seja um franqueado */}
+      <div className="bg-[#1a1a1a] border-t border-gray-800">
+        <div className="max-w-6xl mx-auto px-4 py-10 md:py-12 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
+          <div>
+            <p className="text-[#ffcc00] text-[11px] font-black uppercase tracking-wider mb-1">Projeto Expansão 2030</p>
+            <h3 className="text-white font-black text-xl md:text-2xl mb-1">Quer abrir uma franquia Europcar?</h3>
+            <p className="text-gray-400 text-sm max-w-xl">Entre em uma rede global de mobilidade presente em mais de 140 países. Simule a rentabilidade e fale com a nossa expansão.</p>
+          </div>
+          <a
+            href="/seja-um-franqueado"
+            className="bg-[#ffcc00] hover:bg-yellow-400 text-gray-900 font-black py-3 px-8 rounded text-sm whitespace-nowrap transition-colors"
+          >
+            Seja um franqueado →
+          </a>
         </div>
       </div>
     </main>
