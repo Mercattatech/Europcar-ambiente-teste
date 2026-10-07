@@ -118,23 +118,25 @@ export default function PainelComissoes() {
    // Totais consideram só vendas efetivadas (PIX pendente fica de fora)
    const filteredTotals = useMemo(() => {
       return filtered.reduce(
-         (acc: { vendas: number; net: number; markup: number; comissao: number; count: number; estimadas: number }, r: any) => {
+         (acc: { vendas: number; net: number; markup: number; desconto: number; markupLiq: number; comissao: number; count: number; estimadas: number }, r: any) => {
             if (!r.isEfetivada) return acc;
             return {
                vendas:    acc.vendas   + (r.valorCalculado || 0),
                net:       acc.net      + (r.netBRL || 0),
                markup:    acc.markup   + (r.markupBRL || 0),
+               desconto:  acc.desconto + (r.descontoCupom || 0),
+               markupLiq: acc.markupLiq + (r.markupLiquidoBRL || 0),
                comissao:  acc.comissao + commissionOf(r),
                count:     acc.count + 1,
                estimadas: acc.estimadas + (r.netSource === 'ESTIMADO' ? 1 : 0),
             };
          },
-         { vendas: 0, net: 0, markup: 0, comissao: 0, count: 0, estimadas: 0 }
+         { vendas: 0, net: 0, markup: 0, desconto: 0, markupLiq: 0, comissao: 0, count: 0, estimadas: 0 }
       );
    }, [filtered, commissionOf]);
 
    const exportCsv = () => {
-      const header = ['Reserva', 'Data', 'Cliente', 'Tipo', 'Valor Venda (BRL)', 'NET (BRL)', 'NET (moeda local)', 'Moeda', 'Markup %', 'Markup (BRL)', `Comissao (${rateNum}% s/ ${base})`, 'Origem NET/Markup'];
+      const header = ['Reserva', 'Data', 'Cliente', 'Tipo', 'Valor Venda (BRL)', 'NET (BRL)', 'NET (moeda local)', 'Moeda', 'Markup %', 'Markup (BRL)', 'Cupom', 'Desconto cupom (BRL)', 'Markup liquido (BRL)', `Comissao (${rateNum}% s/ ${base})`, 'Origem NET/Markup'];
       const lines = filtered.map((r: any) => {
          let p: any = {};
          try { p = JSON.parse(r.customerData); } catch { /* ignore */ }
@@ -142,7 +144,7 @@ export default function PainelComissoes() {
          return [
             r.resNumber || '', new Date(r.createdAt).toLocaleDateString('pt-BR'), `${p?.nome || ''} ${p?.sobrenome || ''}`.trim(),
             r.tipoPagamento, n(r.valorCalculado), n(r.netBRL), n(r.netLocal), r.netCurrency || '',
-            r.markupPercent == null ? '' : String(r.markupPercent).replace('.', ','), n(r.markupBRL), n(commissionOf(r)),
+            r.markupPercent == null ? '' : String(r.markupPercent).replace('.', ','), n(r.markupBRL), r.cupom || '', n(r.descontoCupom), n(r.markupLiquidoBRL), n(commissionOf(r)),
             r.netSource === 'XRS_QUOTE' ? 'API (registrado)' : r.netSource === 'ESTIMADO' ? 'Estimado' : '',
          ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(';');
       });
@@ -370,12 +372,14 @@ export default function PainelComissoes() {
                               <th className="px-5 py-4 text-[10px] font-bold text-slate-300 uppercase tracking-wider text-right">NET (API)</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-purple-300 uppercase tracking-wider text-right">Markup %</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-purple-300 uppercase tracking-wider text-right">Markup R$</th>
+                               <th className="px-5 py-4 text-[10px] font-bold text-orange-300 uppercase tracking-wider text-right">Desc. Cupom</th>
+                               <th className="px-5 py-4 text-[10px] font-bold text-purple-200 uppercase tracking-wider text-right">Markup Líq.</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-emerald-400 uppercase tracking-wider text-right">Comissão ({rateNum}%)</th>
                            </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-800/50">
                            {filtered.length === 0 ? (
-                              <tr><td colSpan={9} className="text-center py-10 text-gray-500">Nenhuma reserva para este filtro.</td></tr>
+                              <tr><td colSpan={11} className="text-center py-10 text-gray-500">Nenhuma reserva para este filtro.</td></tr>
                            ) : (
                               filtered.map((res: any) => {
                                  let parsed: any = {};
@@ -441,6 +445,19 @@ export default function PainelComissoes() {
                                        <td className="px-5 py-4 text-right">
                                           {res.markupBRL == null ? <span className="text-gray-600">—</span> : (
                                              <span className="font-bold text-purple-300">{est && res.markupBRL > 0 && '~'}{fmt(res.markupBRL)}</span>
+                                       )}
+                                       </td>
+                                       <td className="px-5 py-4 text-right" title={res.cupomLabel || ''}>
+                                          {res.cupom ? (
+                                             <>
+                                                <div className="font-bold text-orange-300">{res.descontoCupom != null ? `− ${fmt(res.descontoCupom)}` : 'valor n/d'}</div>
+                                                <div className="text-[10px] text-gray-500">{res.cupom}{res.cupomLabel ? ` · ${res.cupomLabel}` : ''}</div>
+                                             </>
+                                          ) : <span className="text-gray-600">—</span>}
+                                       </td>
+                                       <td className="px-5 py-4 text-right">
+                                          {res.markupLiquidoBRL == null ? <span className="text-gray-600">—</span> : (
+                                             <span className="font-bold text-purple-200">{est && res.markupLiquidoBRL > 0 && '~'}{fmt(res.markupLiquidoBRL)}</span>
                                           )}
                                        </td>
                                        <td className="px-5 py-4 text-right">
@@ -465,6 +482,8 @@ export default function PainelComissoes() {
                                     {filteredTotals.net > 0 ? `${((filteredTotals.markup / filteredTotals.net) * 100).toFixed(2).replace('.', ',')}%` : '—'}
                                  </td>
                                  <td className="px-5 py-4 text-right font-black text-purple-300">{fmt(filteredTotals.markup)}</td>
+                                  <td className="px-5 py-4 text-right font-black text-orange-300">{filteredTotals.desconto > 0 ? `− ${fmt(filteredTotals.desconto)}` : '—'}</td>
+                                  <td className="px-5 py-4 text-right font-black text-purple-200">{fmt(filteredTotals.markupLiq)}</td>
                                  <td className="px-5 py-4 text-right font-black text-emerald-400">{fmt(filteredTotals.comissao)}</td>
                               </tr>
                            </tfoot>

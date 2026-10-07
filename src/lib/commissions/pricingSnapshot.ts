@@ -74,9 +74,14 @@ export function buildPricingSnapshot(params: {
 
 /**
  * Lê o snapshot salvo; para reservas antigas devolve uma estimativa
- * (NET = cotação regravada no car; markup = cobrado online − proteções − acessórios − NET, só ETO).
+ * (valor cobrado online + sobretaxa paga no balcão = NET × (1 + margem). Se o car salvo tiver a cotação NET
+ * do XRS, o markup é a diferença; senão o NET é derivado da margem configurada. Só contratos ETO).
  */
-export function resolvePricingSnapshot(customerData: any, amountInCents: number | null | undefined): PricingSnapshot | null {
+export function resolvePricingSnapshot(
+  customerData: any,
+  amountInCents: number | null | undefined,
+  opts?: { configuredMarkupPercent?: number }
+): PricingSnapshot | null {
   const cd = customerData || {};
   if (cd.pricingSnapshot && num(cd.pricingSnapshot.netBRL) > 0) {
     const s = cd.pricingSnapshot;
@@ -93,21 +98,34 @@ export function resolvePricingSnapshot(customerData: any, amountInCents: number 
 
   const booking = cd.booking || {};
   const car = booking.car || {};
-  const netLocal = num(car.totalRateEstimate);
-  const netBRL = num(car.totalRateEstimateInBookingCurrency) || netLocal;
-  if (netBRL <= 0) return null;
-
-  let markupBRL = 0;
+  const carLocal = num(car.totalRateEstimate);
+  const carBRL = num(car.totalRateEstimateInBookingCurrency) || carLocal;
   const paid = (amountInCents || 0) / 100;
-  if (isEtoContract(booking.contractID) && paid > 0) {
-    const ins = (Array.isArray(cd.xrsInsurances) ? cd.xrsInsurances : [])
-      .reduce((s: number, i: any) => s + num(i.priceBRL), 0);
-    const equip = (Array.isArray(cd.xrsEquipment) ? cd.xrsEquipment : [])
-      .reduce((s: number, e: any) => s + (num(e.totalBRL) > 0 ? num(e.totalBRL) : num(e.priceBRL)) * (e.qty || 1), 0);
-    const implied = paid - ins - equip - netBRL;
-    // Diferenças pequenas (arredondamento/câmbio) não são markup
-    markupBRL = implied > netBRL * 0.005 ? implied : 0;
+  const eto = isEtoContract(booking.contractID);
+
+  // O checkout cobra online (total com markup − sobretaxa paga no balcão). Para comparar com o NET
+  // (total TRE do XRS) é preciso somar de volta o que é pago no balcão.
+  const grossOnline = paid + counterChargesBRL(booking);
+
+  let netBRL = carBRL;
+  let netLocal = carLocal;
+  let markupBRL = 0;
+
+  if (eto && grossOnline > 0) {
+    const carLooksLikeNet = carBRL > 0 && Math.abs(carBRL - grossOnline) / grossOnline > 0.01;
+    if (carLooksLikeNet) {
+      // Car regravado com a cotação do XRS = NET real
+      markupBRL = Math.max(0, grossOnline - carBRL);
+    } else {
+      // Car guardado já com markup (ou ausente): deriva o NET do valor cobrado e da margem configurada
+      const pct = Math.max(0, opts?.configuredMarkupPercent || 0);
+      netBRL = grossOnline / (1 + pct / 100);
+      netLocal = carLocal > 0 && carBRL > 0 ? carLocal * (netBRL / carBRL) : 0;
+      markupBRL = grossOnline - netBRL;
+    }
+    if (markupBRL < netBRL * 0.005) markupBRL = 0; // arredondamento/câmbio não é markup
   }
+  if (netBRL <= 0) return null;
 
   return {
     netBRL: round2(netBRL),
@@ -119,3 +137,22 @@ export function resolvePricingSnapshot(customerData: any, amountInCents: number 
     source: 'ESTIMADO',
   };
 }
+
+const AIRPORT_CODES = ['APF', 'APT', 'AIRPORTFEE', 'APS', 'ASF', 'APF2', 'APTF', 'STF'];
+
+/** Cobranças pagas no balcão (sobretaxa de aeroporto etc.) — mesma regra do checkout. */
+function counterChargesBRL(booking: any): number {
+  const list = Array.isArray(booking?.quoteInsurances) ? booking.quoteInsurances : [];
+  return list
+    .filter((i: any) => {
+      if (i.paidBy === 'counter' || i.paidBy === 'business') return true;
+      return !i.paidBy && AIRPORT_CODES.includes(String(i.code || '').toUpperCase());
+    })
+    .reduce((sum: number, i: any) => {
+      const v = num(i.rentalPriceInBookingCurrencyAI) > 0
+        ? num(i.rentalPriceInBookingCurrencyAI)
+        : (num(i.priceInBookingCurrency) > 0 ? num(i.priceInBookingCurrency) : num(i.price));
+      return sum + v;
+    }, 0);
+}
+
