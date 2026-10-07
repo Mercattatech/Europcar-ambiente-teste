@@ -41,6 +41,14 @@ const toArray = (v: any): any[] => (Array.isArray(v) ? v : v ? [v] : []);
 export interface XrsSnapshot {
   insurances: { code: string; name: string; priceBRL: number }[];
   equipment: { code: string; name: string; qty: number; priceBRL: number; totalBRL: number }[];
+  /**
+   * Franquia (excess) que sobra ao contratar cada proteção — atributo `excessWithPOM` do XRS
+   * (moeda local) e `bkExcessWithPOM` (moeda de pagamento). 0/0 = franquia zero.
+   * Só entra o código cujo atributo veio no XML.
+   */
+  excess?: Record<string, { local: number; brl: number }>;
+  /** % de IVA (chargeLine chrgTy=00028), quando informado */
+  vatPercent?: number;
   quote?: {
     /** Moeda local da estação (ex.: EUR) */
     currency?: string;
@@ -60,7 +68,7 @@ export interface XrsSnapshot {
  * Tolerante a variações de formato (atributos em `$` ou direto no nó).
  */
 export function extractSnapshotFromXrsReservation(raw: any): XrsSnapshot {
-  const snapshot: XrsSnapshot = { insurances: [], equipment: [] };
+  const snapshot: XrsSnapshot = { insurances: [], equipment: [], excess: {} };
   if (!raw) return snapshot;
 
   // Item só entra se estiver "no total" (ou se o XRS não informar esse atributo).
@@ -80,14 +88,23 @@ export function extractSnapshotFromXrsReservation(raw: any): XrsSnapshot {
   ];
   const chargeCodes = new Set<string>();
   for (const cl of toArray(raw.quote?.chargeList?.chargeLine ?? raw.chargeList?.chargeLine)) {
-    const k = String((cl?.$ || cl || {}).auxK || '').trim().toUpperCase();
+    const ca = cl?.$ || cl || {};
+    const k = String(ca.auxK || '').trim().toUpperCase();
     if (k) chargeCodes.add(k);
+    if (String(ca.chrgTy || '') === '00028' && !snapshot.vatPercent) {
+      const pct = num(ca.chrgPct);
+      if (pct > 0 && pct <= 100) snapshot.vatPercent = pct;
+    }
   }
   const NOT_PROTECTION = /FEE|TAX|VAT|^LAF$|^APF|^APT|^APS|^ASF|^YSC|^HS|RELOC|ONEWAY|DELIVER|COLLECT/;
   const seenIns = new Set<string>();
   for (const node of insNodes) {
     const a = node?.$ || node || {};
     const code = String(a.code || '').trim().toUpperCase();
+    // Franquia remanescente (guardada p/ qualquer código listado; o e-mail só usa as contratadas)
+    if (code && a.excessWithPOM !== undefined && !snapshot.excess![code]) {
+      snapshot.excess![code] = { local: num(a.excessWithPOM), brl: num(a.bkExcessWithPOM) };
+    }
     if (!code || seenIns.has(code)) continue;
     const type = String(a.type || '').toUpperCase();
     const isKnownProtection = PROTECTION_CODES.has(code);

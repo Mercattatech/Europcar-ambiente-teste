@@ -178,6 +178,72 @@
   </td>
 </tr>
 
+<!-- DETALHAMENTO DA RESERVA -->
+<tr>
+  <td class="px" style="padding:26px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">Detalhamento da reserva</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #dfe4dd;">
+      {{#TEXTO_DIARIAS}}<tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Diárias cobradas</td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{TEXTO_DIARIAS}}</td>
+      </tr>{{/TEXTO_DIARIAS}}
+      {{#QUILOMETRAGEM}}<tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Quilometragem</td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{QUILOMETRAGEM}}</td>
+      </tr>{{/QUILOMETRAGEM}}
+      {{#TARIFA}}<tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Tarifa</td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{TARIFA}}</td>
+      </tr>{{/TARIFA}}
+      {{#VALOR_VEICULO}}<tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Aluguel do veículo<br><span style="font-weight:normal;font-size:11px;color:#8a948c;">taxas e impostos inclusos</span></td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{VALOR_VEICULO}}</td>
+      </tr>{{/VALOR_VEICULO}}
+      {{#VALOR_PROTECOES}}<tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Proteções contratadas<br><span style="font-weight:normal;font-size:11px;color:#8a948c;">valor total do período, não por dia</span></td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{VALOR_PROTECOES}}</td>
+      </tr>{{/VALOR_PROTECOES}}
+      {{#VALOR_ACESSORIOS}}<tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Acessórios e equipamentos</td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{VALOR_ACESSORIOS}}</td>
+      </tr>{{/VALOR_ACESSORIOS}}
+      {{#TOTAL_RESERVA}}<tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Total da reserva</td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{TOTAL_RESERVA}}</td>
+      </tr>{{/TOTAL_RESERVA}}
+      {{#CAMBIO}}<tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Câmbio utilizado</td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{CAMBIO}}</td>
+      </tr>{{/CAMBIO}}
+      {{#VALOR_PAGO_ONLINE}}<tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Pago online agora</td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{VALOR_PAGO_ONLINE}}</td>
+      </tr>{{/VALOR_PAGO_ONLINE}}
+      {{#VALOR_BALCAO}}<tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">A pagar no balcão<br><span style="font-weight:normal;font-size:11px;color:#8a948c;">cobrado na moeda local</span></td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{VALOR_BALCAO}}</td>
+      </tr>{{/VALOR_BALCAO}}
+      {{#LISTA_BALCAO}}<tr>
+        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Cobranças no balcão</td>
+        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;"><span style="font-weight:normal;font-size:12px;line-height:19px;color:#3d463f;">{{LISTA_BALCAO}}</span></td>
+      </tr>{{/LISTA_BALCAO}}
+    </table>
+    {{#CAMBIO}}<p style="margin:8px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8a948c;font-style:italic;">Valores em reais são estimativas pelo câmbio acima; a cobrança no balcão é feita na moeda local.</p>{{/CAMBIO}}
+  </td>
+</tr>
+
+{{#LISTA_INCLUIDOS}}<!-- O QUE ESTÁ INCLUÍDO -->
+<tr>
+  <td class="px" style="padding:26px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">O que está incluído na tarifa</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f7f9f6;border:1px solid #dfe4dd;border-radius:8px;">
+      <tr><td style="padding:16px 20px;font-family:Arial,Helvetica,sans-serif;">
+        <p style="margin:0;font-size:13px;line-height:22px;color:#3d463f;">{{LISTA_INCLUIDOS}}</p>
+      </td></tr>
+    </table>
+  </td>
+</tr>
+{{/LISTA_INCLUIDOS}}
 <!-- PROTEÇÕES E EXTRAS -->
 <tr>
   <td class="px" style="padding:26px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;">
@@ -188,6 +254,27 @@
         <p style="margin:0 0 16px 0;font-size:13px;line-height:22px;color:#3d463f;">{{LISTA_PROTECOES}}</p>
         <p style="margin:0 0 8px 0;font-size:13px;font-weight:bold;color:#1f2421;">Acessórios e equipamentos:</p>
         <p style="margin:0;font-size:13px;line-height:22px;color:#3d463f;">{{LISTA_EXTRAS}}</p>
+      </td></tr>
+    </table>
+  </td>
+</tr>
+
+<!-- FRANQUIA, CAUÇÃO E COBRANÇAS -->
+<tr>
+  <td class="px" style="padding:26px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;">
+    <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">Franquia, caução e cobranças</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f7f9f6;border:1px solid #dfe4dd;border-radius:8px;">
+      <tr><td style="padding:16px 20px;font-family:Arial,Helvetica,sans-serif;">
+        <p style="margin:0 0 6px 0;font-size:13px;font-weight:bold;color:#1f2421;">Franquia das proteções contratadas</p>
+        <p style="margin:0 0 14px 0;font-size:13px;line-height:22px;color:#3d463f;">{{#LISTA_FRANQUIA}}{{LISTA_FRANQUIA}}{{/LISTA_FRANQUIA}}</p>
+        <p style="margin:0 0 6px 0;font-size:13px;font-weight:bold;color:#1f2421;">O que a proteção não cobre</p>
+        <p style="margin:0 0 14px 0;font-size:13px;line-height:21px;color:#3d463f;">As exclusões variam conforme a proteção contratada e o país de retirada e constam no <strong>Contrato de Locação</strong>. Itens como vidros, faróis, pneus, chaves, interior, fundo e teto do veículo podem ter regras próprias ou ser excluídos — confirme com a estação, antes de assinar, o que a sua proteção cobre. Eventuais taxas administrativas ou de uso da cobertura em caso de dano também seguem o contrato do país de retirada.</p>
+        <p style="margin:0 0 6px 0;font-size:13px;font-weight:bold;color:#1f2421;">Caução (pré-autorização no cartão de crédito)</p>
+        <p style="margin:0 0 14px 0;font-size:13px;line-height:21px;color:#3d463f;">O valor da caução <strong>não é definido nem informado na reserva</strong>: ele é determinado pela estação no momento da retirada, conforme a categoria do veículo e as proteções contratadas, e fica bloqueado no limite do cartão de crédito do condutor principal. Após a devolução e a vistoria do veículo, o bloqueio é liberado; o prazo para o limite voltar a ficar disponível depende do banco emissor do cartão. Para saber o valor antes da viagem, consulte a estação de retirada ou a nossa Central de Atendimento.</p>
+        <p style="margin:0 0 6px 0;font-size:13px;font-weight:bold;color:#1f2421;">Outras cobranças no balcão ou após a devolução</p>
+        <p style="margin:0 0 14px 0;font-size:13px;line-height:21px;color:#3d463f;">Além dos valores informados neste e-mail, podem ser cobrados, conforme o uso e o contrato: combustível, pedágios e multas, diárias adicionais por atraso, serviços e acessórios opcionais contratados no balcão e danos não cobertos pela proteção.</p>
+        <p style="margin:0 0 6px 0;font-size:13px;font-weight:bold;color:#1f2421;">Devolução e tolerância</p>
+        <p style="margin:0 0 0 0;font-size:13px;line-height:21px;color:#3d463f;">A devolução está prevista para <strong>{{DATA_DEVOLUCAO}} às {{HORARIO_DEVOLUCAO}}</strong>. A tolerância de atraso na devolução é definida pela estação e consta no contrato; atrasos além dela podem gerar a cobrança de diárias adicionais.</p>
       </td></tr>
     </table>
   </td>

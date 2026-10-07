@@ -18,6 +18,7 @@
 import { buildEmailCurrencyVars } from '@/lib/receiptLocales';
 import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 import { INSURANCE_NAMES_PT, type XrsSnapshot } from '@/lib/email/xrsReservationSnapshot';
+import { buildReservationDetailVars, calcCounterBRL } from '@/lib/email/reservationDetailVars';
 
 // Mesmos códigos de proteção usados em bookXRS.ts / reservas/route.ts
 export const INSURANCE_CODES = [
@@ -239,15 +240,54 @@ export function buildReservationEmailVars(params: {
     });
   } catch { /* mantém 1 */ }
 
-  const vehicleBRL = num(car.totalRateEstimateInBookingCurrency || car.totalRateEstimate);
+  const vehicleBRLNet = num(car.totalRateEstimateInBookingCurrency || car.totalRateEstimate);
   const insBRL = lists.extras.reduce((s, e) => s + e.priceBRL, 0);
   const equipBRL = lists.equipment.reduce((s, e) => s + (e.totalBRL > 0 ? e.totalBRL : e.priceBRL * days) * (e.qty || 1), 0);
   const paidBRL = (params.amountInCents || 0) / 100;
+  const rateForCounter = num(car?.exchangeRate) || num(params.xrs?.quote?.exchangeRate);
+
+  // ⚠️ MARKUP: o car salvo na reserva é REGRAVADO com a cotação do XRS (api/reservas, sync-greenway),
+  // que é a tarifa NET — o markup (eto_margin_percent) é aplicado só na tela de veículos e fica apenas
+  // no valor efetivamente cobrado (amountInCents). Em reservas pré-pagas o valor cobrado é a fonte da
+  // verdade: total completo = cobrado online + o que é pago no balcão (ex.: sobretaxa de aeroporto).
+  const prepaidWithPaid = paymentMethod !== 'BALCAO' && paidBRL > 0;
+  const fullPrepaidBRL = prepaidWithPaid
+    ? paidBRL + calcCounterBRL(booking, car, rateForCounter)
+    : 0;
+  const vehicleBRL = prepaidWithPaid
+    ? Math.max(0, fullPrepaidBRL - insBRL - equipBRL)
+    : vehicleBRLNet;
+
   const totalBRL = params.preferPaidAmount && paidBRL > 0
     ? paidBRL
-    : ((vehicleBRL + insBRL + equipBRL) || paidBRL);
+    : prepaidWithPaid
+      ? fullPrepaidBRL
+      : ((vehicleBRL + insBRL + equipBRL) || paidBRL);
 
   const cv = buildDestinationCurrencyVars(totalBRL, booking, car, params.xrs);
+
+  // Detalhamento pedido pelos clientes (diárias, km, incluídos, franquia, câmbio, online × balcão).
+  // Nunca pode impedir o envio do e-mail: em caso de erro, as variáveis ficam vazias.
+  let detail: Record<string, string> = {};
+  try {
+    detail = buildReservationDetailVars({
+      booking,
+      car,
+      days,
+      currency: cv.MOEDA,
+      rate: rateForCounter,
+      extras: lists.extras,
+      vehicleBRL,
+      insBRL,
+      equipBRL,
+      paidBRL,
+      paymentMethod,
+      xrs: params.xrs,
+      fmtPair: (brl: number) => buildDestinationCurrencyVars(brl, booking, car, params.xrs).VALOR_TOTAL,
+    });
+  } catch (err: any) {
+    console.warn('[reservationEmailVars] Falha ao montar detalhamento:', err?.message);
+  }
 
   const vars: Record<string, string> = {
     NOME: cd.nome || cd.firstName || '',
@@ -273,6 +313,7 @@ export function buildReservationEmailVars(params: {
     LOCAL_DEVOLUCAO: booking.returnStation || booking.pickupStation || '',
     LISTA_PROTECOES: lists.LISTA_PROTECOES,
     LISTA_EXTRAS: lists.LISTA_EXTRAS,
+    ...detail,
     ...(params.extraVars || {}),
   };
 
