@@ -38,6 +38,9 @@ export default function PainelComissoes() {
    const [savingRate, setSavingRate] = useState(false);
    const [filter, setFilter]       = useState<FilterType>('ALL');
    const [base, setBase]           = useState<CommissionBase>('VENDA');
+   const [backfilling, setBackfilling] = useState(false);
+   const [backfillMsg, setBackfillMsg] = useState("");
+   const [backfillFails, setBackfillFails] = useState<{ resNumber: string; detail: string }[]>([]);
 
    useEffect(() => {
       try {
@@ -68,6 +71,32 @@ export default function PainelComissoes() {
    }, [startDate, endDate]);
 
    useEffect(() => { fetchReport(); }, [fetchReport]);
+
+   // Reconsulta no XRS o NET real das reservas antigas (em lotes) e grava NET/markup exatos
+   const runBackfill = async (retry = false) => {
+      setBackfilling(true);
+      setBackfillFails([]);
+      let updated = 0, failed = 0;
+      const fails: { resNumber: string; detail: string }[] = [];
+      try {
+         for (let i = 0; i < 100; i++) {
+            setBackfillMsg(`Consultando o XRS... ${updated} atualizadas, ${failed} com falha`);
+            const res = await fetch('/api/admin/comissoes/backfill', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ retry }),
+            });
+            const d = await res.json();
+            if (!res.ok || d.error) { setBackfillMsg(`Erro: ${d.error || res.status}`); break; }
+            updated += d.updated; failed += d.failed;
+            for (const r of d.results || []) if (!r.ok) fails.push({ resNumber: r.resNumber, detail: r.detail });
+            if (d.remaining <= 0 || d.processed === 0) { setBackfillMsg(`Concluído: ${updated} atualizadas com valor real, ${failed} não puderam ser calculadas.`); break; }
+         }
+      } catch { setBackfillMsg('Erro de conexão durante o reprocessamento'); }
+      setBackfillFails(fails);
+      setBackfilling(false);
+      fetchReport();
+   };
 
    const handleSaveRate = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -145,7 +174,7 @@ export default function PainelComissoes() {
             r.resNumber || '', new Date(r.createdAt).toLocaleDateString('pt-BR'), `${p?.nome || ''} ${p?.sobrenome || ''}`.trim(),
             r.tipoPagamento, n(r.valorCalculado), n(r.netBRL), n(r.netLocal), r.netCurrency || '',
             r.markupPercent == null ? '' : String(r.markupPercent).replace('.', ','), n(r.markupBRL), r.cupom || '', n(r.descontoCupom), n(r.markupLiquidoBRL), n(commissionOf(r)),
-            r.netSource === 'XRS_QUOTE' ? 'API (registrado)' : r.netSource === 'ESTIMADO' ? 'Estimado' : '',
+            r.netSource === 'XRS_QUOTE' ? 'API (registrado)' : r.netSource === 'XRS_BACKFILL' ? 'API (reconsultado)' : r.netSource === 'ESTIMADO' ? 'Estimado' : '',
          ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(';');
       });
       const blob = new Blob(['\uFEFF' + [header.join(';'), ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -299,10 +328,37 @@ export default function PainelComissoes() {
                   </div>
                </div>
 
-               {filteredTotals.estimadas > 0 && (
-                  <div className="bg-sky-500/10 border border-sky-500/30 rounded-xl p-4 text-xs text-sky-200">
-                     ℹ️ {filteredTotals.estimadas} reserva(s) são anteriores ao registro automático de NET/markup. Para elas o valor aparece com <strong>~</strong> e é uma
-                     estimativa (calculada a partir da cotação salva e do valor cobrado). As novas vendas gravam o NET e o markup reais no momento da reserva.
+               {(filteredTotals.estimadas > 0 || backfillMsg) && (
+                  <div className="bg-sky-500/10 border border-sky-500/30 rounded-xl p-4 text-xs text-sky-200 space-y-3">
+                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div>
+                           {filteredTotals.estimadas > 0 && (
+                              <p>ℹ️ {filteredTotals.estimadas} reserva(s) ainda têm NET/markup <strong>estimados</strong> (marcados com <strong>~</strong>). As novas vendas gravam o valor real no momento da reserva.
+                              Use o botão ao lado para consultar o NET real de cada reserva no XRS (Greenway) e gravar o markup exato.</p>
+                           )}
+                           {backfillMsg && <p className="font-bold text-sky-100 mt-1">{backfillMsg}</p>}
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                           <button
+                              onClick={() => runBackfill(false)}
+                              disabled={backfilling}
+                              className="bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-lg text-xs transition-colors"
+                           >
+                              {backfilling ? '⏳ Consultando XRS...' : '🔄 Buscar NET real no XRS'}
+                           </button>
+                           {backfillFails.length > 0 && !backfilling && (
+                              <button onClick={() => runBackfill(true)} className="bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white font-bold px-3 py-2 rounded-lg text-xs transition-colors">
+                                 Tentar de novo as falhas
+                              </button>
+                           )}
+                        </div>
+                     </div>
+                     {backfillFails.length > 0 && (
+                        <ul className="text-[11px] text-amber-300 list-disc pl-5 space-y-0.5">
+                           {backfillFails.slice(0, 15).map(f => <li key={f.resNumber}><strong>{f.resNumber}</strong>: {f.detail}</li>)}
+                           {backfillFails.length > 15 && <li>… e mais {backfillFails.length - 15}</li>}
+                        </ul>
+                     )}
                   </div>
                )}
 

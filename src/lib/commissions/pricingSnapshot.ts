@@ -21,7 +21,7 @@ export interface PricingSnapshot {
   markupPercent: number;
   markupBRL: number;
   capturedAt: string;
-  source: 'XRS_QUOTE' | 'ESTIMADO';
+  source: 'XRS_QUOTE' | 'XRS_BACKFILL' | 'ESTIMADO';
 }
 
 const num = (v: any): number => {
@@ -92,7 +92,7 @@ export function resolvePricingSnapshot(
       markupPercent: num(s.markupPercent),
       markupBRL: num(s.markupBRL),
       capturedAt: s.capturedAt || '',
-      source: 'XRS_QUOTE',
+      source: s.source === 'XRS_BACKFILL' ? 'XRS_BACKFILL' : 'XRS_QUOTE',
     };
   }
 
@@ -141,7 +141,7 @@ export function resolvePricingSnapshot(
 const AIRPORT_CODES = ['APF', 'APT', 'AIRPORTFEE', 'APS', 'ASF', 'APF2', 'APTF', 'STF'];
 
 /** Cobranças pagas no balcão (sobretaxa de aeroporto etc.) — mesma regra do checkout. */
-function counterChargesBRL(booking: any): number {
+export function counterChargesBRL(booking: any): number {
   const list = Array.isArray(booking?.quoteInsurances) ? booking.quoteInsurances : [];
   return list
     .filter((i: any) => {
@@ -156,3 +156,42 @@ function counterChargesBRL(booking: any): number {
     }, 0);
 }
 
+
+/**
+ * Reconstrói o snapshot de uma reserva ANTIGA a partir da reconsulta no XRS (search.searchbyid):
+ * NET = cotação atual da reserva no XRS; markup = (valor cobrado online + sobretaxa paga no balcão) − NET.
+ * Devolve { error } quando o resultado não é plausível (nunca grava valor duvidoso).
+ */
+export function buildBackfillSnapshot(
+  customerData: any,
+  amountInCents: number | null | undefined,
+  quote: { totalRateEstimate?: string; totalRateEstimateInBookingCurrency?: string; currency?: string } | undefined
+): PricingSnapshot | { error: string } {
+  const cd = customerData || {};
+  const booking = cd.booking || {};
+  if (!isEtoContract(booking.contractID)) return { error: 'Reserva não é ETO (sem markup)' };
+  if (!quote) return { error: 'XRS não devolveu cotação' };
+
+  const netLocal = num(quote.totalRateEstimate);
+  const netBRL = num(quote.totalRateEstimateInBookingCurrency) || netLocal;
+  if (netBRL <= 0) return { error: 'Cotação XRS sem valor' };
+
+  const gross = (amountInCents || 0) / 100 + counterChargesBRL(booking);
+  if (gross <= 0) return { error: 'Reserva sem valor cobrado' };
+
+  const markupBRL = gross - netBRL;
+  const pct = (markupBRL / netBRL) * 100;
+  // Fora desta faixa o XRS provavelmente inclui itens (proteções/extras) que não são tarifa do carro
+  if (pct < -0.5 || pct > 80) return { error: `Resultado implausível (${pct.toFixed(1)}%) — conferir manualmente` };
+
+  const mk = pct < 0.5 ? 0 : markupBRL;
+  return {
+    netBRL: round2(netBRL),
+    netLocal: netLocal > 0 ? round2(netLocal) : null,
+    netCurrency: quote.currency ? String(quote.currency).toUpperCase() : null,
+    markupPercent: mk > 0 ? round2(pct) : 0,
+    markupBRL: round2(mk),
+    capturedAt: new Date().toISOString(),
+    source: 'XRS_BACKFILL',
+  };
+}

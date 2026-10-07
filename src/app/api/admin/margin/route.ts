@@ -15,15 +15,19 @@ async function checkAdmin() {
 }
 
 // GET — público (frontend precisa ler a margem para exibir preços)
+// Sempre dinâmico e sem cache: um valor velho/zerado aqui vira venda sem markup.
+export const dynamic = 'force-dynamic';
+const NO_STORE = { 'Cache-Control': 'no-store, max-age=0' };
+
 export async function GET() {
   try {
     const config = await prisma.contentBlock.findUnique({ where: { key: MARGIN_KEY } });
     const percent = parseFloat(config?.value_ptBR || '0');
-    return NextResponse.json({ percent: isNaN(percent) ? 0 : percent });
+    return NextResponse.json({ percent: isNaN(percent) ? 0 : percent }, { headers: NO_STORE });
   } catch (error: any) {
-    // DB down — default to 0% margin
-    console.warn('[margin] DB error, usando margem 0%:', error.message);
-    return NextResponse.json({ percent: 0 });
+    // Banco indisponível: NÃO devolver 0% (o checkout cobraria sem markup). O front trava o "Pagar agora".
+    console.error('[margin] DB error, margem indisponível:', error.message);
+    return NextResponse.json({ error: 'Margem indisponível' }, { status: 503, headers: NO_STORE });
   }
 }
 

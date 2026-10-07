@@ -225,6 +225,8 @@ function VehiclesContent() {
 
   // ETO margin from admin panel
   const [etoMargin, setEtoMargin] = useState(0);
+  // false até a margem ser lida com sucesso; sem ela não oferecemos "Pagar agora" (evita vender ETO sem markup)
+  const [etoMarginReady, setEtoMarginReady] = useState(false);
 
   // Selected tariff type per car
   const [selectedTariffType, setSelectedTariffType] = useState<'POA' | 'ETO'>('POA');
@@ -698,10 +700,19 @@ function VehiclesContent() {
 
   // Load ETO margin from admin panel
   useEffect(() => {
-    fetch('/api/admin/margin')
-      .then(r => r.json())
-      .then(d => setEtoMargin(d.percent || 0))
-      .catch(() => {});
+    let cancelled = false;
+    const load = async (attempt: number) => {
+      try {
+        const r = await fetch('/api/admin/margin', { cache: 'no-store' });
+        const d = await r.json();
+        if (!r.ok || typeof d?.percent !== 'number') throw new Error('margin unavailable');
+        if (!cancelled) { setEtoMargin(d.percent); setEtoMarginReady(true); }
+      } catch {
+        if (!cancelled && attempt < 4) setTimeout(() => load(attempt + 1), 1500 * (attempt + 1));
+      }
+    };
+    load(0);
+    return () => { cancelled = true; };
   }, []);
 
   // Load extras when advancing to step 3
@@ -1930,7 +1941,7 @@ function VehiclesContent() {
                     const totalPriceETO = totalPriceETO_raw * (1 + etoMargin / 100);
                     const totalBRL_ETO = totalBRL_ETO_raw * (1 + etoMargin / 100);
                     const isBrazil = stationCountry === 'BR' || !stationCountry || pickupStation.toUpperCase().startsWith('BR');
-                    const hasETO = !isBrazil && etoCar && totalPriceETO_raw > 0;
+                    const hasETO = !isBrazil && etoMarginReady && etoCar && totalPriceETO_raw > 0;
                     // Calculate discount % ETO vs POA
                     const discountPct = hasETO && totalPricePOA > 0 ? Math.round((1 - totalPriceETO / totalPricePOA) * 100) : 0;
 

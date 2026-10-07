@@ -13,9 +13,11 @@ export default function MargemPage() {
     fetch("/api/admin/margin")
       .then(r => r.json())
       .then(d => {
-        setMargin(d.percent || 0);
-        setSavedMargin(d.percent || 0);
+        if (typeof d.percent !== "number") { setToast("⚠️ Não foi possível ler a margem salva. Recarregue antes de salvar."); return; }
+        setMargin(d.percent);
+        setSavedMargin(d.percent);
       })
+      .catch(() => setToast("⚠️ Não foi possível ler a margem salva. Recarregue antes de salvar."))
       .finally(() => setLoading(false));
   }, []);
 
