@@ -9,7 +9,8 @@ export const dynamic = 'force-dynamic';
  * Chave de API dedicada ao MCP. SEM valor padrão: se MCP_API_KEY não estiver definida,
  * o acesso por chave fica desativado (só sessão de administrador do painel).
  */
-const MCP_KEY = (process.env.MCP_API_KEY || '').trim();
+const MCP_KEY = (process.env.MCP_API_KEY || process.env.MPC_API_KEY || '').trim();
+const MCP_KEY_SOURCE = process.env.MCP_API_KEY ? 'MCP_API_KEY' : process.env.MPC_API_KEY ? 'MPC_API_KEY' : null;
 
 function keyMatches(candidate: string): boolean {
   if (!MCP_KEY || !candidate) return false;
@@ -99,6 +100,8 @@ export async function GET(request: Request) {
       server: 'Europcar Brasil MCP Server',
       protocolVersion: '2024-11-05',
       authenticated: false,
+      keyConfigured: !!MCP_KEY,
+      keySource: MCP_KEY_SOURCE,
     }, { headers: corsHeaders });
   }
 
