@@ -1,11 +1,22 @@
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { AI_TOOLS_DEFINITIONS, executeAITool } from '@/lib/ai/aiTools';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/authOptions';
+import { checkAdmin } from '@/lib/checkAdmin';
 
 export const dynamic = 'force-dynamic';
 
-const DEFAULT_MCP_KEY = process.env.MCP_API_KEY || 'europcar_mcp_secure_key_2026';
+/**
+ * Chave de API dedicada ao MCP. SEM valor padrão: se MCP_API_KEY não estiver definida,
+ * o acesso por chave fica desativado (só sessão de administrador do painel).
+ */
+const MCP_KEY = (process.env.MCP_API_KEY || '').trim();
+
+function keyMatches(candidate: string): boolean {
+  if (!MCP_KEY || !candidate) return false;
+  const a = Buffer.from(candidate);
+  const b = Buffer.from(MCP_KEY);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 /**
  * Validação de segurança para o MCP
@@ -19,17 +30,12 @@ async function authenticateRequest(request: Request): Promise<boolean> {
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
 
   // 1. Chave de API dedicada ao MCP
-  if (token === DEFAULT_MCP_KEY || xMcpKey === DEFAULT_MCP_KEY || queryKey === DEFAULT_MCP_KEY) {
+  if (keyMatches(token) || keyMatches(xMcpKey) || keyMatches(queryKey)) {
     return true;
   }
 
-  // 2. Se for acesso autenticado via cookie de sessão do painel
-  const session = await getServerSession(authOptions).catch(() => null);
-  if (session?.user?.email) {
-    return true;
-  }
-
-  return false;
+  // 2. Acesso autenticado via cookie de sessão do painel — somente administradores
+  return await checkAdmin().catch(() => false);
 }
 
 const corsHeaders = {
@@ -59,8 +65,17 @@ export async function GET(request: Request) {
 
   // Se o Claude conectar via SSE (Server-Sent Events padrão MCP)
   if (acceptHeader.includes('text/event-stream')) {
+    // O handshake SSE exige autenticação (antes vazava a chave na URL do endpoint)
+    if (!isAuth) {
+      return NextResponse.json(
+        { error: 'Não autorizado.' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
     const encoder = new TextEncoder();
-    const endpointUrl = `${fullUrl}?key=${DEFAULT_MCP_KEY}`;
+    // Só devolve a chave se o próprio cliente a enviou na query string (ele já a conhece)
+    const queryKey = new URL(request.url).searchParams.get('key') || '';
+    const endpointUrl = keyMatches(queryKey) ? `${fullUrl}?key=${encodeURIComponent(queryKey)}` : fullUrl;
     const stream = new ReadableStream({
       start(controller) {
         controller.enqueue(encoder.encode(`event: endpoint\ndata: ${endpointUrl}\n\n`));
@@ -75,6 +90,16 @@ export async function GET(request: Request) {
         ...corsHeaders,
       },
     });
+  }
+
+  // Descoberta pública: só informa que está online. Ferramentas só para quem está autenticado.
+  if (!isAuth) {
+    return NextResponse.json({
+      status: 'ONLINE',
+      server: 'Europcar Brasil MCP Server',
+      protocolVersion: '2024-11-05',
+      authenticated: false,
+    }, { headers: corsHeaders });
   }
 
   return NextResponse.json({
@@ -92,7 +117,7 @@ export async function GET(request: Request) {
         "europcar-brasil": {
           url: fullUrl,
           headers: {
-            "Authorization": `Bearer ${DEFAULT_MCP_KEY}`
+            "Authorization": "Bearer <valor de MCP_API_KEY>"
           }
         }
       }
@@ -134,7 +159,7 @@ export async function POST(request: Request) {
           },
           serverInfo: {
             name: 'europcar-brasil-mcp',
-            version: '1.0.0'
+            version: '1.1.0'
           }
         }
       }, { headers: corsHeaders });

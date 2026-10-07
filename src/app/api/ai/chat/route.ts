@@ -1,23 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/authOptions';
+import { checkAdmin } from '@/lib/checkAdmin';
 import { executeAITool } from '@/lib/ai/aiTools';
 
 export const dynamic = 'force-dynamic';
-
-const ADMIN_EMAILS = [
-  "grupomercatta@gmail.com",
-  "matheus@grupomercatta.com.br",
-  "matheusconti@gmail.com",
-  "matheus@grupomercatta.com"
-];
-
-async function checkAdmin() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return false;
-  if (ADMIN_EMAILS.includes(session.user.email)) return true;
-  return true;
-}
 
 /**
  * Orquestrador Local Inteligente

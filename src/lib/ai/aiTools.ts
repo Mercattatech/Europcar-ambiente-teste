@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma';
-import { callXRS } from '@/lib/europcar/xrsClient';
+import { callXRS, getStations, getStation } from '@/lib/europcar/xrsClient';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
+import { consultarDisponibilidade } from '@/lib/europcar/availability';
 import { cancelXRSReservation, voidCieloPaymentForLocalReservation } from '@/lib/europcar/cancelService';
 import { sendTransactionalEmail } from '@/lib/emailService';
 import { sendBookingConfirmation } from '@/lib/email/sendBookingConfirmation';
@@ -359,6 +360,41 @@ export const AI_TOOLS_DEFINITIONS: AIToolDefinition[] = [
           type: 'number',
           description: 'Quantidade máxima de logs a retornar (padrão: 10, máximo 25)'
         }
+      }
+    }
+  },
+
+  // ── 6. DISPONIBILIDADE & LOJAS ──
+  {
+    name: 'consultar_disponibilidade',
+    description: 'Consulta em tempo real (XRS) quais categorias de carro (códigos ACRISS, ex.: CDMR) estão disponíveis, sob requisição ou ausentes para uma loja de retirada/devolução e período, com preço por dia e total (na moeda local e em R$). Em lojas fora do Brasil retorna também as tarifas "Pagar agora" (ETO) já com o markup do painel. Use listar_estacoes para descobrir o código da loja de um país/cidade.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        lojaRetirada: { type: 'string', description: 'Código da loja de retirada (ex.: LIST01 = Lisboa Aeroporto). Veja listar_estacoes.' },
+        lojaDevolucao: { type: 'string', description: 'Código da loja de devolução. Se omitido, usa a mesma da retirada.' },
+        dataRetirada: { type: 'string', description: 'Data de retirada (YYYY-MM-DD ou DD/MM/YYYY).' },
+        horaRetirada: { type: 'string', description: 'Hora de retirada (HH:MM). Padrão 10:00.' },
+        dataDevolucao: { type: 'string', description: 'Data de devolução (YYYY-MM-DD ou DD/MM/YYYY).' },
+        horaDevolucao: { type: 'string', description: 'Hora de devolução (HH:MM). Padrão: mesma da retirada.' },
+        categorias: { type: 'array', items: { type: 'string' }, description: 'Lista de categorias ACRISS (ex.: ["CDMR","EDAR"]). Se omitida, consulta todas as categorias que a loja opera.' },
+        idadeCondutor: { type: 'number', description: 'Idade do condutor (influencia preço e elegibilidade). Opcional.' },
+        paisResidencia: { type: 'string', description: 'País de residência do condutor, ISO-2 (padrão: BR).' },
+        incluirPrecoLiquido: { type: 'boolean', description: 'Uso interno: inclui o preço NET (sem markup) nas tarifas ETO.' }
+      },
+      required: ['lojaRetirada', 'dataRetirada', 'dataDevolucao']
+    }
+  },
+  {
+    name: 'listar_estacoes',
+    description: 'Lista as lojas (estações) Europcar de um país (código ISO-2, ex.: PT, IT, BR) com código, nome e cidade, ou detalha uma loja (endereço, telefone, e-mail, antecedência mínima). Use para obter o código da loja antes de consultar_disponibilidade.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pais: { type: 'string', description: 'País em ISO-2 (ex.: PT, IT, FR, US, BR).' },
+        busca: { type: 'string', description: 'Filtro por nome/cidade/código (ex.: "lisboa", "airport").' },
+        codigo: { type: 'string', description: 'Código de uma loja para ver os detalhes (ignora pais/busca).' },
+        limit: { type: 'number', description: 'Máximo de lojas na lista (padrão 50, máximo 200).' }
       }
     }
   }
@@ -1369,6 +1405,65 @@ export async function executeAITool(toolName: string, args: Record<string, any>)
           payload: termo ? l.payload : l.payload.slice(0, 300) + '...',
           response: termo ? l.response : l.response.slice(0, 300) + '...'
         }))
+      };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 6. DISPONIBILIDADE & LOJAS
+    // ═══════════════════════════════════════════════════════════════
+    case 'consultar_disponibilidade': {
+      const categorias = Array.isArray(args.categorias)
+        ? args.categorias
+        : typeof args.categorias === 'string'
+          ? args.categorias.split(/[\s,;]+/)
+          : [];
+      return consultarDisponibilidade({
+        lojaRetirada: args.lojaRetirada || args.pickupStation,
+        lojaDevolucao: args.lojaDevolucao || args.returnStation,
+        dataRetirada: args.dataRetirada || args.pickupDate,
+        horaRetirada: args.horaRetirada || args.pickupTime,
+        dataDevolucao: args.dataDevolucao || args.returnDate,
+        horaDevolucao: args.horaDevolucao || args.returnTime,
+        categorias,
+        idadeCondutor: args.idadeCondutor != null ? Number(args.idadeCondutor) : undefined,
+        paisResidencia: args.paisResidencia,
+        incluirPrecoLiquido: args.incluirPrecoLiquido === true,
+      });
+    }
+
+    case 'listar_estacoes': {
+      const codigo = String(args.codigo || '').trim().toUpperCase();
+      if (codigo) {
+        const st = await getStation(codigo);
+        if (!st) throw new Error(`Loja "${codigo}" não encontrada.`);
+        return {
+          codigo: st.stationCode,
+          nome: st.stationName,
+          cidade: st.cityName,
+          pais: st.countryCode,
+          endereco: [st.address1, st.address2, st.postalCode].filter(Boolean).join(', '),
+          telefone: st.phoneWithInternationalDialling || st.phoneNumber,
+          email: st.email,
+          antecedênciaMinima: st.leadTime,
+          entrega: st.delivery,
+          coleta: st.collection,
+        };
+      }
+
+      const pais = String(args.pais || '').trim().toUpperCase();
+      if (!/^[A-Z]{2}$/.test(pais)) throw new Error('Informe o país em ISO-2 (ex.: PT, IT, BR) ou o código de uma loja.');
+      const busca = String(args.busca || '').trim().toLowerCase();
+      const limit = Math.min(200, Math.max(1, Number(args.limit) || 50));
+
+      const todas = await getStations(pais);
+      const filtradas = busca
+        ? todas.filter((s) => `${s.stationCode} ${s.stationName} ${s.cityName || ''}`.toLowerCase().includes(busca))
+        : todas;
+      return {
+        pais,
+        total: filtradas.length,
+        exibindo: Math.min(limit, filtradas.length),
+        lojas: filtradas.slice(0, limit).map((s) => ({ codigo: s.stationCode, nome: s.stationName, cidade: s.cityName })),
       };
     }
 

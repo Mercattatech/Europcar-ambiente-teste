@@ -1501,7 +1501,7 @@ export default function PainelRecusasLogs() {
     "europcar-brasil": {
       "url": "https://europcar.seudominio.com.br/api/mcp",
       "headers": {
-        "Authorization": "Bearer europcar_mcp_secure_key_2026"
+        "Authorization": "Bearer SUA_MCP_API_KEY"
       }
     }
   }
@@ -1516,7 +1516,7 @@ export default function PainelRecusasLogs() {
                                 "europcar-brasil": {
                                   url: typeof window !== "undefined" ? `${window.location.origin}/api/mcp` : "https://europcar.seudominio.com.br/api/mcp",
                                   headers: {
-                                    Authorization: "Bearer europcar_mcp_secure_key_2026"
+                                    Authorization: "Bearer SUA_MCP_API_KEY"
                                   }
                                 }
                               }
@@ -1593,6 +1593,14 @@ export default function PainelRecusasLogs() {
                       {
                         name: "consultar_logs_sistema",
                         desc: "Inspeciona requisições e respostas brutas da Cielo (LogCielo) e XRS (LogXRS)."
+                       },
+                       {
+                         name: "consultar_disponibilidade",
+                         desc: "Consulta categorias ACRISS por loja e período: estado (disponível, sob requisição ou ausente), preço por dia e total, com markup ETO."
+                       },
+                       {
+                         name: "listar_estacoes",
+                         desc: "Lista lojas Europcar por país/busca ou detalha uma estação (horários, antecedência mínima)."
                       }
                     ].map((tool, idx) => (
                       <div key={idx} className="bg-gray-900/80 border border-gray-800/80 p-3 rounded-xl">
