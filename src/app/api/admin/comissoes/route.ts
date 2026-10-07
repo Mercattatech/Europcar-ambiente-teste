@@ -1,17 +1,9 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/authOptions';
+import { checkAdmin } from '@/lib/checkAdmin';
+import { resolvePricingSnapshot } from '@/lib/commissions/pricingSnapshot';
 
-const ADMIN_EMAILS = ["grupomercatta@gmail.com", "matheus@grupomercatta.com.br", "matheusconti@gmail.com", "matheus@grupomercatta.com"];
-
-async function checkAdmin() {
-   const session = await getServerSession(authOptions);
-   if (!session?.user?.email) return false;
-   if (ADMIN_EMAILS.includes(session.user.email)) return true;
-   const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
-   return dbUser?.role === 'ADMIN';
-}
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
    if (!(await checkAdmin())) {
@@ -23,13 +15,10 @@ export async function GET(request: Request) {
       const startDate = searchParams.get('startDate');
       const endDate = searchParams.get('endDate');
 
+      // Datas interpretadas no fuso de Brasília (UTC-3), não no do servidor
       const dateFilter: any = {};
-      if (startDate) dateFilter.gte = new Date(startDate);
-      if (endDate) {
-         const end = new Date(endDate);
-         end.setHours(23, 59, 59, 999);
-         dateFilter.lte = end;
-      }
+      if (startDate) dateFilter.gte = new Date(`${startDate}T00:00:00.000-03:00`);
+      if (endDate) dateFilter.lte = new Date(`${endDate}T23:59:59.999-03:00`);
 
       const resWhere: any = {
          status: { not: 'CANCELLED' } // Canceladas não entram na conta
@@ -51,6 +40,8 @@ export async function GET(request: Request) {
       // 3. Process and calculate
       let totalComissao = 0;
       let totalVendas = 0;
+      let totalNet = 0;
+      let totalMarkup = 0;
       const grouped = {
          'PIX': { vendas: 0, comissao: 0, count: 0 },          // PIX Efetivado (Pago)
          'CREDIT_CARD': { vendas: 0, comissao: 0, count: 0 },  // Cartão de Crédito
@@ -86,11 +77,16 @@ export async function GET(request: Request) {
             tipo = res.status === 'CONFIRMED_PREPAID' ? 'CREDIT_CARD' : 'BALCAO';
          }
 
+         // NET capturado da API + markup aplicado (gravados na venda; estimados nas reservas antigas)
+         const snap = resolvePricingSnapshot(parsed, res.amountInCents);
+
          // Totaliza apenas vendas efetivadas (PIX pendente não gera receita confirmada)
          const isEfetivada = tipo !== 'PIX_PENDING';
          if (isEfetivada) {
             totalVendas += valor;
             totalComissao += comissao;
+            totalNet += snap?.netBRL || 0;
+            totalMarkup += snap?.markupBRL || 0;
          }
          
          if (tipo === 'PIX') {
@@ -116,7 +112,13 @@ export async function GET(request: Request) {
             valorCalculado: valor,
             comissaoCalculada: comissao,
             tipoPagamento: tipo,
-            isEfetivada
+            isEfetivada,
+            netBRL: snap?.netBRL ?? null,
+            netLocal: snap?.netLocal ?? null,
+            netCurrency: snap?.netCurrency ?? null,
+            markupPercent: snap?.markupPercent ?? null,
+            markupBRL: snap?.markupBRL ?? null,
+            netSource: snap?.source ?? null
          };
       });
 
@@ -124,6 +126,8 @@ export async function GET(request: Request) {
          rate,
          totalComissao,
          totalVendas,
+         totalNet,
+         totalMarkup,
          grouped,
          reservations: resultList
       });

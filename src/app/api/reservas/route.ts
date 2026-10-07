@@ -10,6 +10,7 @@ import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 import { getReservationErrorMessage } from '@/lib/cms/reservationErrors';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { registerFailedTransaction } from '@/lib/rejectionService';
+import { buildPricingSnapshot, readEtoMarkupPercent, isEtoContract, type PricingSnapshot } from '@/lib/commissions/pricingSnapshot';
 
 export const dynamic = 'force-dynamic';
 
@@ -452,6 +453,8 @@ export async function POST(request: Request) {
       let onRequestItems: any[] = [];
       let xrsStatusCode: string = 'S';
       let xrsWarnings: any[] = [];
+      // NET (API) + markup aplicado, gravado na reserva para o relatório de comissões
+      let pricingSnapshot: PricingSnapshot | null = null;
       if (paymentApproved) {
         const car = bookingData.car || {};
         const pickupDate = bookingData.pickupDate;
@@ -672,6 +675,14 @@ export async function POST(request: Request) {
             if (quoteNode.currency) bookingData.car.currency = String(quoteNode.currency);
             if (quoteNode.bookingCurrency) bookingData.car.bookingCurrency = String(quoteNode.bookingCurrency);
 
+            // Registra o NET capturado da API e o markup vigente (não pode impedir a reserva)
+            try {
+              const markupPct = isEtoContract(contractID) ? await readEtoMarkupPercent() : 0;
+              pricingSnapshot = buildPricingSnapshot({ quoteNode, contractID, markupPercent: markupPct });
+            } catch (snapErr: any) {
+              console.warn(`[reservas] Falha ao registrar NET/markup de ${resNumber}:`, snapErr?.message);
+            }
+
             // Para BALCÃO (POA): o valor total registrado deve ser exatamente
             // a tarifa confirmada pelo Greenway + opcionais selecionados
             if (paymentData.method === 'BALCAO') {
@@ -840,6 +851,7 @@ export async function POST(request: Request) {
                 ...(bookingData?.payerSplit && { payerSplit: bookingData.payerSplit }),
                 // Cupom de desconto aplicado
                 ...(couponData && { couponData }),
+                ...(pricingSnapshot && { pricingSnapshot }),
                 ...(xrsWarnings.length > 0 && { xrsWarnings }),
               })
            }
