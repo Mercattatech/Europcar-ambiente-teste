@@ -366,6 +366,7 @@ export default function PainelComissoes() {
                               <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cliente</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tipo</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Valor Venda</th>
+                              <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tarifa</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-slate-300 uppercase tracking-wider text-right">NET (API)</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-purple-300 uppercase tracking-wider text-right">Markup %</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-purple-300 uppercase tracking-wider text-right">Markup R$</th>
@@ -374,7 +375,7 @@ export default function PainelComissoes() {
                         </thead>
                         <tbody className="divide-y divide-gray-800/50">
                            {filtered.length === 0 ? (
-                              <tr><td colSpan={8} className="text-center py-10 text-gray-500">Nenhuma reserva para este filtro.</td></tr>
+                              <tr><td colSpan={9} className="text-center py-10 text-gray-500">Nenhuma reserva para este filtro.</td></tr>
                            ) : (
                               filtered.map((res: any) => {
                                  let parsed: any = {};
@@ -406,6 +407,19 @@ export default function PainelComissoes() {
                                        </td>
                                        <td className="px-5 py-4 text-right">
                                           <div className="font-bold text-gray-300">{fmt(res.valorCalculado)}</div>
+                                       </td>
+                                       <td className="px-5 py-4">
+                                          {res.tarifa ? (
+                                             <>
+                                                <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded border ${res.tarifa === 'POA' ? 'bg-gray-500/20 text-gray-300 border-gray-500/30' : 'bg-purple-500/20 text-purple-300 border-purple-500/30'}`}>
+                                                   {res.tarifa === 'POA' ? 'POA · sem markup' : res.tarifa === 'ETO_ZERO' ? 'ETO franquia zero' : 'ETO · pagar agora'}
+                                                </span>
+                                                {res.tarifa !== 'POA' && res.markupBRL === 0 && (
+                                                   <div className="text-[9px] text-red-400 font-bold mt-1">⚠️ ETO sem markup</div>
+                                                )}
+                                             </>
+                                          ) : <span className="text-gray-600">—</span>}
+                                          <div className="text-[10px] text-gray-500 mt-1">{res.estacao || ''}{res.cupom ? ` · cupom ${res.cupom}` : ''}</div>
                                        </td>
                                        <td className="px-5 py-4 text-right" title={est ? 'Estimado: reserva anterior ao registro automático do NET' : 'NET capturado da API no momento da reserva'}>
                                           {res.netBRL == null ? (
@@ -445,6 +459,7 @@ export default function PainelComissoes() {
                               <tr>
                                  <td className="px-5 py-4 text-xs font-black text-white uppercase" colSpan={3}>Total ({filteredTotals.count} efetivadas)</td>
                                  <td className="px-5 py-4 text-right font-black text-white">{fmt(filteredTotals.vendas)}</td>
+                                 <td />
                                  <td className="px-5 py-4 text-right font-black text-slate-200">{fmt(filteredTotals.net)}</td>
                                  <td className="px-5 py-4 text-right font-black text-purple-300">
                                     {filteredTotals.net > 0 ? `${((filteredTotals.markup / filteredTotals.net) * 100).toFixed(2).replace('.', ',')}%` : '—'}

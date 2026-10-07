@@ -118,7 +118,16 @@ export async function GET(request: Request) {
             netCurrency: snap?.netCurrency ?? null,
             markupPercent: snap?.markupPercent ?? null,
             markupBRL: snap?.markupBRL ?? null,
-            netSource: snap?.source ?? null
+            netSource: snap?.source ?? null,
+            // Tarifa escolhida: markup só existe em ETO ("Pagar agora") fora do Brasil
+            tarifa: (() => {
+               const cid = String(parsed?.booking?.contractID || '');
+               if (cid === '56935495') return 'ETO_ZERO';
+               if (cid === '56935466' || parsed?.booking?.tariffType === 'ETO') return 'ETO';
+               return cid ? 'POA' : null;
+            })(),
+            estacao: parsed?.booking?.pickupStation ?? null,
+            cupom: parsed?.couponData?.code ?? null
          };
       });
 
