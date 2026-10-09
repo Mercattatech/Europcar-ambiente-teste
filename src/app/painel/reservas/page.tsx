@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, Fragment } from "react";
 import { computeReservationMetrics } from "@/lib/europcar/reservationMetrics";
@@ -1790,22 +1790,30 @@ export default function PainelReservas() {
                                            <div className="border-t border-gray-700/50 my-2"></div>
                                            <p className="text-gray-300"><strong>Retirada:</strong> {parsed?.booking?.pickupStation || "—"} — {parsed?.booking?.pickupDate ? `${parsed.booking.pickupDate.slice(6,8)}/${parsed.booking.pickupDate.slice(4,6)}/${parsed.booking.pickupDate.slice(0,4)}` : "—"} {parsed?.booking?.pickupTime ? `${parsed.booking.pickupTime.slice(0,2)}:${parsed.booking.pickupTime.slice(2)}` : ""}</p>
                                            <p className="text-gray-300"><strong>Devolução:</strong> {parsed?.booking?.returnStation || parsed?.booking?.pickupStation || "—"} — {parsed?.booking?.returnDate ? `${parsed.booking.returnDate.slice(6,8)}/${parsed.booking.returnDate.slice(4,6)}/${parsed.booking.returnDate.slice(0,4)}` : "—"} {parsed?.booking?.returnTime ? `${parsed.booking.returnTime.slice(0,2)}:${parsed.booking.returnTime.slice(2)}` : ""}</p>
-                                           <p className="text-gray-300"><strong>Dias:</strong> {parsed?.booking?.days || "—"}</p>
-                                           <p className="text-gray-300"><strong>País:</strong> {parsed?.booking?.country || "BR"}</p>
+                                           <p className="text-gray-300"><strong>Dias:</strong> {metrics.days || parsed?.booking?.duration || parsed?.booking?.days || "—"}</p>
+                                           <p className="text-gray-300"><strong>País:</strong> {parsed?.booking?.stationCountry || parsed?.booking?.country || (parsed?.booking?.pickupStation?.startsWith('BR') ? 'BR' : '—')}</p>
                                         </div>
                                         <div className="bg-gray-900 rounded-lg p-4 border border-gray-700/50 flex-1 min-w-[200px]">
                                            <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Valores e Pagamento</p>
-                                           <p className="text-gray-300"><strong>Total EUR:</strong> {metrics.amountEUR > 0 ? `€ ${metrics.amountEUR.toFixed(2)}` : "—"}</p>
-                                           <p className="text-gray-300"><strong>Total BRL:</strong> {metrics.amountBRL > 0 ? `R$ ${metrics.amountBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "—"}</p>
+                                           {metrics.isPrepaid && metrics.counterDueEUR && metrics.counterDueEUR > 0.05 ? (
+                                              <>
+                                                 <p className="text-gray-300"><strong>Pago Online:</strong> R$ {metrics.amountBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-gray-400 text-xs">(€ {metrics.amountEUR.toFixed(2)})</span></p>
+                                                 <p className="text-amber-400"><strong>No Balcão:</strong> € {metrics.counterDueEUR.toFixed(2)} <span className="text-amber-400/70 text-xs">(~R$ {metrics.counterDueBRL?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</span></p>
+                                                 <p className="text-gray-300"><strong>Total Contrato XRS:</strong> € {metrics.contractTotalEUR?.toFixed(2)} <span className="text-gray-400 text-xs">(R$ {metrics.contractTotalBRL?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</span></p>
+                                              </>
+                                           ) : (
+                                              <>
+                                                 <p className="text-gray-300"><strong>Total EUR:</strong> {metrics.amountEUR > 0 ? `€ ${metrics.amountEUR.toFixed(2)}` : "—"}</p>
+                                                 <p className="text-gray-300"><strong>Total BRL:</strong> {metrics.amountBRL > 0 ? `R$ ${metrics.amountBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "—"}</p>
+                                              </>
+                                           )}
                                            <p className="text-gray-300"><strong>Câmbio:</strong> {(() => {
-                                              const totalEUR = parseFloat(parsed?.booking?.car?.totalRateEstimate || '0');
-                                              const totalBRLraw = res.amountInCents ? res.amountInCents / 100 : parseFloat(parsed?.booking?.car?.totalRateInBookingCurrency || '0');
-                                              const xrsRate = parseFloat(parsed?.booking?.car?.exchangeRate || '0');
-                                              if (totalEUR > 0 && totalBRLraw > 0) {
-                                                const effectiveRate = totalBRLraw / totalEUR;
-                                                return `1 EUR = ${effectiveRate.toFixed(4)} BRL${xrsRate > 0 && Math.abs(effectiveRate - xrsRate) > 0.01 ? ` (XRS: ${xrsRate.toFixed(4)})` : ''}`;
+                                              const xrsRate = parseFloat(parsed?.booking?.car?.exchangeRate || parsed?.booking?.exchangeRate || '0');
+                                              if (xrsRate > 0) {
+                                                const cur = String(parsed?.booking?.car?.currency || 'EUR').toUpperCase();
+                                                return `1 ${cur} = ${xrsRate.toFixed(4)} BRL`;
                                               }
-                                              return xrsRate > 0 ? `1 EUR = ${xrsRate.toFixed(4)} BRL (XRS)` : '—';
+                                              return '—';
                                            })()}</p>
                                            <div className="border-t border-gray-700/50 my-2"></div>
                                            <p className="text-gray-300"><strong>Método:</strong> <span className={`text-xs font-bold px-2 py-0.5 rounded ${res.status === 'CONFIRMED_PREPAID' ? 'bg-green-500/20 text-green-400' : res.status === 'PENDING_PIX' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-300'}`}>{STATUS_LABELS[res.status] || res.status}</span></p>

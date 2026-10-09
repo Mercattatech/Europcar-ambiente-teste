@@ -19,6 +19,10 @@ export interface ParsedReservationMetrics {
   isVoucher: boolean;
   days: number;
   opStatus: string;
+  contractTotalEUR?: number;
+  contractTotalBRL?: number;
+  counterDueEUR?: number;
+  counterDueBRL?: number;
 }
 
 const BRAZIL_AIRPORTS = [
@@ -55,16 +59,16 @@ export function computeReservationMetrics(res: any, parsedCustomerData?: any): P
 
   // 4. Detecção de Moeda e Estação
   const pickupStation = String(booking?.pickupStation || '').toUpperCase().trim();
-  const stationCountry = String(booking?.stationCountry || parsed?.pais || '').toUpperCase().trim();
+  const stationCountry = String(booking?.stationCountry || '').toUpperCase().trim();
   const carCurrency = String(car?.currency || car?.bookingCurrencyOfTotalRateEstimate || '').toUpperCase().trim();
 
   const isBrazilStation =
     stationCountry === 'BR' ||
     pickupStation.startsWith('BR') ||
     BRAZIL_AIRPORTS.some(code => pickupStation.startsWith(code)) ||
-    carCurrency === 'BRL';
+    (carCurrency === 'BRL' && !['EUR', 'USD', 'GBP'].includes(carCurrency));
 
-  const exchangeRate = parseFloat(car?.exchangeRate || '0') || 6.1;
+  const exchangeRate = parseFloat(car?.exchangeRate || booking?.exchangeRate || '0') || 6.1;
 
   // 5. Cálculo seguro do Valor em BRL
   let amountBRL = 0;
@@ -84,13 +88,31 @@ export function computeReservationMetrics(res: any, parsedCustomerData?: any): P
     }
   }
 
-  // 6. Cálculo seguro do Valor em EUR (Net)
+  // 6. Cálculo seguro do Valor em EUR sempre consistente com a taxa real da XRS
   let amountEUR = 0;
-  if (carCurrency === 'EUR' && car?.totalRateEstimate && !isNaN(parseFloat(car.totalRateEstimate))) {
+  if (amountBRL > 0 && exchangeRate > 0) {
+    // Valor em EUR correspondente ao que foi cobrado/faturado em BRL
+    amountEUR = amountBRL / exchangeRate;
+  } else if (carCurrency === 'EUR' && car?.totalRateEstimate && !isNaN(parseFloat(car.totalRateEstimate))) {
     amountEUR = parseFloat(car.totalRateEstimate);
+    if (amountBRL === 0 && exchangeRate > 0) {
+      amountBRL = amountEUR * exchangeRate;
+    }
   } else if (amountBRL > 0) {
     amountEUR = amountBRL / exchangeRate;
   }
+
+  // Contrato total XRS (quando o XML da XRS confirmar a cotação total de veículo + acessórios)
+  const rawContractEUR = car?.totalRateEstimate && !isNaN(parseFloat(car.totalRateEstimate))
+    ? parseFloat(car.totalRateEstimate)
+    : 0;
+  const contractTotalEUR = rawContractEUR > 0 ? rawContractEUR : amountEUR;
+  const contractTotalBRL = isBrazilStation || carCurrency === 'BRL'
+    ? contractTotalEUR
+    : (contractTotalEUR * exchangeRate);
+
+  const counterDueEUR = Math.max(0, contractTotalEUR - amountEUR);
+  const counterDueBRL = Math.max(0, contractTotalBRL - amountBRL);
 
   // 7. Classificação Confiável da Forma de Pagamento
   const rawPm = String(parsed?.paymentMethod || parsed?.paymentData?.method || '').toUpperCase().trim();
@@ -120,7 +142,7 @@ export function computeReservationMetrics(res: any, parsedCustomerData?: any): P
   const isVoucher = paymentMethod === 'VOUCHER' && !isCancelled;
   const isPrepaid = isPixPaid || isCreditCard;
 
-  const days = booking?.days ? parseInt(booking.days, 10) : 0;
+  const days = booking?.duration ? parseInt(booking.duration, 10) : (booking?.days ? parseInt(booking.days, 10) : 0);
 
   return {
     amountBRL,
@@ -136,5 +158,9 @@ export function computeReservationMetrics(res: any, parsedCustomerData?: any): P
     isVoucher,
     days,
     opStatus,
+    contractTotalEUR,
+    contractTotalBRL,
+    counterDueEUR,
+    counterDueBRL,
   };
 }
