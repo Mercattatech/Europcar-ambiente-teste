@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Auditoria de Fallbacks do Sistema — Europcar Brasil</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 18mm 14mm 18mm 14mm;
+      @bottom-right {
+        content: "Página " counter(page);
+        font-family: Arial, sans-serif;
+        font-size: 8pt;
+        color: #64748b;
+      }
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #1e293b;
+      background: #ffffff;
+      font-size: 10pt;
+      line-height: 1.45;
+    }
+    
+    /* Cover / Header */
+    .header-banner {
+      background: linear-gradient(135deg, #008d36 0%, #005a22 100%);
+      color: #ffffff;
+      padding: 24px 28px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+    .header-banner h1 {
+      margin: 0 0 6px 0;
+      font-size: 20pt;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+    }
+    .header-banner p {
+      margin: 2px 0;
+      font-size: 10pt;
+      color: #d1fae5;
+    }
+    .header-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.25);
+      font-size: 8.5pt;
+      color: #a7f3d0;
+    }
+
+    /* Executive Summary Alert */
+    .alert-box {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      border-left: 5px solid #008d36;
+      padding: 14px 18px;
+      border-radius: 6px;
+      margin-bottom: 24px;
+    }
+    .alert-box h3 {
+      margin: 0 0 4px 0;
+      color: #166534;
+      font-size: 11pt;
+      font-weight: 800;
+    }
+    .alert-box p {
+      margin: 0;
+      color: #15803d;
+      font-size: 9pt;
+      line-height: 1.4;
+    }
+
+    /* Section Styles */
+    .section-title {
+      font-size: 12pt;
+      font-weight: 800;
+      color: #0f172a;
+      border-bottom: 2px solid #008d36;
+      padding-bottom: 6px;
+      margin: 26px 0 12px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-desc {
+      font-size: 8.5pt;
+      color: #64748b;
+      margin-bottom: 10px;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      font-size: 8.5pt;
+      page-break-inside: auto;
+    }
+    tr {
+      page-break-inside: avoid;
+    }
+    th {
+      background-color: #f1f5f9;
+      color: #334155;
+      text-align: left;
+      padding: 8px 10px;
+      font-weight: 700;
+      border: 1px solid #cbd5e1;
+      font-size: 8pt;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    td {
+      padding: 8px 10px;
+      border: 1px solid #e2e8f0;
+      vertical-align: top;
+      color: #334155;
+    }
+    tr:nth-child(even) td {
+      background-color: #f8fafc;
+    }
+
+    /* Badges & Tags */
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 7.5pt;
+      font-family: monospace;
+    }
+    .badge-code {
+      background-color: #f1f5f9;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+    }
+    .badge-warn {
+      background-color: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fcd34d;
+    }
+    .badge-danger {
+      background-color: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fca5a5;
+    }
+    .badge-ok {
+      background-color: #dcfce7;
+      color: #166534;
+      border: 1px solid #86efac;
+    }
+
+    .file-path {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 7.5pt;
+      color: #0369a1;
+      word-break: break-all;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+
+    .footer-note {
+      margin-top: 30px;
+      padding: 16px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 8pt;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BANNER CABEÇALHO -->
+  <div class="header-banner">
+    <h1>EUROPCAR BRASIL</h1>
+    <p><strong>Relatório Técnico:</strong> Auditoria de Fallbacks e Valores Padrão do Sistema</p>
+    <p>Mapeamento de todos os valores de contingência, heurísticas e salvaguardas em código</p>
+    <div class="header-meta">
+      <span><strong>Data do Levantamento:</strong> 09 de Outubro de 2026</span>
+      <span><strong>Ambiente:</strong> Produção (Hostinger / Coolify / XRS Europcar)</span>
+      <span><strong>Status:</strong> Revisão Executiva</span>
+    </div>
+  </div>
+
+  <!-- RESUMO EXECUTIVO -->
+  <div class="alert-box">
+    <h3>📋 Objetivo da Auditoria</h3>
+    <p>
+      Este relatório cataloga <strong>todos os pontos do sistema</strong> onde existem valores padrão (fallbacks), 
+      decisões condicionais (<code>||</code>) ou heurísticas de contingência. O objetivo é permitir que a gestão e engenharia 
+      revisem se algum valor automático pode mascarar falhas da API XRS ou induzir a erros contábeis e de exibição.
+    </p>
+  </div>
+
+  <!-- 1. CÂMBIO E MOEDAS -->
+  <div class="section-title">1. Câmbio e Conversão de Moedas (XRS / Local)</div>
+  <div class="section-desc">Pontos onde o sistema lida com taxas de câmbio entre Moeda Local (EUR/USD) e BRL.</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Função / Módulo</th>
+        <th style="width: 25%;">Arquivo</th>
+        <th style="width: 20%;">Fallback Aplicado</th>
+        <th style="width: 30%;">Impacto e Ponto de Atenção</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Câmbio no Painel Admin</strong></td>
+        <td><span class="file-path">src/app/painel/reservas/page.tsx</span></td>
+        <td><span class="badge badge-ok">XRS Direto</span><br><code>xrsRate</code> oficial</td>
+        <td><strong>Corrigido hoje:</strong> O painel calculava <code>TotalBRL / TotalEUR</code> gerando um "falso câmbio" (ex: 3.72). Agora lê 100% o valor retornado pela XRS.</td>
+      </tr>
+      <tr>
+        <td><strong>Câmbio das Métricas</strong></td>
+        <td><span class="file-path">src/lib/europcar/reservationMetrics.ts</span></td>
+        <td><span class="badge badge-warn">6.1</span><br><code>car.exchangeRate || 6.1</code></td>
+        <td>Usado apenas se nem a cotação do veículo nem o booking tiverem taxa gravada. <em>Recomendação: buscar do Banco Central em caso de ausência total.</em></td>
+      </tr>
+      <tr>
+        <td><strong>Câmbio Checkout & Obrigado</strong></td>
+        <td><span class="file-path">src/app/checkout/page.tsx<br>src/app/obrigado/page.tsx</span></td>
+        <td><span class="badge badge-code">1.0</span><br><code>car.exchangeRate || '1'</code></td>
+        <td>Fallback neutro para evitar divisão por zero na tela do cliente caso a resposta venha corrompida.</td>
+      </tr>
+      <tr>
+        <td><strong>Câmbio em Snapshot de E-mail</strong></td>
+        <td><span class="file-path">src/lib/email/xrsReservationSnapshot.ts</span></td>
+        <td><span class="badge badge-code">Razão de Totais</span><br><code>totalBooking / totalLocal</code></td>
+        <td>Se o nó da cotação no XML da XRS não trouxer explicitamente o atributo <code>exchangeRate</code>, calcula a proporção matemática dos valores.</td>
+      </tr>
+      <tr>
+        <td><strong>Moeda por Estação (Recibo)</strong></td>
+        <td><span class="file-path">src/lib/receiptLocales.ts</span></td>
+        <td><span class="badge badge-code">Heurística por Código</span><br><code>LIS</code>→EUR, <code>GRU</code>→BRL</td>
+        <td>Identifica a moeda pela sigla do aeroporto caso o veículo não informe a moeda nativa. Fallback final: <code>BRL</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 2. PAÍS E LOCALIDADE -->
+  <div class="section-title">2. País, Estação e Regras de Localidade</div>
+  <div class="section-desc">Identificação geográfica da estação de retirada e devolução vs residência do cliente.</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Função / Módulo</th>
+        <th style="width: 25%;">Arquivo</th>
+        <th style="width: 20%;">Fallback Aplicado</th>
+        <th style="width: 30%;">Impacto e Ponto de Atenção</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>País no Recibo da Reserva</strong></td>
+        <td><span class="file-path">src/app/api/receipt/[resNumber]/route.ts</span></td>
+        <td><span class="badge badge-warn">BR</span><br><code>booking.country || 'BR'</code></td>
+        <td><strong>Ponto Crítico:</strong> Se o booking tiver <code>stationCountry</code> em vez de <code>country</code>, pode formatar recibos de Lisboa com padrão brasileiro.</td>
+      </tr>
+      <tr>
+        <td><strong>País de Emissão da CNH</strong></td>
+        <td><span class="file-path">src/app/api/reservas/route.ts</span></td>
+        <td><span class="badge badge-code">BR</span><br><code>paisEmissao || 'BR'</code></td>
+        <td>Se o cliente brasileiro não especificar o país emissor da carteira de habilitação, assume emissão nacional <code>BR</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>Estação de Devolução</strong></td>
+        <td><span class="file-path">src/app/api/reservas/route.ts<br>src/app/checkout/page.tsx</span></td>
+        <td><span class="badge badge-code">pickupStation</span></td>
+        <td>Se a devolução em outro local (One-Way) não foi selecionada, a devolução é fixada na mesma estação de retirada.</td>
+      </tr>
+      <tr>
+        <td><strong>Estações do Brasil</strong></td>
+        <td><span class="file-path">src/lib/europcar/reservationMetrics.ts</span></td>
+        <td><span class="badge badge-code">Lista IATA Fixa</span><br><code>GRU, CGH, GIG...</code></td>
+        <td>Lista de 20 códigos aeroportuários para impedir multiplicação indevida por câmbio em viagens dentro do Brasil.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="page-break"></div>
+
+  <!-- 3. CONTRATOS E CIDs DA EUROPCAR -->
+  <div class="section-title">3. Contratos e Códigos de Tarifa (CIDs Europcar)</div>
+  <div class="section-desc">Contratos corporativos e de agência negociados com a Europcar Internacional.</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Tipo de Tarifa</th>
+        <th style="width: 25%;">Arquivo Principal</th>
+        <th style="width: 20%;">CID Padrão / Fallback</th>
+        <th style="width: 30%;">Regra de Aplicação</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Balcão Padrão (POA)</strong></td>
+        <td><span class="file-path">src/lib/europcar/xrsClient.ts</span></td>
+        <td><span class="badge badge-code">57269673</span></td>
+        <td>Tarifa pública padrão de balcão (Pay on Arrival). Utilizada se nenhuma outra for especificada na busca.</td>
+      </tr>
+      <tr>
+        <td><strong>Balcão Promocional (POA 2)</strong></td>
+        <td><span class="file-path">src/app/reservation/vehicles/page.tsx</span></td>
+        <td><span class="badge badge-code">55138134</span></td>
+        <td>Consultada em paralelo. Se trouxer tarifas mais baratas para o veículo, substitui automaticamente a padrão.</td>
+      </tr>
+      <tr>
+        <td><strong>ETO Pré-pago (Com Excesso)</strong></td>
+        <td><span class="file-path">src/app/reservation/vehicles/page.tsx</span></td>
+        <td><span class="badge badge-code">56935466</span><br><small>(BA: 73675595)</small></td>
+        <td>Tarifa líquida internacional pré-paga ("Pagar Agora"). Aplica margem administrativa configurada no painel.</td>
+      </tr>
+      <tr>
+        <td><strong>ETO Zero Excess (Sem Excesso)</strong></td>
+        <td><span class="file-path">src/app/reservation/vehicles/page.tsx</span></td>
+        <td><span class="badge badge-code">56935495</span><br><small>(BA: 73804373)</small></td>
+        <td>Tarifa com cobertura total de franquia. Acionada no upgrade de seguro zero excess no Step 3.</td>
+      </tr>
+      <tr>
+        <td><strong>IATA Europcar Brasil (EXO)</strong></td>
+        <td><span class="file-path">src/app/api/reservas/route.ts</span></td>
+        <td><span class="badge badge-code">02170722</span></td>
+        <td>Código de agência IATA para identificação oficial de vendas emitidas pela filial Brasil.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 4. HORÁRIOS, DATAS E DURAÇÃO -->
+  <div class="section-title">4. Horários, Datas e Duração da Locação</div>
+  <div class="section-desc">Tratamento de prazos de diária e horários padrão.</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Função / Módulo</th>
+        <th style="width: 25%;">Arquivo</th>
+        <th style="width: 20%;">Fallback Aplicado</th>
+        <th style="width: 30%;">Impacto e Ponto de Atenção</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Horário Padrão de Retirada/Devolução</strong></td>
+        <td><span class="file-path">src/lib/europcar/availability.ts<br>src/app/checkout/page.tsx</span></td>
+        <td><span class="badge badge-code">1000</span> (10:00)</td>
+        <td>Se o cliente ou URL de pesquisa não indicar horário exato, a cotação no XRS é feita assumindo retirada e devolução às 10h00.</td>
+      </tr>
+      <tr>
+        <td><strong>Contagem de Diárias</strong></td>
+        <td><span class="file-path">src/lib/europcar/reservationMetrics.ts<br>src/lib/rentalDays.ts</span></td>
+        <td><span class="badge badge-code">booking.duration || 1</span></td>
+        <td>Ciclos de 24h com tolerância oficial da Europcar (29 min). Se a data vier corrompida, o fallback mínimo é 1 diária.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 5. VALORES, PAYER SPLIT E TAXAS -->
+  <div class="section-title">5. Valores, Split de Pagamento (PayerList) e Balcão</div>
+  <div class="section-desc">Identificação de quem paga cada cobrança (Cielo Online vs Balcão da Estação).</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Função / Módulo</th>
+        <th style="width: 25%;">Arquivo</th>
+        <th style="width: 20%;">Fallback Aplicado</th>
+        <th style="width: 30%;">Impacto e Ponto de Atenção</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Divisão PayerList (XRS)</strong></td>
+        <td><span class="file-path">src/lib/europcar/parsePayerList.ts<br>src/app/checkout/page.tsx</span></td>
+        <td><span class="badge badge-warn">Lista de Códigos</span><br><code>APF, APT, AIRPORT...</code></td>
+        <td>Se o XML da XRS não contiver o nó <code>payerList</code>, o sistema usa uma lista fixa de códigos de aeroporto para destinar a taxa ao balcão.</td>
+      </tr>
+      <tr>
+        <td><strong>Sobretaxa Aeroporto em Pré-pago</strong></td>
+        <td><span class="file-path">src/app/reservation/vehicles/page.tsx</span></td>
+        <td><span class="badge badge-code">Cotação NP Paralela</span></td>
+        <td>A cotação ETO pré-paga oculta a sobretaxa local. O sistema roda uma cotação NP em paralelo para injetar a taxa real a pagar no balcão.</td>
+      </tr>
+      <tr>
+        <td><strong>Preço Convertido em BRL</strong></td>
+        <td><span class="file-path">src/app/checkout/page.tsx</span></td>
+        <td><span class="badge badge-code">Total Local</span></td>
+        <td>Se <code>totalRateEstimateInBookingCurrency</code> vier vazio, utiliza <code>totalRateEstimate</code> como base.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="page-break"></div>
+
+  <!-- 6. CREDENCIAIS E BANCO DE DADOS -->
+  <div class="section-title">6. Credenciais de API e Banco de Dados (XRS e Cielo)</div>
+  <div class="section-desc">Ordem de precedência para autenticação nas APIs de terceiros.</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Serviço</th>
+        <th style="width: 25%;">Arquivo</th>
+        <th style="width: 20%;">Ordem de Fallback</th>
+        <th style="width: 30%;">Impacto e Ponto de Atenção</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Credenciais XRS Europcar</strong></td>
+        <td><span class="file-path">src/lib/europcar/xrsClient.ts</span></td>
+        <td>1. Banco (<code>XRSConfig</code>)<br>2. <code>.env</code><br>3. <span class="badge badge-danger">DEMO</span></td>
+        <td>Se as credenciais não estiverem cadastradas no admin e nem no <code>.env</code>, cai no usuário <code>DEMO</code> (PTN).</td>
+      </tr>
+      <tr>
+        <td><strong>Credenciais Cielo</strong></td>
+        <td><span class="file-path">src/app/api/reservas/route.ts</span></td>
+        <td>1. Banco (<code>CieloConfig</code>)<br>2. Query SQL Raw<br>3. <code>.env</code></td>
+        <td>Resiliência contra falhas de migration: se novas colunas 3DS faltarem, o SQL raw busca apenas as chaves essenciais.</td>
+      </tr>
+      <tr>
+        <td><strong>Bandeira do Cartão (Cielo)</strong></td>
+        <td><span class="file-path">src/lib/cielo/cieloClient.ts</span></td>
+        <td>1. Consulta BIN Cielo<br>2. <span class="badge badge-code">Primeiro Dígito</span></td>
+        <td>Se a API de BIN da Cielo oscilar, identifica Visa (4), Mastercard (5), Amex (3) ou Elo (6) pelo prefixo para não barrar o pagamento.</td>
+      </tr>
+      <tr>
+        <td><strong>MCC e Nome de Loja (3DS 2.2)</strong></td>
+        <td><span class="file-path">src/app/api/reservas/route.ts</span></td>
+        <td><code>mcc: '7512'</code><br><code>name: 'Europcar Brasil'</code></td>
+        <td>Campos obrigatórios pelo Banco Central para autenticação de risco 3DS sem erro 605/606/607.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 7. CATÁLOGO DE ESTAÇÕES E VEÍCULOS -->
+  <div class="section-title">7. Catálogo de Estações e Imagens de Veículos</div>
+  <div class="section-desc">Mecanismos de contingência para exibição visual e busca de agências.</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Recurso</th>
+        <th style="width: 25%;">Arquivo</th>
+        <th style="width: 20%;">Mecanismo de Fallback</th>
+        <th style="width: 30%;">Impacto e Ponto de Atenção</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Lista de Estações Mundiais</strong></td>
+        <td><span class="file-path">src/app/api/europcar/getStations/route.ts</span></td>
+        <td>1. Microsite JSON<br>2. <span class="badge badge-code">XML XRS por País</span></td>
+        <td>O microsite global baixa 4.000 agências. Se o CDN falhar, consulta a rota XML do país selecionado com cache em memória.</td>
+      </tr>
+      <tr>
+        <td><strong>Imagem do Veículo</strong></td>
+        <td><span class="file-path">src/app/checkout/page.tsx<br>src/app/reservation/vehicles/page.tsx</span></td>
+        <td>1. API (<code>carvisual</code>)<br>2. CDN Europcar (<code>${code}_IT.png</code>)<br>3. Placeholder SVG</td>
+        <td>Garante que o cliente sempre veja a foto do carro, mesmo que a frota tenha sido cadastrada sem link visual.</td>
+      </tr>
+      <tr>
+        <td><strong>Nome Amigável do Modelo</strong></td>
+        <td><span class="file-path">src/app/reservation/vehicles/page.tsx</span></td>
+        <td><code>carCategorySample || carCategoryName || code</code></td>
+        <td>Prioriza o modelo comercial (ex: "Peugeot 208") em vez do código ACRISS técnico (ex: "EDMR").</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 8. E-MAILS E TEMPLATES -->
+  <div class="section-title">8. Envio de E-mails e Templates Transacionais</div>
+  <div class="section-desc">Garantia de entrega dos comprovantes de voucher e cancelamento.</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Função / Módulo</th>
+        <th style="width: 25%;">Arquivo</th>
+        <th style="width: 20%;">Mecanismo de Fallback</th>
+        <th style="width: 30%;">Impacto e Ponto de Atenção</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Provedor de E-mail (SMTP vs Resend)</strong></td>
+        <td><span class="file-path">src/lib/emailService.ts</span></td>
+        <td>1. SMTP com retry de 2s<br>2. <span class="badge badge-ok">Resend API</span></td>
+        <td>Se a porta SMTP do servidor local cair ou sofrer rate-limit, o disparo é chaveado instantaneamente para a API do Resend.</td>
+      </tr>
+      <tr>
+        <td><strong>Template de Confirmação</strong></td>
+        <td><span class="file-path">src/lib/email/sendReservationConfirmationEmail.ts</span></td>
+        <td>1. Template CMS (banco)<br>2. <span class="badge badge-code">HTML Hardcoded</span></td>
+        <td>Se o template HTML do banco de dados for editado com erro de sintaxe ou apagado, dispara o voucher nativo embutido no código.</td>
+      </tr>
+      <tr>
+        <td><strong>Remetente do E-mail</strong></td>
+        <td><span class="file-path">src/lib/email/sendBookingConfirmation.ts</span></td>
+        <td><code>process.env.RESEND_FROM_EMAIL || 'nao-responda@europcar.com.br'</code></td>
+        <td>Remetente institucional padrão de disparo.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 9. MENSAGENS DE ERRO CMS -->
+  <div class="section-title">9. Mensagens de Erro e Recusas de Pagamento (CMS)</div>
+  <div class="section-desc">Tradução de códigos numéricos da Cielo e XRS para mensagens claras ao cliente.</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 25%;">Origem</th>
+        <th style="width: 25%;">Arquivo</th>
+        <th style="width: 20%;">Ordem de Resolução</th>
+        <th style="width: 30%;">Impacto e Ponto de Atenção</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Erros de Pagamento e XRS</strong></td>
+        <td><span class="file-path">src/lib/cms/reservationErrors.ts</span></td>
+        <td>1. <code>ContentBlock (reservation.error.<code>)</code><br>2. Dicionário Estático<br>3. Mensagem Bruta API</td>
+        <td>Permite que o administrador altere o texto de recusa de cartão ou idade mínima via painel sem necessidade de deploy.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 10. RECOMENDAÇÕES FINAIS -->
+  <div class="section-title">10. Recomendações e Plano de Ação para a Equipe</div>
+  <div class="alert-box" style="background:#eff6ff;border-color:#93c5fd;border-left-color:#2563eb;">
+    <h3 style="color:#1e40af;">Recomendações Prioritárias para Revisão:</h3>
+    <p style="color:#1d4ed8;margin-bottom:8px;">
+      1. <strong>Recibo Internacional (Receipt):</strong> Ajustar o arquivo <code>src/app/api/receipt/[resNumber]/route.ts</code> para validar <code>booking.stationCountry</code> antes de assumir <code>'BR'</code>, garantindo que o locale e a moeda sejam formatados como Portugal/Europa quando a locação for no exterior.
+    </p>
+    <p style="color:#1d4ed8;margin-bottom:8px;">
+      2. <strong>Câmbio Mínimo de Emergência:</strong> O valor <code>6.1</code> em <code>reservationMetrics.ts</code> só entra em ação se a reserva não contiver cotação XRS. Avaliar a integração com a API do Banco Central para cotação viva em caso de ausência total.
+    </p>
+    <p style="color:#1d4ed8;">
+      3. <strong>PayerList da XRS:</strong> Como a XRS nem sempre envia o nó <code>payerList</code> completo, manter a regra de classificação por códigos de aeroporto (<code>APF</code>, <code>APT</code>) para garantir que a taxa nunca seja cobrada online indevidamente.
+    </p>
+  </div>
+
+  <div class="footer-note">
+    Documento gerado automaticamente pela suíte de engenharia de software da Europcar Brasil.<br>
+    Arquivo original: <code>docs/relatorio-fallbacks-sistema.html</code> &bull; Versão compilada em PDF: <code>docs/Relatorio_Auditoria_Fallbacks_Europcar.pdf</code>
+  </div>
+
+</body>
+</html>

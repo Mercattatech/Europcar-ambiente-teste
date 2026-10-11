@@ -11,6 +11,8 @@ export default function PainelUsuarios() {
    const [editingUser, setEditingUser] = useState<any>(null);
    const [newPassword, setNewPassword] = useState("");
    const [newName, setNewName] = useState("");
+   const [newEmail, setNewEmail] = useState("");
+   const [syncReservations, setSyncReservations] = useState(true);
    const [saving, setSaving] = useState(false);
    
    // Create User
@@ -28,6 +30,22 @@ export default function PainelUsuarios() {
    const showToast = (message: string, type: "success" | "error" = "success") => {
       setToast({ message, type });
       setTimeout(() => setToast(null), 3000);
+   };
+
+   const openEditModal = (u: any) => {
+      setEditingUser(u);
+      setNewName(u.name || "");
+      setNewEmail(u.email || "");
+      setNewPassword("");
+      setSyncReservations(true);
+   };
+
+   const closeEditModal = () => {
+      setEditingUser(null);
+      setNewPassword("");
+      setNewName("");
+      setNewEmail("");
+      setSyncReservations(true);
    };
 
    const fetchUsers = async () => {
@@ -61,14 +79,17 @@ export default function PainelUsuarios() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(updates),
          });
+         const data = await res.json().catch(() => ({}));
          if (res.ok) {
-            showToast("Usuário atualizado com sucesso!");
+            let msg = "Usuário atualizado com sucesso!";
+            if (data.emailChanged && typeof data.syncedReservationsCount === 'number' && data.syncedReservationsCount > 0) {
+               msg += ` (${data.syncedReservationsCount} reserva(s) atualizada(s) para o novo e-mail)`;
+            }
+            showToast(msg);
             fetchUsers();
-            setEditingUser(null);
-            setNewPassword("");
-            setNewName("");
+            closeEditModal();
          } else {
-            showToast("Erro ao atualizar", "error");
+            showToast(data.error || "Erro ao atualizar", "error");
          }
       } catch (e) {
          showToast("Erro de conexão", "error");
@@ -283,7 +304,7 @@ export default function PainelUsuarios() {
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                                  </button>
                                  {/* Edit */}
-                                 <button onClick={() => { setEditingUser(u); setNewName(u.name || ""); setNewPassword(""); }} className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors" title="Editar">
+                                 <button onClick={() => openEditModal(u)} className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors" title="Editar">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                  </button>
                                  {/* Toggle Role */}
@@ -358,19 +379,19 @@ export default function PainelUsuarios() {
                <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg shadow-2xl">
                   <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
                      <h2 className="text-lg font-black text-white">Editar Usuário</h2>
-                     <button onClick={() => { setEditingUser(null); setNewPassword(""); setNewName(""); }} className="text-gray-500 hover:text-white transition-colors">
+                     <button onClick={closeEditModal} className="text-gray-500 hover:text-white transition-colors">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                      </button>
                   </div>
                   <div className="p-6 space-y-5">
                      {/* User Info */}
                      <div className="flex items-center gap-3 bg-gray-800/50 rounded-lg p-3">
-                        <div className="w-10 h-10 rounded-full bg-green-900/50 flex items-center justify-center text-green-400 font-bold">
+                        <div className="w-10 h-10 rounded-full bg-green-900/50 flex items-center justify-center text-green-400 font-bold shrink-0">
                            {(editingUser.name || editingUser.email || "?")[0].toUpperCase()}
                         </div>
-                        <div>
-                           <p className="font-bold text-white">{editingUser.name || "Sem nome"}</p>
-                           <p className="text-xs text-gray-500">{editingUser.email}</p>
+                        <div className="overflow-hidden">
+                           <p className="font-bold text-white truncate">{editingUser.name || "Sem nome"}</p>
+                           <p className="text-xs text-gray-500 truncate">{editingUser.email}</p>
                         </div>
                      </div>
 
@@ -384,6 +405,43 @@ export default function PainelUsuarios() {
                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500 outline-none focus:border-green-600"
                            placeholder="Nome do usuário"
                         />
+                     </div>
+
+                     {/* Change Email */}
+                     <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2 flex items-center justify-between">
+                           <span>E-mail</span>
+                           {newEmail.trim().toLowerCase() !== (editingUser.email || '').trim().toLowerCase() && (
+                              <span className="text-[11px] text-amber-400 font-medium normal-case">
+                                 Alterando e-mail
+                              </span>
+                           )}
+                        </label>
+                        <input
+                           type="email"
+                           value={newEmail}
+                           onChange={e => setNewEmail(e.target.value)}
+                           className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500 outline-none focus:border-green-600"
+                           placeholder="usuario@email.com"
+                        />
+                        <p className="text-[10px] text-gray-500 mt-1">Utilizado para login, notificações e vínculo de reservas.</p>
+
+                        {/* Checkbox para sincronizar reservas anteriores se o email foi alterado */}
+                        {newEmail.trim().toLowerCase() !== (editingUser.email || '').trim().toLowerCase() && newEmail.trim() !== '' && (
+                           <div className="mt-3 p-3 bg-blue-950/40 border border-blue-800/60 rounded-lg flex items-start gap-3">
+                              <input
+                                 type="checkbox"
+                                 id="syncReservationsCheckbox"
+                                 checked={syncReservations}
+                                 onChange={e => setSyncReservations(e.target.checked)}
+                                 className="mt-0.5 rounded border-gray-600 text-green-600 focus:ring-green-500 h-4 w-4 bg-gray-800"
+                              />
+                              <label htmlFor="syncReservationsCheckbox" className="text-xs text-gray-300 cursor-pointer select-none">
+                                 <span className="font-bold text-blue-300 block">Sincronizar reservas do e-mail anterior</span>
+                                 Atualizar reservas e histórico vinculados a <strong className="text-white font-mono">{editingUser.email}</strong> para o novo e-mail, mantendo o histórico acessível pelo cliente.
+                              </label>
+                           </div>
+                        )}
                      </div>
 
                      {/* Change Password */}
@@ -416,14 +474,31 @@ export default function PainelUsuarios() {
                      </div>
                   </div>
                   <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-800">
-                     <button onClick={() => { setEditingUser(null); setNewPassword(""); setNewName(""); }} className="px-5 py-2.5 rounded-lg bg-gray-800 text-gray-300 font-bold text-sm hover:bg-gray-700 transition-colors">
+                     <button onClick={closeEditModal} className="px-5 py-2.5 rounded-lg bg-gray-800 text-gray-300 font-bold text-sm hover:bg-gray-700 transition-colors">
                         Cancelar
                      </button>
                      <button
                         disabled={saving}
                         onClick={() => {
                            const updates: any = {};
-                           if (newName && newName !== editingUser.name) updates.name = newName;
+                           if (newName !== editingUser.name) updates.name = newName;
+
+                           const cleanEmail = newEmail.trim().toLowerCase();
+                           const currentEmail = (editingUser.email || '').trim().toLowerCase();
+                           if (cleanEmail !== currentEmail) {
+                              if (!cleanEmail) {
+                                 showToast("O e-mail não pode ser vazio.", "error");
+                                 return;
+                              }
+                              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                              if (!emailRegex.test(cleanEmail)) {
+                                 showToast("Formato de e-mail inválido.", "error");
+                                 return;
+                              }
+                              updates.email = cleanEmail;
+                              updates.syncReservations = syncReservations;
+                           }
+
                            if (newPassword) updates.newPassword = newPassword;
                            if (Object.keys(updates).length === 0) { showToast("Nenhuma alteração para salvar.", "error"); return; }
                            handleUpdateUser(editingUser.id, updates);

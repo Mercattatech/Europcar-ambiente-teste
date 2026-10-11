@@ -37,7 +37,7 @@ export async function GET(req: Request) {
       for (const res of reservations) {
          try {
             const data = typeof res.customerData === 'string' ? JSON.parse(res.customerData) : res.customerData;
-            const email = (data?.customer?.email || data?.driver?.email || '').toLowerCase().trim();
+            const email = (data?.email || data?.customer?.email || data?.driver?.email || data?.booking?.driver?.email || '').toLowerCase().trim();
             if (email) {
                if (!reservationsByEmail[email]) reservationsByEmail[email] = [];
                reservationsByEmail[email].push(res);

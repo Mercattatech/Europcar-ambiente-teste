@@ -62,10 +62,14 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
    try {
       if (!(await checkAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const { id, role } = await req.json();
+      const { id, role, email, name } = await req.json();
+      const updateData: any = {};
+      if (role !== undefined) updateData.role = role;
+      if (name !== undefined) updateData.name = name;
+      if (email !== undefined) updateData.email = String(email).trim().toLowerCase();
       const updatedUser = await prisma.user.update({
          where: { id },
-         data: { role }
+         data: updateData
       });
       return NextResponse.json(updatedUser);
    } catch (error) {
