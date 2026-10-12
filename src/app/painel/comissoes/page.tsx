@@ -3,19 +3,58 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import ImportNetPanel from "./ImportNetPanel";
 
-type FilterType = 'ALL' | 'PIX' | 'CREDIT_CARD' | 'BALCAO' | 'PIX_PENDING';
+type FilterType = 'ALL' | 'ONLINE' | 'PIX' | 'CREDIT_CARD' | 'BALCAO' | 'PIX_PENDING';
 
 // Regra: comissão = % × markup líquido (NET × margem do /painel/margem − cupom),
 // gerada SOMENTE em vendas pagas no Cartão de Crédito ou PIX efetivado.
 const geraComissao = (r: any) => r.tipoPagamento === 'CREDIT_CARD' || r.tipoPagamento === 'PIX';
 
+const matchPagamento = (r: any, f: FilterType) =>
+   f === 'ALL' ? true : f === 'ONLINE' ? geraComissao(r) : r.tipoPagamento === f;
+
 const FILTER_OPTIONS: { key: FilterType; label: string; emoji: string; color: string; active: string }[] = [
    { key: 'ALL',         label: 'Todos',           emoji: '📋', color: 'text-gray-400  border-gray-700 bg-gray-800/50',         active: 'text-white    border-white      bg-gray-700' },
+   { key: 'ONLINE',      label: 'Cartão + PIX (comissionáveis)', emoji: '🤑', color: 'text-teal-300 border-teal-800 bg-teal-900/20', active: 'text-white    border-teal-400   bg-teal-700' },
    { key: 'PIX',         label: 'PIX (Efetivado)', emoji: '📱', color: 'text-emerald-400 border-emerald-800 bg-emerald-900/20', active: 'text-white    border-emerald-500 bg-emerald-700' },
    { key: 'CREDIT_CARD', label: 'Cartão Crédito',  emoji: '💳', color: 'text-blue-400  border-blue-800  bg-blue-900/20',         active: 'text-white    border-blue-500   bg-blue-700' },
    { key: 'BALCAO',      label: 'Pagto. Balcão',   emoji: '🏢', color: 'text-yellow-400 border-yellow-800 bg-yellow-900/20',    active: 'text-white    border-yellow-500 bg-yellow-700' },
    { key: 'PIX_PENDING', label: 'PIX Pendente',    emoji: '⏳', color: 'text-amber-400 border-amber-800 bg-amber-900/20',        active: 'text-white    border-amber-500  bg-amber-700' },
 ];
+
+// Status operacional (mesmos códigos da Gestão de Reservas). Sem status gravado = R.
+const OP_STATUS: Record<string, { label: string; color: string }> = {
+   R:  { label: 'On Request',        color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' },
+   S:  { label: 'Sold',              color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' },
+   CF: { label: 'Confirmed',         color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' },
+   CC: { label: 'Cancelled',         color: 'bg-red-500/20 text-red-400 border-red-500/40' },
+   CP: { label: 'Cancelled Prepaid', color: 'bg-orange-500/20 text-orange-400 border-orange-500/40' },
+   CO: { label: 'Checked Out',       color: 'bg-purple-500/20 text-purple-400 border-purple-500/40' },
+   TD: { label: 'Turn Down',         color: 'bg-gray-600/30 text-gray-400 border-gray-500/40' },
+   NS: { label: 'No Show',           color: 'bg-gray-500/20 text-gray-500 border-gray-500/40' },
+};
+const opOf = (r: any): string => r.operationalStatus || 'R';
+
+const OP_FILTER_OPTIONS: { value: string; label: string }[] = [
+   { value: 'ALL', label: 'Todos' },
+   { value: 'ACTIVE', label: 'Momentâneos' },
+   { value: 'R',  label: 'R - On Request' },
+   { value: 'S',  label: 'S - Sold' },
+   { value: 'CF', label: 'CF - Confirmed' },
+   { value: 'DONE', label: 'Concluídos' },
+   { value: 'CC', label: 'CC - Cancelled' },
+   { value: 'CP', label: 'CP - Cancelled Prepaid' },
+   { value: 'CO', label: 'CO - Checked Out' },
+   { value: 'TD', label: 'TD - Turn Down' },
+   { value: 'NS', label: 'NS - No Show' },
+];
+
+const matchOp = (r: any, f: string) => {
+   const op = opOf(r);
+   if (f === 'ALL') return true;
+   if (f === 'ACTIVE') return ['R', 'S', 'CF'].includes(op);
+   if (f === 'DONE') return ['CC', 'CP', 'CO', 'TD', 'NS'].includes(op);
+   return op === f;
+};
 
 function fmt(v: number) {
    return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -35,6 +74,7 @@ export default function PainelComissoes() {
    const [rateInput, setRateInput] = useState("");
    const [savingRate, setSavingRate] = useState(false);
    const [filter, setFilter]       = useState<FilterType>('ALL');
+   const [opFilter, setOpFilter]   = useState('ALL');
    const [backfilling, setBackfilling] = useState(false);
    const [backfillMsg, setBackfillMsg] = useState("");
    const [backfillFails, setBackfillFails] = useState<{ resNumber: string; detail: string }[]>([]);
@@ -131,9 +171,8 @@ export default function PainelComissoes() {
    // ── Filtragem e totais derivados ────────────────────────────────────
    const filtered = useMemo(() => {
       if (!data?.reservations) return [];
-      if (filter === 'ALL') return data.reservations;
-      return data.reservations.filter((r: any) => r.tipoPagamento === filter);
-   }, [data, filter]);
+      return data.reservations.filter((r: any) => matchPagamento(r, filter) && matchOp(r, opFilter));
+   }, [data, filter, opFilter]);
 
    // Totais consideram só vendas efetivadas (PIX pendente fica de fora)
    const filteredTotals = useMemo(() => {
@@ -156,14 +195,14 @@ export default function PainelComissoes() {
    }, [filtered, commissionOf]);
 
    const exportCsv = () => {
-      const header = ['Reserva', 'Data', 'Cliente', 'Tipo', 'Valor Venda (BRL)', 'NET (BRL)', 'NET (moeda local)', 'Moeda', 'Markup %', 'Markup (BRL)', 'Cupom', 'Desconto cupom (BRL)', 'Markup liquido (BRL)', `Comissao (${rateNum}% do markup liquido - so Cartao/PIX)`, 'Origem NET/Markup'];
+      const header = ['Reserva', 'Data', 'Cliente', 'Tipo', 'Status operacional', 'Valor Venda (BRL)', 'NET (BRL)', 'NET (moeda local)', 'Moeda', 'Markup %', 'Markup (BRL)', 'Cupom', 'Desconto cupom (BRL)', 'Markup liquido (BRL)', `Comissao (${rateNum}% do markup liquido - so Cartao/PIX)`, 'Origem NET/Markup'];
       const lines = filtered.map((r: any) => {
          let p: any = {};
          try { p = JSON.parse(r.customerData); } catch { /* ignore */ }
          const n = (v: number | null | undefined) => (v == null ? '' : v.toFixed(2).replace('.', ','));
          return [
             r.resNumber || '', new Date(r.createdAt).toLocaleDateString('pt-BR'), `${p?.nome || ''} ${p?.sobrenome || ''}`.trim(),
-            r.tipoPagamento, n(r.valorCalculado), n(r.netBRL), n(r.netLocal), r.netCurrency || '',
+            r.tipoPagamento, `${opOf(r)} - ${OP_STATUS[opOf(r)]?.label || ''}`, n(r.valorCalculado), n(r.netBRL), n(r.netLocal), r.netCurrency || '',
             r.markupPercent == null ? '' : String(r.markupPercent).replace('.', ','), n(r.markupBRL), r.cupom || '', n(r.descontoCupom), n(r.markupLiquidoBRL), n(commissionOf(r)),
             r.semNetReal ? `SEM NET REAL${r.netErro ? ` (${r.netErro})` : ''}` : r.netSource === 'XRS_QUOTE' ? 'API (registrado na venda)' : r.netSource === 'XRS_BACKFILL' ? 'API (reconsultado no XRS)' : r.netSource === 'EUROPCAR_EXTRATO' ? 'Europcar (extrato oficial)' : r.netSource === 'SEM_MARKUP' ? 'Tarifa sem markup (POA)' : '',
          ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(';');
@@ -253,9 +292,7 @@ export default function PainelComissoes() {
                   <div className="flex flex-wrap gap-2">
                      {FILTER_OPTIONS.map(opt => {
                         const isActive = filter === opt.key;
-                        const counts = opt.key === 'ALL'
-                           ? data.reservations.length
-                           : data.reservations.filter((r: any) => r.tipoPagamento === opt.key).length;
+                        const counts = data.reservations.filter((r: any) => matchOp(r, opFilter) && matchPagamento(r, opt.key)).length;
                         return (
                            <button
                               key={opt.key}
@@ -271,6 +308,23 @@ export default function PainelComissoes() {
                         );
                      })}
                   </div>
+
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mt-5 mb-3">Status Operacional</p>
+                  <div className="flex flex-wrap gap-2">
+                     {OP_FILTER_OPTIONS.map(opt => {
+                        const isActive = opFilter === opt.value;
+                        const count = data.reservations.filter((r: any) => matchPagamento(r, filter) && matchOp(r, opt.value)).length;
+                        return (
+                           <button
+                              key={opt.value}
+                              onClick={() => setOpFilter(opt.value)}
+                              className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${isActive ? 'bg-purple-700/40 border-purple-400 text-white' : 'bg-gray-800/60 border-gray-700 text-gray-400 hover:text-white'}`}
+                           >
+                              {opt.label} <span className="font-mono opacity-70">({count})</span>
+                           </button>
+                        );
+                     })}
+                  </div>
                </div>
 
                {/* ── Somatória ───────────────────────────────────────── */}
@@ -278,7 +332,7 @@ export default function PainelComissoes() {
                   <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl p-5 shadow-lg relative overflow-hidden">
                      <div className="absolute top-3 right-3 text-2xl opacity-30">💵</div>
                      <p className="text-white/70 text-xs font-bold uppercase tracking-wide">
-                        Total em Vendas {filter !== 'ALL' && <span className="normal-case">(filtrado)</span>}
+                        Total em Vendas {(filter !== 'ALL' || opFilter !== 'ALL') && <span className="normal-case">(filtrado)</span>}
                      </p>
                      <p className="text-2xl font-black text-white mt-2">{fmt(filteredTotals.vendas)}</p>
                      <p className="text-[11px] text-indigo-200 mt-1">{filteredTotals.count} reservas efetivadas</p>
@@ -300,7 +354,7 @@ export default function PainelComissoes() {
                   <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-xl p-5 shadow-lg relative overflow-hidden">
                      <div className="absolute top-3 right-3 text-2xl opacity-30">🤑</div>
                      <p className="text-white/70 text-xs font-bold uppercase tracking-wide">
-                        Comissão {filter !== 'ALL' && <span className="normal-case">(filtrado)</span>}
+                        Comissão {(filter !== 'ALL' || opFilter !== 'ALL') && <span className="normal-case">(filtrado)</span>}
                      </p>
                      <p className="text-2xl font-black text-white mt-2">{fmt(filteredTotals.comissao)}</p>
                      <p className="text-[11px] text-emerald-200 mt-1">{rateNum}% do markup líquido · só Cartão e PIX</p>
@@ -419,6 +473,7 @@ export default function PainelComissoes() {
                               <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Reserva / Data</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cliente</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tipo</th>
+                              <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status Op.</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Valor Venda</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tarifa</th>
                               <th className="px-5 py-4 text-[10px] font-bold text-slate-300 uppercase tracking-wider text-right">NET (API)</th>
@@ -431,7 +486,7 @@ export default function PainelComissoes() {
                         </thead>
                         <tbody className="divide-y divide-gray-800/50">
                            {filtered.length === 0 ? (
-                              <tr><td colSpan={11} className="text-center py-10 text-gray-500">Nenhuma reserva para este filtro.</td></tr>
+                              <tr><td colSpan={12} className="text-center py-10 text-gray-500">Nenhuma reserva para este filtro.</td></tr>
                            ) : (
                               filtered.map((res: any) => {
                                  let parsed: any = {};
@@ -459,6 +514,11 @@ export default function PainelComissoes() {
                                               res.tipoPagamento === 'PIX'         ? '📱 PIX (Pago)' :
                                               res.tipoPagamento === 'PIX_PENDING' ? '⏳ PIX Pendente' :
                                                                                     '🏢 Balcão'}
+                                          </span>
+                                       </td>
+                                       <td className="px-5 py-4">
+                                          <span className={`text-[10px] font-bold px-2 py-1 rounded border whitespace-nowrap ${OP_STATUS[opOf(res)]?.color || 'bg-gray-700 text-gray-300 border-gray-600'}`} title={OP_STATUS[opOf(res)]?.label || ''}>
+                                             {opOf(res)} · {OP_STATUS[opOf(res)]?.label || 'Desconhecido'}
                                           </span>
                                        </td>
                                        <td className="px-5 py-4 text-right">
@@ -532,7 +592,7 @@ export default function PainelComissoes() {
                         {filtered.length > 0 && (
                            <tfoot className="bg-gray-800/60 border-t-2 border-gray-700">
                               <tr>
-                                 <td className="px-5 py-4 text-xs font-black text-white uppercase" colSpan={3}>Total ({filteredTotals.count} efetivadas)</td>
+                                 <td className="px-5 py-4 text-xs font-black text-white uppercase" colSpan={4}>Total ({filteredTotals.count} efetivadas)</td>
                                  <td className="px-5 py-4 text-right font-black text-white">{fmt(filteredTotals.vendas)}</td>
                                  <td />
                                  <td className="px-5 py-4 text-right font-black text-slate-200">{fmt(filteredTotals.net)}</td>
