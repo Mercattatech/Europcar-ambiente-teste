@@ -63,7 +63,10 @@ export async function voidCieloPaymentForLocalReservation(localReservationId: st
     const reservation = await prisma.localReservation.findUnique({ where: { id: localReservationId } });
     if (!reservation?.customerData) return { attempted: false };
 
-    const parsed: any = JSON.parse(reservation.customerData as string);
+    // Aceita string JSON (padrão) ou objeto (reservas alteradas antes da correção do modifyReservation)
+    const parsed: any = typeof reservation.customerData === 'string'
+      ? JSON.parse(reservation.customerData)
+      : reservation.customerData;
     const paymentId: string | undefined = parsed?.paymentId;
     if (!paymentId) return { attempted: false };
 

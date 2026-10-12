@@ -757,7 +757,7 @@ export async function executeAITool(toolName: string, args: Record<string, any>)
 
       await prisma.localReservation.update({
         where: { id: localRes.id },
-        data: { customerData: cd }
+        data: { customerData: JSON.stringify(cd) }
       });
 
       return {

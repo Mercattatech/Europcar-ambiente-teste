@@ -20,8 +20,14 @@ export async function GET(req: Request) {
       });
       
       const userReservations = allReservations.map(r => {
+         // customerData pode estar salvo como string JSON (padrão) ou como objeto
+         // (reservas alteradas antes da correção do modifyReservation). Aceita os dois.
          let cd: any = {};
-         try { cd = JSON.parse(r.customerData as string); } catch(e){}
+         try {
+            cd = typeof r.customerData === 'string'
+               ? JSON.parse(r.customerData)
+               : (r.customerData as any) || {};
+         } catch(e){}
          // Use the amountInCents from DB (grand total incl. extras) if available
          // otherwise fall back to the car rate from the booking data
          const grandTotalBRL = r.amountInCents && r.amountInCents > 0

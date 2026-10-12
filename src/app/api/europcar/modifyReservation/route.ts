@@ -150,9 +150,11 @@ export async function POST(request: Request) {
             }
           }
 
+          // Grava como string JSON — mesmo formato usado no resto do sistema (bookReservation, sync-pix...).
+          // Gravar o objeto direto fazia /api/reservas/user falhar no JSON.parse e a reserva sumia do login do cliente.
           await prisma.localReservation.update({
             where: { id: localRes.id },
-            data: { customerData: cd, updatedAt: new Date() }
+            data: { customerData: JSON.stringify(cd), updatedAt: new Date() }
           });
 
           // Send modification email
