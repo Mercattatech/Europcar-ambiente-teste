@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { checkAdmin } from '@/lib/checkAdmin';
-import { resolvePricingSnapshot, readEtoMarkupPercent } from '@/lib/commissions/pricingSnapshot';
+import { resolvePricingSnapshot, readEtoMarkupPercent, isEtoContract } from '@/lib/commissions/pricingSnapshot';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,7 +67,6 @@ export async function GET(request: Request) {
 
       const resultList = reservations.map(res => {
          const valor = res.amountInCents ? res.amountInCents / 100 : 0;
-         const comissao = valor * (rate / 100);
          
          let parsed: any = {};
          try {
@@ -93,8 +92,9 @@ export async function GET(request: Request) {
             tipo = res.status === 'CONFIRMED_PREPAID' ? 'CREDIT_CARD' : 'BALCAO';
          }
 
-         // NET capturado da API + markup aplicado (gravados na venda; estimados nas reservas antigas)
+         // NET real (gravado na venda ou reconsultado no XRS). Sem estimativas: ETO sem NET real = null.
          const snap = resolvePricingSnapshot(parsed, res.amountInCents, { configuredMarkupPercent: configuredMarkup });
+         const semNetReal = !snap && isEtoContract(parsed?.booking?.contractID);
 
          // Desconto do cupom: uso registrado (CouponUsage) ou valor fixo "R$ x de desconto" no rótulo
          const couponLabel: string | null = parsed?.couponData?.discountLabel ?? null;
@@ -105,11 +105,19 @@ export async function GET(request: Request) {
             const m = couponLabel.match(/R\$\s*([\d.]+,\d{2})/);
             if (m) descontoCupom = parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
          }
-         // Markup líquido: o markup registrado na venda é nominal; se o cupom foi desconto da casa, desconta-se.
-         // Nas reservas estimadas o markup já sai do valor efetivamente cobrado, então não há o que descontar.
+         // Markup líquido: o markup registrado na venda (NET × margem) é nominal; se houve cupom, desconta-se.
+         // No reconsultado (XRS_BACKFILL) o markup já é valor cobrado − NET real, então o cupom já está descontado.
          const markupLiquidoBRL = snap
             ? (snap.source === 'XRS_QUOTE' && descontoCupom ? Math.max(0, snap.markupBRL - descontoCupom) : snap.markupBRL)
             : null;
+
+         // ── Regra de comissão ─────────────────────────────────────────────
+         // Markup = NET (API) × % da página /painel/margem (gravado no pricingSnapshot da venda).
+         // Comissão = rate% (COMMISSION_RATE, ex.: 7,5) do markup LÍQUIDO (markup − cupom),
+         // somente em vendas pagas online: Cartão de Crédito e PIX efetivado.
+         // Balcão e PIX pendente não geram comissão.
+         const geraComissao = tipo === 'CREDIT_CARD' || tipo === 'PIX';
+         const comissao = geraComissao ? Math.max(0, markupLiquidoBRL || 0) * (rate / 100) : 0;
 
          // Totaliza apenas vendas efetivadas (PIX pendente não gera receita confirmada)
          const isEfetivada = tipo !== 'PIX_PENDING';
@@ -152,6 +160,8 @@ export async function GET(request: Request) {
             markupPercent: snap?.markupPercent ?? null,
             markupBRL: snap?.markupBRL ?? null,
             netSource: snap?.source ?? null,
+            semNetReal,
+            netErro: semNetReal ? (parsed?.pricingBackfill?.error ?? null) : null,
             // Tarifa escolhida: markup só existe em ETO ("Pagar agora") fora do Brasil
             tarifa: (() => {
                const cid = String(parsed?.booking?.contractID || '');

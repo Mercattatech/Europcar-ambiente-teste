@@ -2,6 +2,7 @@ import { callXRS, DEFAULT_POA_CID } from '@/lib/europcar/xrsClient';
 import { buildReservationPaymentAttrs, buildCreateVoucherXml, CID_TO_BA } from '@/lib/europcar/paymentMapping';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { parsePayerList } from '@/lib/europcar/parsePayerList';
+import { buildPricingSnapshot, readEtoMarkupPercent, isEtoContract, type PricingSnapshot } from '@/lib/commissions/pricingSnapshot';
 
 export interface BookXRSParams {
   bookingData: any;
@@ -179,6 +180,7 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
     console.warn(`[xrsBook] ⚠️ XRS retornou aviso xrs.rateIDNotApplied para reserva ${resNumber}. Tarifa recalculada pelo Greenway.`);
   }
 
+  let pricingSnapshot: PricingSnapshot | null = null;
   if (quoteNode) {
     const xrsTotalRateBRL = parseFloat(quoteNode.totalRateEstimateInBookingCurrency || quoteNode.totalRateEstimate || '0');
     const xrsTotalRateOrig = parseFloat(quoteNode.totalRateEstimate || '0');
@@ -189,6 +191,19 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
       if (quoteNode.basePrice) bookingData.car.basePrice = String(quoteNode.basePrice);
       if (quoteNode.currency) bookingData.car.currency = String(quoteNode.currency);
       if (quoteNode.bookingCurrency) bookingData.car.bookingCurrency = String(quoteNode.bookingCurrency);
+
+      // NET real (API) + markup vigente, para o relatório de comissões — mesmo registro do fluxo do cartão.
+      // Gravado no próprio customerData (os chamadores PIX/reenvio salvam `{ ...parsedData }` em seguida).
+      // Não substitui um NET já registrado e nunca impede a reserva.
+      try {
+        if (resNumber && !(customerData?.pricingSnapshot?.netBRL > 0)) {
+          const markupPct = isEtoContract(contractID) ? await readEtoMarkupPercent() : 0;
+          pricingSnapshot = buildPricingSnapshot({ quoteNode, contractID, markupPercent: markupPct });
+          if (pricingSnapshot && customerData) customerData.pricingSnapshot = pricingSnapshot;
+        }
+      } catch (snapErr: any) {
+        console.warn(`[xrsBook] Falha ao registrar NET/markup de ${resNumber}:`, snapErr?.message);
+      }
     }
   }
 
@@ -318,5 +333,6 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
       basePrice: quoteNode.basePrice ? String(quoteNode.basePrice) : undefined,
     } : undefined,
     warnings: xrsWarnings,
+    pricingSnapshot,
   };
 }
