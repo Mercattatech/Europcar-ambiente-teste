@@ -161,6 +161,12 @@ export async function GET(request: Request) {
     const areaType = attrs.areaType || (stationCode.length >= 4 ? (stationCode[3] === 'T' ? 'T' : stationCode[3] === 'O' ? 'O' : '') : '');
     const isTerminal = areaType === 'T';
     const isOffTerminal = areaType === 'O';
+    const isRailwayOrCity = areaType === 'C' || areaType === 'L' || areaType === 'X';
+    const isAirport =
+      !isRailwayOrCity &&
+      (isTerminal ||
+       isOffTerminal ||
+       /\b(airport|aeroporto|aeropuerto|flughafen|aéroport)\b/i.test(attrs.stationName || ''));
 
     // Delivery/Collection mode: 'Y' = available, 'R' = on request
     const deliveryMode = attrs.delivery || '';  // '', 'Y', 'R'
@@ -177,7 +183,7 @@ export async function GET(request: Request) {
       email:        sanitizeEmail(attrs.email ?? ''),
       latitude:     attrs.latitude      ?? '',
       longitude:    attrs.longitude     ?? '',
-      type:         attrs.prestige === 'Y' || areaType === 'T' ? 'airport' : 'city',
+      type:         isAirport ? 'airport' : 'city',
       leadTime:     attrs.leadTime      ?? '',
       hours,
       hasLunchBreak,

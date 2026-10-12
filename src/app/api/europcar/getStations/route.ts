@@ -295,17 +295,35 @@ export async function GET(request: Request) {
   const limited = filtered.slice(0, 30);
 
   // Shape payload for frontend autocomplete
-  const payload = limited.map((s) => ({
-    code: s.stationCode ?? s.code,
-    name: s.stationName ?? s.name,
-    city: s.cityName ?? s.city ?? '',
-    country: COUNTRY_NAMES[s.countryCode] ?? s.countryName ?? s.countryCode ?? '',
-    countryCode: s.countryCode ?? '',
-    type: (s.prestige === 'Y' || s.areaType === 'T') ? 'airport' : s.type ?? 'city',
-    address: s.address1 ?? s.address ?? '',
-    features: s.features ?? [],
-    hours: s.hours ?? [],
-  }));
+  const payload = limited.map((s) => {
+    const code = String(s.stationCode ?? s.code ?? '').toUpperCase();
+    const name = s.stationName ?? s.name ?? '';
+    const areaType = String(s.areaType ?? '').toUpperCase();
+
+    // Regra XRS Europcar para identificação de aeroporto:
+    // - areaType="T" (Terminal de aeroporto) ou "O" (Off-terminal com transfer/shuttle de aeroporto)
+    // - Ou 4º caractere do código "T" ou "O" (ex: LIST01, CDGT01) exceto se for explicitamente cidade/trem (C, L, X)
+    // - Ou nome contendo termos específicos de aeroporto
+    const isRailwayOrCity = areaType === 'C' || areaType === 'L' || areaType === 'X';
+    const isAirport =
+      !isRailwayOrCity &&
+      (areaType === 'T' ||
+       areaType === 'O' ||
+       (code.length >= 4 && (code[3] === 'T' || code[3] === 'O')) ||
+       /\b(airport|aeroporto|aeropuerto|flughafen|aéroport)\b/i.test(name));
+
+    return {
+      code,
+      name,
+      city: s.cityName ?? s.city ?? '',
+      country: COUNTRY_NAMES[s.countryCode] ?? s.countryName ?? s.countryCode ?? '',
+      countryCode: s.countryCode ?? '',
+      type: isAirport ? 'airport' : 'city',
+      address: s.address1 ?? s.address ?? '',
+      features: s.features ?? [],
+      hours: s.hours ?? [],
+    };
+  });
 
   return NextResponse.json({ stations: payload });
 }
