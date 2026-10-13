@@ -15,7 +15,7 @@
 <!--[if mso]><style>body,table,td,a{font-family:Arial,Helvetica,sans-serif !important;}</style><![endif]-->
 </head>
 <body style="margin:0;padding:0;background-color:#eef1ed;-webkit-text-size-adjust:100%;">
-<span style="display:none;font-size:1px;color:#eef1ed;max-height:0;overflow:hidden;">Reserva {{NUMERO_RESERVA}} confirmada &bull; {{CARRO}} &bull; Retirada em {{LOCAL_RETIRADA}} em {{DATA_RETIRADA}}</span>
+<span style="display:none;font-size:1px;color:#eef1ed;max-height:0;overflow:hidden;">Reserva {{NUMERO_RESERVA}} confirmada &bull; {{CARRO}} &bull; Retirada em {{NOME_LOJA_RETIRADA}} em {{DATA_RETIRADA}}</span>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#eef1ed;">
 <tr><td align="center" style="padding:24px 12px;">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:600px;background-color:#ffffff;border:1px solid #dfe4dd;border-radius:10px;overflow:hidden;">
@@ -64,12 +64,12 @@
         <td class="col" width="272" valign="top" style="width:272px;padding:16px 20px;border-bottom:1px solid #dfe4dd;border-right:1px solid #dfe4dd;font-family:Arial,Helvetica,sans-serif;">
           <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:1.2px;color:#008d36;font-weight:bold;">RETIRADA</p>
           <p style="margin:0 0 4px 0;font-size:15px;color:#1f2421;font-weight:bold;">{{DATA_RETIRADA}} &middot; {{HORARIO_RETIRADA}}</p>
-          <p style="margin:0;font-size:13px;color:#6d7a70;">{{LOCAL_RETIRADA}}</p>
+          <p style="margin:0;font-size:13px;color:#1f2421;font-weight:bold;">{{NOME_LOJA_RETIRADA}} <span style="font-weight:normal;color:#8a948c;">({{CODIGO_LOJA_RETIRADA}})</span></p>{{#ENDERECO_LOJA_RETIRADA}}<p style="margin:3px 0 0 0;font-size:12px;line-height:18px;color:#6d7a70;">&#x1F4CD; {{ENDERECO_LOJA_RETIRADA}}</p>{{/ENDERECO_LOJA_RETIRADA}}{{#TELEFONE_LOJA_RETIRADA}}<p style="margin:2px 0 0 0;font-size:12px;line-height:18px;color:#6d7a70;">Tel.: {{TELEFONE_LOJA_RETIRADA}}</p>{{/TELEFONE_LOJA_RETIRADA}}
         </td>
         <td class="col" width="272" valign="top" style="width:272px;padding:16px 20px;border-bottom:1px solid #dfe4dd;font-family:Arial,Helvetica,sans-serif;">
           <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:1.2px;color:#008d36;font-weight:bold;">DEVOLUÇÃO</p>
           <p style="margin:0 0 4px 0;font-size:15px;color:#1f2421;font-weight:bold;">{{DATA_DEVOLUCAO}} &middot; {{HORARIO_DEVOLUCAO}}</p>
-          <p style="margin:0;font-size:13px;color:#6d7a70;">{{LOCAL_DEVOLUCAO}}</p>
+          <p style="margin:0;font-size:13px;color:#1f2421;font-weight:bold;">{{NOME_LOJA_DEVOLUCAO}} <span style="font-weight:normal;color:#8a948c;">({{CODIGO_LOJA_DEVOLUCAO}})</span></p>{{#ENDERECO_LOJA_DEVOLUCAO}}<p style="margin:3px 0 0 0;font-size:12px;line-height:18px;color:#6d7a70;">&#x1F4CD; {{ENDERECO_LOJA_DEVOLUCAO}}</p>{{/ENDERECO_LOJA_DEVOLUCAO}}{{#TELEFONE_LOJA_DEVOLUCAO}}<p style="margin:2px 0 0 0;font-size:12px;line-height:18px;color:#6d7a70;">Tel.: {{TELEFONE_LOJA_DEVOLUCAO}}</p>{{/TELEFONE_LOJA_DEVOLUCAO}}
         </td>
       </tr>
       <!-- Veículo | Valor -->
@@ -125,7 +125,7 @@
             <tr><td style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;">
               <p style="margin:0 0 8px 0;font-size:11px;letter-spacing:1.2px;color:#008d36;font-weight:bold;">LEVANTAMENTO</p>
               <p style="margin:0 0 4px 0;font-size:14px;color:#1f2421;font-weight:bold;">{{DATA_RETIRADA}} &agrave;s {{HORARIO_RETIRADA}}</p>
-              <p style="margin:0;font-size:13px;color:#3d463f;">{{LOCAL_RETIRADA}}</p>
+              <p style="margin:0;font-size:13px;color:#1f2421;font-weight:bold;">{{NOME_LOJA_RETIRADA}} <span style="font-weight:normal;color:#8a948c;">({{CODIGO_LOJA_RETIRADA}})</span></p>{{#ENDERECO_LOJA_RETIRADA}}<p style="margin:3px 0 0 0;font-size:12px;line-height:18px;color:#3d463f;">&#x1F4CD; {{ENDERECO_LOJA_RETIRADA}}</p>{{/ENDERECO_LOJA_RETIRADA}}{{#TELEFONE_LOJA_RETIRADA}}<p style="margin:2px 0 0 0;font-size:12px;line-height:18px;color:#3d463f;">Tel.: {{TELEFONE_LOJA_RETIRADA}}</p>{{/TELEFONE_LOJA_RETIRADA}}
             </td></tr>
           </table>
         </td>
@@ -134,7 +134,7 @@
             <tr><td style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;">
               <p style="margin:0 0 8px 0;font-size:11px;letter-spacing:1.2px;color:#008d36;font-weight:bold;">DEVOLUÇÃO</p>
               <p style="margin:0 0 4px 0;font-size:14px;color:#1f2421;font-weight:bold;">{{DATA_DEVOLUCAO}} &agrave;s {{HORARIO_DEVOLUCAO}}</p>
-              <p style="margin:0;font-size:13px;color:#3d463f;">{{LOCAL_DEVOLUCAO}}</p>
+              <p style="margin:0;font-size:13px;color:#1f2421;font-weight:bold;">{{NOME_LOJA_DEVOLUCAO}} <span style="font-weight:normal;color:#8a948c;">({{CODIGO_LOJA_DEVOLUCAO}})</span></p>{{#ENDERECO_LOJA_DEVOLUCAO}}<p style="margin:3px 0 0 0;font-size:12px;line-height:18px;color:#3d463f;">&#x1F4CD; {{ENDERECO_LOJA_DEVOLUCAO}}</p>{{/ENDERECO_LOJA_DEVOLUCAO}}{{#TELEFONE_LOJA_DEVOLUCAO}}<p style="margin:2px 0 0 0;font-size:12px;line-height:18px;color:#3d463f;">Tel.: {{TELEFONE_LOJA_DEVOLUCAO}}</p>{{/TELEFONE_LOJA_DEVOLUCAO}}
             </td></tr>
           </table>
         </td>
@@ -172,6 +172,14 @@
       <tr>
         <td valign="top" style="padding:12px 18px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Forma de pagamento</td>
         <td align="right" valign="top" style="padding:12px 18px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;">{{FORMA_PAGAMENTO}}</td>
+      </tr>
+      <tr>
+        <td valign="top" style="padding:12px 18px;border-top:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{PAGO_ONLINE_LABEL}}</td>
+        <td align="right" valign="top" style="padding:12px 18px;border-top:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#008d36;font-weight:bold;">{{VALOR_PAGO_ONLINE}}</td>
+      </tr>
+      <tr>
+        <td valign="top" style="padding:12px 18px;border-top:1px solid #ecefea;background-color:#fff8ec;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">A pagar no balcão (destino)<br><span style="font-weight:normal;font-size:11px;color:#8a948c;">cobrado na moeda local, na retirada</span></td>
+        <td align="right" valign="top" style="padding:12px 18px;border-top:1px solid #ecefea;background-color:#fff8ec;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#b45f00;font-weight:bold;">{{VALOR_BALCAO}}</td>
       </tr>
     </table>
     {{#MOEDA_ESTRANGEIRA}}<p style="margin:8px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8a948c;font-style:italic;">Valor na moeda local garantido. Estimativa em reais apenas para referência.</p>{{/MOEDA_ESTRANGEIRA}}
@@ -215,14 +223,6 @@
         <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Câmbio utilizado</td>
         <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{CAMBIO}}</td>
       </tr>{{/CAMBIO}}
-      {{#VALOR_PAGO_ONLINE}}<tr>
-        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Pago online agora</td>
-        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{VALOR_PAGO_ONLINE}}</td>
-      </tr>{{/VALOR_PAGO_ONLINE}}
-      {{#VALOR_BALCAO}}<tr>
-        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">A pagar no balcão<br><span style="font-weight:normal;font-size:11px;color:#8a948c;">cobrado na moeda local</span></td>
-        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{VALOR_BALCAO}}</td>
-      </tr>{{/VALOR_BALCAO}}
       {{#LISTA_BALCAO}}<tr>
         <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Cobranças no balcão</td>
         <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;"><span style="font-weight:normal;font-size:12px;line-height:19px;color:#3d463f;">{{LISTA_BALCAO}}</span></td>

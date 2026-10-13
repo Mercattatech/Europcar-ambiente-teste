@@ -10,20 +10,10 @@
  * origens sem duplicar.
  */
 import { readBooking } from '@/lib/europcar/xrsClient';
+import { INSURANCE_NAMES_PT } from '@/lib/europcar/protectionSummary';
 
-// Nomes amigáveis (mesmo mapa usado na tela de seleção em reservation/vehicles)
-export const INSURANCE_NAMES_PT: Record<string, string> = {
-  WWI: 'Proteção de para-brisas, vidros, faróis e pneus', THW: 'Proteção contra Roubo (THW)',
-  STHW: 'Super Proteção contra Roubo', SPTHW: 'Proteção Total contra Roubo',
-  SPCDW: 'Proteção Total contra Danos e Acidentes', SCDW: 'Super Proteção contra Danos',
-  RSA: 'Assistência na estrada 24h', PREMPRE: 'Proteção Plus', PREMPLUS: 'Proteção Premium Plus',
-  PREMIUM: 'Proteção Premium', PAI: 'Proteção para acidentes pessoais', MEDIUM: 'Proteção Média',
-  INTERIOR: 'Cobertura de danos ao interior', AWC: 'Cobertura de estradas não pavimentadas',
-  CDW: 'Proteção contra Danos por Colisão', LDW: 'Proteção Básica', TPL: 'Responsabilidade Civil',
-  PEP: 'Proteção de Efeitos Pessoais', PEC: 'Proteção de Pertences Pessoais', APP: 'Proteção de Aparência',
-  SLDW: 'Proteção Básica Plus', SPAI: 'Proteção Plus para acidentes pessoais',
-  XCU: 'Proteção Estendida', FP: 'Proteção contra Combustível',
-};
+// Nomes amigáveis — mapa movido para protectionSummary (usável também no painel/client)
+export { INSURANCE_NAMES_PT };
 
 /** Códigos de proteção "de verdade" (exclui taxas/sobretaxas que o XRS também lista). */
 const PROTECTION_CODES = new Set([

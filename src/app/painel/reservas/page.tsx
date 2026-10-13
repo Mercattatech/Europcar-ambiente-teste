@@ -2,6 +2,8 @@
 
 import { useState, useEffect, Fragment } from "react";
 import { computeReservationMetrics } from "@/lib/europcar/reservationMetrics";
+import { listContractedProtections, isZeroExcessBooking } from "@/lib/europcar/protectionSummary";
+import StationCode from "@/components/admin/StationCode";
 
 // Status de pagamento (existentes)
 const PAYMENT_STATUS_OPTIONS = [
@@ -1575,6 +1577,11 @@ export default function PainelReservas() {
                               <td className="px-4 py-4">
                                  <div className="font-bold text-white text-xs uppercase">{parsed?.booking?.car?.carCategorySample || parsed?.booking?.car?.carCategoryName || "—"}</div>
                                  <div className="text-[10px] text-gray-500">{parsed?.booking?.car?.carCategoryCode || ""}</div>
+                                 {isZeroExcessBooking(parsed?.booking) && (
+                                    <div className="mt-1 inline-flex items-center gap-1 rounded bg-emerald-500/15 border border-emerald-600/30 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300" title="Proteção Premium — Franquia Zero">
+                                       🛡️ Premium · Franquia Zero
+                                    </div>
+                                 )}
                               </td>
                               <td className="px-4 py-4">
                                  <div className="font-bold text-green-400">
@@ -1788,8 +1795,8 @@ export default function PainelReservas() {
                                            <p className="text-gray-300"><strong>Veículo:</strong> {parsed?.booking?.car?.carCategorySample || parsed?.booking?.car?.carCategoryName || "—"}</p>
                                            <p className="text-gray-300"><strong>Rate ID:</strong> <span className="font-mono text-xs text-gray-500">{parsed?.booking?.car?.rateId || "—"}</span></p>
                                            <div className="border-t border-gray-700/50 my-2"></div>
-                                           <p className="text-gray-300"><strong>Retirada:</strong> {parsed?.booking?.pickupStation || "—"} — {parsed?.booking?.pickupDate ? `${parsed.booking.pickupDate.slice(6,8)}/${parsed.booking.pickupDate.slice(4,6)}/${parsed.booking.pickupDate.slice(0,4)}` : "—"} {parsed?.booking?.pickupTime ? `${parsed.booking.pickupTime.slice(0,2)}:${parsed.booking.pickupTime.slice(2)}` : ""}</p>
-                                           <p className="text-gray-300"><strong>Devolução:</strong> {parsed?.booking?.returnStation || parsed?.booking?.pickupStation || "—"} — {parsed?.booking?.returnDate ? `${parsed.booking.returnDate.slice(6,8)}/${parsed.booking.returnDate.slice(4,6)}/${parsed.booking.returnDate.slice(0,4)}` : "—"} {parsed?.booking?.returnTime ? `${parsed.booking.returnTime.slice(0,2)}:${parsed.booking.returnTime.slice(2)}` : ""}</p>
+                                           <p className="text-gray-300"><strong>Retirada:</strong> <StationCode code={parsed?.booking?.pickupStation} /> — {parsed?.booking?.pickupDate ? `${parsed.booking.pickupDate.slice(6,8)}/${parsed.booking.pickupDate.slice(4,6)}/${parsed.booking.pickupDate.slice(0,4)}` : "—"} {parsed?.booking?.pickupTime ? `${parsed.booking.pickupTime.slice(0,2)}:${parsed.booking.pickupTime.slice(2)}` : ""}</p>
+                                           <p className="text-gray-300"><strong>Devolução:</strong> <StationCode code={parsed?.booking?.returnStation || parsed?.booking?.pickupStation} /> — {parsed?.booking?.returnDate ? `${parsed.booking.returnDate.slice(6,8)}/${parsed.booking.returnDate.slice(4,6)}/${parsed.booking.returnDate.slice(0,4)}` : "—"} {parsed?.booking?.returnTime ? `${parsed.booking.returnTime.slice(0,2)}:${parsed.booking.returnTime.slice(2)}` : ""}</p>
                                            <p className="text-gray-300"><strong>Dias:</strong> {metrics.days || parsed?.booking?.duration || parsed?.booking?.days || "—"}</p>
                                            <p className="text-gray-300"><strong>País:</strong> {parsed?.booking?.stationCountry || parsed?.booking?.country || (parsed?.booking?.pickupStation?.startsWith('BR') ? 'BR' : '—')}</p>
                                         </div>
@@ -1817,7 +1824,7 @@ export default function PainelReservas() {
                                            })()}</p>
                                            <div className="border-t border-gray-700/50 my-2"></div>
                                            <p className="text-gray-300"><strong>Método:</strong> <span className={`text-xs font-bold px-2 py-0.5 rounded ${res.status === 'CONFIRMED_PREPAID' ? 'bg-green-500/20 text-green-400' : res.status === 'PENDING_PIX' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-300'}`}>{STATUS_LABELS[res.status] || res.status}</span></p>
-                                           {parsed?.contractID && <p className="text-gray-300 mt-1"><strong>ContractID:</strong> <span className="font-mono text-xs text-orange-400">{parsed.contractID}</span></p>}
+                                           {(parsed?.booking?.contractID || parsed?.contractID) && <p className="text-gray-300 mt-1"><strong>ContractID:</strong> <span className="font-mono text-xs text-orange-400">{parsed?.booking?.contractID || parsed?.contractID}</span></p>}
                                            <p className="text-gray-300"><strong>Merchant Order:</strong> <span className="font-mono text-[10px] text-gray-500">{res.merchantOrderId || "—"}</span></p>
                                            {parsed?.couponData && (
                                               <>
@@ -1860,17 +1867,20 @@ export default function PainelReservas() {
                                               </>
                                            )}
                                            <div className="border-t border-gray-700/50 my-2"></div>
-                                           <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Proteções Selecionadas</p>
-                                           {parsed?.booking?.extras && Object.keys(parsed.booking.extras).filter((k: string) => parsed.booking.extras[k] > 0).length > 0 ? (
-                                              <div className="flex flex-wrap gap-1">
-                                                 {Object.entries(parsed.booking.extras).filter(([, v]: any) => v > 0).map(([code, qty]: any) => {
-                                                    const qi = (parsed?.booking?.xrsInsurances || []).find((i: any) => i.code === code);
-                                                    const name = qi?.name || code;
-                                                    const priceBRL = qi?.priceBRL || 0;
-                                                    return (<span key={code} className="bg-green-900/40 text-green-300 text-[10px] font-bold px-2 py-1 rounded">🛡️ {name} x{qty}{priceBRL > 0 && ` (R$${parseFloat(priceBRL).toFixed(2)})`}</span>);
-                                                 })}
-                                              </div>
-                                           ) : (<p className="text-gray-500 text-xs italic">Nenhuma proteção selecionada</p>)}
+                                           <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">Proteções Contratadas</p>
+                                           {(() => {
+                                              const prots = listContractedProtections(parsed);
+                                              if (prots.length === 0) return (<p className="text-gray-500 text-xs italic">Nenhuma proteção contratada (somente a cobertura básica da tarifa)</p>);
+                                              return (
+                                                 <div className="flex flex-wrap gap-1">
+                                                    {prots.map((p) => (
+                                                       <span key={p.code} className={`text-[10px] font-bold px-2 py-1 rounded ${p.includedInRate ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-600/40' : 'bg-green-900/40 text-green-300'}`}>
+                                                          🛡️ {p.name}{p.qty > 1 ? ` x${p.qty}` : ''}{p.includedInRate ? ' (incluída na tarifa)' : ''}{p.priceBRL > 0 && ` (R$${p.priceBRL.toFixed(2)})`}
+                                                       </span>
+                                                    ))}
+                                                 </div>
+                                              );
+                                           })()}
                                            {parsed?.booking?.xrsEquipment && parsed.booking.xrsEquipment.length > 0 && (
                                               <>
                                                  <div className="border-t border-gray-700/50 my-2"></div>

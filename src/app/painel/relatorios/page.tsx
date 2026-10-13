@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { computeReservationMetrics } from "@/lib/europcar/reservationMetrics";
+import StationCode from "@/components/admin/StationCode";
 
 const OP_STATUS_CONFIG: Record<string, { label: string; description: string; color: string }> = {
    R:  { label: "R",  description: "On Request",       color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/40" },
@@ -679,8 +680,8 @@ export default function PainelRelatorios() {
                                  <td className="px-3 py-3 text-[10px] text-gray-500 font-mono">
                                     {car?.exchangeRate ? parseFloat(car.exchangeRate).toFixed(4) : "—"}
                                  </td>
-                                 <td className="px-3 py-3 text-[10px] text-gray-400">{booking?.pickupStation || "—"}</td>
-                                 <td className="px-3 py-3 text-[10px] text-gray-400">{booking?.returnStation || booking?.pickupStation || "—"}</td>
+                                 <td className="px-3 py-3 text-[10px] text-gray-400"><StationCode code={booking?.pickupStation} /></td>
+                                 <td className="px-3 py-3 text-[10px] text-gray-400"><StationCode code={booking?.returnStation || booking?.pickupStation} /></td>
                                  <td className="px-3 py-3 text-[10px] text-gray-400">
                                     {car?.carCategorySample || car?.carCategoryName || "—"}
                                     <br /><span className="text-gray-600">{car?.carCategoryCode || ""}</span>

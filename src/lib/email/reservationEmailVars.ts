@@ -19,6 +19,7 @@ import { buildEmailCurrencyVars } from '@/lib/receiptLocales';
 import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 import { INSURANCE_NAMES_PT, type XrsSnapshot } from '@/lib/email/xrsReservationSnapshot';
 import { buildReservationDetailVars, calcCounterBRL } from '@/lib/email/reservationDetailVars';
+import { isZeroExcessBooking, ZERO_EXCESS_LABEL } from '@/lib/europcar/protectionSummary';
 
 // Mesmos códigos de proteção usados em bookXRS.ts / reservas/route.ts
 export const INSURANCE_CODES = [
@@ -144,10 +145,15 @@ export function buildExtrasListVars(
 ): { LISTA_PROTECOES: string; LISTA_EXTRAS: string; extras: ExtraLine[]; equipment: EquipLine[] } {
   const { extras, equipment } = resolveReservationExtras(customerData, overrides);
 
-  const LISTA_PROTECOES = extras.length > 0
-    ? extras
-        .map((ex) => `• 🛡️ ${ex.name || ex.code}${ex.qty > 1 ? ` ×${ex.qty}` : ''}${ex.priceBRL > 0 ? ` — R$ ${fmtBRL(ex.priceBRL)}` : ''}`)
-        .join('<br/>')
+  // Franquia zero é um contrato (não um item de proteção): entra como primeira linha
+  const protLines = extras
+    .map((ex) => `• 🛡️ ${ex.name || ex.code}${ex.qty > 1 ? ` ×${ex.qty}` : ''}${ex.priceBRL > 0 ? ` — R$ ${fmtBRL(ex.priceBRL)}` : ''}`);
+  if (isZeroExcessBooking(customerData?.booking)) {
+    protLines.unshift(`• 🛡️ ${ZERO_EXCESS_LABEL} (incluída no valor da reserva)`);
+  }
+
+  const LISTA_PROTECOES = protLines.length > 0
+    ? protLines.join('<br/>')
     : 'Nenhuma proteção adicional selecionada';
 
   const LISTA_EXTRAS = equipment.length > 0

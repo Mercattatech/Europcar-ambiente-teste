@@ -12,6 +12,7 @@
  */
 import type { ExtraLine } from '@/lib/email/reservationEmailVars';
 import type { XrsSnapshot } from '@/lib/email/xrsReservationSnapshot';
+import { isZeroExcessBooking, ZERO_EXCESS_LABEL } from '@/lib/europcar/protectionSummary';
 
 const num = (v: any): number => {
   const n = parseFloat(String(v ?? '0'));
@@ -26,7 +27,7 @@ const isCounterCharge = (i: any): boolean => {
   return !i?.paidBy && AIRPORT_CODES.includes(String(i?.code || '').toUpperCase());
 };
 
-const fmtBRL = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
+const fmtBRL = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /** Valor em R$ de uma cobrança (priceInBookingCurrency → rentalPrice...AI → preço local × câmbio). */
 const chargeBRL = (c: any, rate: number): number => {
@@ -146,7 +147,9 @@ export function buildReservationDetailVars(p: DetailVarsParams): Record<string, 
   if (includedLines.length > 0) pushInc('Taxas e impostos aplicáveis ao aluguel');
 
   // ── Franquia das proteções contratadas ─────────────────────
+  const zeroExcess = isZeroExcessBooking(booking);
   const franquiaLines: string[] = [];
+  if (zeroExcess) franquiaLines.push(`• ${ZERO_EXCESS_LABEL}: <strong>franquia zero</strong>`);
   for (const ex of extras) {
     const q = quoteIns.find((i) => String(i.code || '').toUpperCase() === ex.code.toUpperCase());
     const x = xrs?.excess?.[ex.code.toUpperCase()];
@@ -161,7 +164,8 @@ export function buildReservationDetailVars(p: DetailVarsParams): Record<string, 
     );
   }
   const ded = num(car?.deductibleAmount);
-  if (ded > 0) {
+  // Com franquia zero a franquia da cobertura básica não se aplica
+  if (ded > 0 && !zeroExcess) {
     const cur = String(car?.deductibleCurrency || '').toUpperCase();
     franquiaLines.push(
       `• Cobertura básica incluída na tarifa: franquia de <strong>${cur && cur !== 'BRL' ? fmtLocal(ded, cur) : fmtBRL(ded)}</strong>`,
@@ -169,6 +173,32 @@ export function buildReservationDetailVars(p: DetailVarsParams): Record<string, 
   }
 
   const totalFull = p.vehicleBRL + p.insBRL + p.equipBRL;
+
+  // ── Pago online × a pagar no balcão (SEMPRE informado) ──────
+  // Pago online é em reais (cartão/PIX); o balcão é cobrado na moeda local.
+  const pm = p.paymentMethod;
+  const PAGO_ONLINE_LABEL =
+    pm === 'CREDIT' ? 'Pago no cartão de crédito'
+    : pm === 'PIX' ? 'Pago via PIX'
+    : pm === 'VOUCHER' ? 'Faturado via voucher'
+    : 'Pago online';
+
+  let VALOR_PAGO_ONLINE: string;
+  let VALOR_BALCAO: string;
+  if (!isPrepaid) {
+    VALOR_PAGO_ONLINE = 'R$ 0,00 — nada foi cobrado online';
+    VALOR_BALCAO = totalFull > 0 ? p.fmtPair(totalFull) : 'Valor total da reserva';
+  } else {
+    if (p.paidBRL > 0) VALOR_PAGO_ONLINE = fmtBRL(p.paidBRL);
+    else if (pm === 'VOUCHER') VALOR_PAGO_ONLINE = 'Conforme voucher';
+    else {
+      const est = Math.max(0, totalFull - counterBRL);
+      VALOR_PAGO_ONLINE = est > 0 ? `${fmtBRL(est)} (aguardando confirmação do pagamento)` : 'Aguardando confirmação do pagamento';
+    }
+    VALOR_BALCAO = counterBRL > 0
+      ? p.fmtPair(counterBRL)
+      : 'Nada a pagar — apenas a caução (bloqueio temporário no cartão)';
+  }
 
   return {
     QTD_DIARIAS: String(d),
@@ -180,8 +210,9 @@ export function buildReservationDetailVars(p: DetailVarsParams): Record<string, 
     VALOR_ACESSORIOS: p.equipBRL > 0 ? p.fmtPair(p.equipBRL) : '',
     TOTAL_RESERVA: totalFull > 0 ? p.fmtPair(totalFull) : '',
     CAMBIO: foreign ? `1 ${currency} = R$ ${rate.toFixed(4).replace('.', ',')}` : '',
-    VALOR_PAGO_ONLINE: showSplit && p.paidBRL > 0 ? p.fmtPair(p.paidBRL) : '',
-    VALOR_BALCAO: showSplit ? p.fmtPair(counterBRL) : '',
+    VALOR_PAGO_ONLINE,
+    PAGO_ONLINE_LABEL,
+    VALOR_BALCAO,
     LISTA_BALCAO: showSplit ? counterLines.join('<br/>') : '',
     LISTA_INCLUIDOS: includedLines.join('<br/>'),
     LISTA_FRANQUIA: franquiaLines.length > 0

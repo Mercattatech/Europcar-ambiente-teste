@@ -8,6 +8,7 @@ Cole cada HTML no template correspondente em `/painel/config-email` (campo HTML)
 | `RESERVA_SOB_SOLICITACAO.html` | RESERVA_SOB_SOLICITACAO | `Reserva {{NUMERO_RESERVA}} em análise — Europcar Brasil` |
 | `RESERVA_CONFIRMADA.html` | RESERVA_CONFIRMADA | `Reserva {{NUMERO_RESERVA}} confirmada — Europcar Brasil` |
 | `RESERVA_ALTERADA.html` | RESERVA_ALTERADA | `Reserva {{NUMERO_RESERVA}} alterada — Europcar Brasil` |
+| `CANCELAMENTO.html` | CANCELAMENTO | `Reserva {{NUMERO_RESERVA}} cancelada — Europcar Brasil` |
 
 ## Bloco condicional
 
@@ -27,9 +28,24 @@ O motor resolve **um nível** de bloco condicional — não aninhe `{{#A}}` dent
 | `TARIFA` | "Pagar agora — cancelamento grátis" / "Pagar no balcão" |
 | `VALOR_VEICULO`, `VALOR_PROTECOES`, `VALOR_ACESSORIOS`, `TOTAL_RESERVA` | valores na moeda local (≈ R$) |
 | `CAMBIO` | "1 EUR = R$ 6,0368" (só moeda estrangeira) |
-| `VALOR_PAGO_ONLINE`, `VALOR_BALCAO`, `LISTA_BALCAO` | divisão online × balcão (ex.: sobretaxa de aeroporto) |
+| `VALOR_PAGO_ONLINE`, `PAGO_ONLINE_LABEL` | **sempre preenchido** — "Pago no cartão de crédito" / "Pago via PIX" + valor em R$ (Balcão: "R$ 0,00") |
+| `VALOR_BALCAO` | **sempre preenchido** — valor a pagar no destino (moeda local ≈ R$) ou "Nada a pagar — apenas a caução" |
+| `LISTA_BALCAO` | itens cobrados no balcão (ex.: sobretaxa de aeroporto) |
 | `LISTA_INCLUIDOS` | km, coberturas incluídas, taxas de licença/administração, IVA % |
-| `LISTA_FRANQUIA` | franquia de cada proteção contratada ("franquia zero" quando 0) |
+| `LISTA_FRANQUIA` | franquia de cada proteção contratada ("franquia zero" quando 0, inclusive Proteção Premium) |
+
+## Lojas de retirada e devolução
+
+Preenchidas automaticamente em `sendTransactionalEmail` (`src/lib/email/enrichReservationEmailVars.ts`)
+para todos os e-mails de reserva, via XRS `getStation` (com cache de 24h).
+
+| Variável | Conteúdo |
+|---|---|
+| `NOME_LOJA_RETIRADA` / `NOME_LOJA_DEVOLUCAO` | "CORROIOS SEIXAL" (cai para o código se o XRS falhar) |
+| `CODIGO_LOJA_RETIRADA` / `CODIGO_LOJA_DEVOLUCAO` | "LISX02" |
+| `ENDERECO_LOJA_RETIRADA` / `ENDERECO_LOJA_DEVOLUCAO` | "Estação Ferroviária Corroios, 2855-097 Corroios, Portugal" |
+| `TELEFONE_LOJA_RETIRADA` / `TELEFONE_LOJA_DEVOLUCAO` | telefone da loja |
+| `LOCAL_RETIRADA` / `LOCAL_DEVOLUCAO` | linha única "NOME (CÓDIGO) — endereço" (compatível com templates antigos) |
 
 > **Caução:** o valor **não vem do XRS**. O template traz apenas o texto explicativo (quem define, quando
 > é bloqueada e que a liberação depende do banco emissor) — nunca um valor.

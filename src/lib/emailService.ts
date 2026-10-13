@@ -241,6 +241,21 @@ export async function sendTransactionalEmail(to: string, trigger: string, dataVa
 
     const fromEmail = await getFromEmail();
 
+    // E-mails de reserva: completa loja (nome + endereço) e valores online × balcão.
+    // Limite de 8s — se o XRS/banco demorar, envia com as variáveis originais.
+    try {
+      const { enrichReservationEmailVars, withReservationVarDefaults, RESERVATION_TRIGGERS } = await import('@/lib/email/enrichReservationEmailVars');
+      if (RESERVATION_TRIGGERS.has(trigger)) {
+        const enriched = await Promise.race([
+          enrichReservationEmailVars(trigger, dataVars),
+          new Promise<Record<string, string>>((resolve) => setTimeout(() => resolve(dataVars), 8000)),
+        ]);
+        dataVars = withReservationVarDefaults(enriched);
+      }
+    } catch (enrichErr: any) {
+      console.warn(`[Email] Enriquecimento de variáveis falhou (${trigger}):`, enrichErr?.message);
+    }
+
     // Normaliza todas as chaves fornecidas (remove acentos, uppercase)
     const normalizedVars: Record<string, string> = {};
     for (const [key, value] of Object.entries(dataVars)) {
