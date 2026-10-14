@@ -87,8 +87,8 @@ export default function PainelReservas() {
    const [adminModifyData, setAdminModifyData] = useState<{
       pickupDate: string; pickupTime: string; pickupStationID: string;
       returnDate: string; returnTime: string; returnStationID: string;
-      carCategory: string;
-   }>({ pickupDate: '', pickupTime: '1000', pickupStationID: '', returnDate: '', returnTime: '1000', returnStationID: '', carCategory: '' });
+      carCategory: string; flightNumber: string;
+   }>({ pickupDate: '', pickupTime: '1000', pickupStationID: '', returnDate: '', returnTime: '1000', returnStationID: '', carCategory: '', flightNumber: '' });
    const [adminModifying, setAdminModifying] = useState(false);
    const [adminModifyMsg, setAdminModifyMsg] = useState('');
    const [resendingEmail, setResendingEmail] = useState<string | null>(null);
@@ -574,6 +574,7 @@ export default function PainelReservas() {
          returnTime: parsed?.booking?.returnTime || '1000',
          returnStationID: parsed?.booking?.returnStation || parsed?.booking?.pickupStation || '',
          carCategory: parsed?.booking?.car?.carCategoryCode || '',
+         flightNumber: parsed?.flightNumber || '',
       });
       setAdminModifyMsg('');
    };
@@ -597,6 +598,9 @@ export default function PainelReservas() {
          if (adminModifyData.returnTime) payload.returnTime = adminModifyData.returnTime;
          if (adminModifyData.returnStationID) payload.returnStationID = adminModifyData.returnStationID;
          if (adminModifyData.carCategory) payload.carCategory = adminModifyData.carCategory;
+         // Número do voo: só envia se foi alterado (permite também apagar)
+         const newFlight = adminModifyData.flightNumber.trim().toUpperCase();
+         if (newFlight !== String(parsed?.flightNumber || '').trim().toUpperCase()) payload.flightNumber = newFlight;
 
          const res = await fetch('/api/europcar/modifyReservation', {
             method: 'POST',
@@ -859,9 +863,16 @@ export default function PainelReservas() {
 
                      {/* Categoria do carro */}
                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mt-2">Veículo</p>
-                     <div>
-                        <label className="block text-[10px] font-medium text-gray-400 mb-1">Categoria (ex: EDMR, CDMR, SDMR)</label>
-                        <input type="text" value={adminModifyData.carCategory} onChange={e => setAdminModifyData(p => ({ ...p, carCategory: e.target.value.toUpperCase() }))} placeholder="EDMR" className="w-40 bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-white text-xs font-mono uppercase focus:outline-none focus:border-blue-500 transition-colors" />
+                     <div className="grid grid-cols-2 gap-2">
+                        <div>
+                           <label className="block text-[10px] font-medium text-gray-400 mb-1">Categoria (ex: EDMR, CDMR, SDMR)</label>
+                           <input type="text" value={adminModifyData.carCategory} onChange={e => setAdminModifyData(p => ({ ...p, carCategory: e.target.value.toUpperCase() }))} placeholder="EDMR" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-white text-xs font-mono uppercase focus:outline-none focus:border-blue-500 transition-colors" />
+                        </div>
+                        <div>
+                           <label className="block text-[10px] font-medium text-gray-400 mb-1">Número do voo</label>
+                           <input type="text" value={adminModifyData.flightNumber} onChange={e => setAdminModifyData(p => ({ ...p, flightNumber: e.target.value.toUpperCase().replace(/\s/g, '') }))} maxLength={8} placeholder="Ex: LA3212" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-white text-xs font-mono uppercase focus:outline-none focus:border-blue-500 transition-colors" />
+                           {!modifyModal.parsed?.flightNumber && <p className="text-[10px] text-gray-500 mt-1">Nenhum voo informado na reserva</p>}
+                        </div>
                      </div>
                   </div>
 

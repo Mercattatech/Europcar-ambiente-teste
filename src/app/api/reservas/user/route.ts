@@ -13,6 +13,9 @@ export async function GET(req: Request) {
          return NextResponse.json([], { status: 401 });
       }
 
+      const norm = (v: any) => (typeof v === 'string' ? v.trim().toLowerCase() : '');
+      const sessionEmail = norm(session.user.email);
+
       // Busca todas as reservas locais e filtra pelo email dentro do JSON
       // (Bypass temporário para bancos que não suportam JSON field filtering no ORM de forma simples)
       const allReservations = await prisma.localReservation.findMany({
@@ -39,6 +42,10 @@ export async function GET(req: Request) {
              status: r.status,
              createdAt: r.createdAt,
              email: cd?.email,
+             _emails: [
+                cd?.email, cd?.customer?.email, cd?.driver?.email,
+                cd?.booking?.email, cd?.booking?.customer?.email, cd?.booking?.driver?.email,
+             ].map(norm).filter(Boolean),
              pickupDate: cd?.booking?.pickupDate,
              pickupTime: cd?.booking?.pickupTime,
              returnDate: cd?.booking?.returnDate,
@@ -50,7 +57,9 @@ export async function GET(req: Request) {
              paymentMethod: cd?.booking?.paymentMethod,
              paymentData: cd?.booking?.paymentData || r.status,
          };
-      }).filter(r => r.email?.toLowerCase() === session.user?.email?.toLowerCase());
+      })
+      .filter(r => r._emails.includes(sessionEmail))
+      .map(({ _emails, ...rest }) => rest);
 
       return NextResponse.json(userReservations);
 

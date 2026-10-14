@@ -17,6 +17,7 @@ export async function POST(request: Request) {
       pickupStationID, pickupDate, pickupTime,
       returnStationID, returnDate, returnTime,
       carCategory,
+      flightNumber,
       firstName, lastName
     } = body;
 
@@ -72,12 +73,19 @@ export async function POST(request: Request) {
 
     // Build reservation attributes
     const carCategoryAttr = carCategory ? ` carCategory="${escapeXml(carCategory)}"` : '';
+    // flightNumber: undefined = não alterar; string (inclusive vazia) = alterar
+    const hasFlightChange = typeof flightNumber === 'string';
+    const cleanFlight = hasFlightChange ? flightNumber.trim().toUpperCase() : '';
+    if (hasFlightChange && cleanFlight && !/^[A-Z0-9]{2,8}$/.test(cleanFlight)) {
+      return NextResponse.json({ error: 'Número do voo inválido. Use letras e números (ex: LA3212).' }, { status: 400 });
+    }
+    const flightAttr = hasFlightChange ? ` flightNumber="${escapeXml(cleanFlight)}"` : '';
 
     const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
 <message>
   <serviceRequest serviceCode="modifyReservation">
     <serviceParameters>
-      <reservation resNumber="${escapeXml(resNumber)}"${carCategoryAttr}>${checkoutBlock}${checkinBlock}
+      <reservation resNumber="${escapeXml(resNumber)}"${carCategoryAttr}${flightAttr}>${checkoutBlock}${checkinBlock}
       </reservation>
       <driver countryOfResidence="BR" firstName="${escapeXml(firstName || 'Passageiro')}" lastName="${escapeXml(lastName || 'Europcar')}" title="MR"/>
     </serviceParameters>
@@ -150,6 +158,10 @@ export async function POST(request: Request) {
             }
           }
 
+          if (hasFlightChange) {
+            if (cleanFlight) cd.flightNumber = cleanFlight;
+            else delete cd.flightNumber;
+          }
           // Grava como string JSON — mesmo formato usado no resto do sistema (bookReservation, sync-pix...).
           // Gravar o objeto direto fazia /api/reservas/user falhar no JSON.parse e a reserva sumia do login do cliente.
           await prisma.localReservation.update({
