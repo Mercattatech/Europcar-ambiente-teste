@@ -63,7 +63,7 @@ export async function sendCancellationEmail(data: CancellationEmailData) {
 
     <!-- Header -->
     <div style="background:#008d36;padding:28px 32px;text-align:center;border-bottom:5px solid #FFD800;">
-      <div style="font-size:32px;font-weight:900;font-style:italic;color:#fff;letter-spacing:-1px;">Europcar</div>
+      <div style="line-height:0;font-size:0;"><img src="https://europcar.com.br/logo-email.png" width="150" height="35" alt="Europcar" style="display:inline-block;width:150px;height:35px;border:0;outline:none;text-decoration:none;"></div>
       <div style="color:rgba(255,255,255,0.7);font-size:13px;margin-top:4px;">europcar.com.br</div>
     </div>
 

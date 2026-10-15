@@ -12,7 +12,7 @@ function buildResetEmailHtml(nome: string, resetLink: string): string {
 <body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
   <div style="max-width:520px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
     <div style="background:#008d36;padding:28px 32px;text-align:center;border-bottom:5px solid #FFD800;">
-      <div style="font-size:28px;font-weight:900;font-style:italic;color:#fff;letter-spacing:-1px;">Europcar</div>
+      <div style="line-height:0;font-size:0;"><img src="https://europcar.com.br/logo-email.png" width="150" height="35" alt="Europcar" style="display:inline-block;width:150px;height:35px;border:0;outline:none;text-decoration:none;"></div>
       <div style="color:rgba(255,255,255,0.75);font-size:12px;margin-top:4px;">Redefinição de Senha</div>
     </div>
     <div style="padding:32px;">
