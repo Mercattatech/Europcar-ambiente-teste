@@ -704,7 +704,14 @@ export async function POST(request: Request) {
                   return s + (t > 0 ? t : d * bookingDays) * (eq.qty || 1);
                 }, 0);
 
-              const fullBalcaoBRL = xrsTotalRateBRL + confirmedInsBRL + confirmedEquipBRL;
+              const extrasSumBRL = confirmedInsBRL + confirmedEquipBRL;
+              // ⚠️ A cotação do XRS (quoteNode.totalRateEstimate) retornada no bookReservation
+              // já é o total consolidado da reserva quando opcionais foram incluídos no request.
+              // NUNCA somar os extras se xrsTotalRateBRL já os inclui (xrsTotalRateBRL >= extrasSumBRL).
+              const fullBalcaoBRL = (xrsTotalRateBRL >= extrasSumBRL || extrasSumBRL === 0)
+                ? xrsTotalRateBRL
+                : (xrsTotalRateBRL + extrasSumBRL);
+
               paymentData.amountInCents = Math.round(fullBalcaoBRL * 100);
               console.log(`[reservas] 💰 Valor Balcão sincronizado com cotação real do GW: R$ ${fullBalcaoBRL.toFixed(2)} (${paymentData.amountInCents} centavos)`);
             }

@@ -209,7 +209,11 @@ export async function POST(req: Request) {
                 const t = parseFloat(eq.totalBRL || 0);
                 return s + (t > 0 ? t : 0);
               }, 0);
-              const expectedAmountInCents = Math.round((quoteTotalBRL + confirmedInsBRL + confirmedEquipBRL) * 100);
+              const extrasSumBRL = confirmedInsBRL + confirmedEquipBRL;
+              const expectedTotalBRL = (quoteTotalBRL >= extrasSumBRL || extrasSumBRL === 0)
+                ? quoteTotalBRL
+                : (quoteTotalBRL + extrasSumBRL);
+              const expectedAmountInCents = Math.round(expectedTotalBRL * 100);
 
               if (Math.abs(expectedAmountInCents - (res.amountInCents || 0)) > 50) {
                 amountChanged = true;

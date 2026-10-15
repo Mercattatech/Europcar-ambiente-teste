@@ -70,51 +70,7 @@ export function computeReservationMetrics(res: any, parsedCustomerData?: any): P
 
   const exchangeRate = parseFloat(car?.exchangeRate || booking?.exchangeRate || '0') || 6.1;
 
-  // 5. Cálculo seguro do Valor em BRL
-  let amountBRL = 0;
-  if (res?.amountInCents && Number(res.amountInCents) > 0) {
-    amountBRL = Number(res.amountInCents) / 100;
-  } else if (car?.totalRateEstimateInBookingCurrency && !isNaN(parseFloat(car.totalRateEstimateInBookingCurrency))) {
-    amountBRL = parseFloat(car.totalRateEstimateInBookingCurrency);
-  } else if (car?.totalRateInBookingCurrency && !isNaN(parseFloat(car.totalRateInBookingCurrency))) {
-    amountBRL = parseFloat(car.totalRateInBookingCurrency);
-  } else if (car?.totalRateEstimate && !isNaN(parseFloat(car.totalRateEstimate))) {
-    const rawVal = parseFloat(car.totalRateEstimate);
-    // Se a estação for no Brasil, totalRateEstimate já está em BRL (NUNCA multiplicar pelo câmbio!)
-    if (isBrazilStation || carCurrency === 'BRL') {
-      amountBRL = rawVal;
-    } else {
-      amountBRL = rawVal * exchangeRate;
-    }
-  }
-
-  // 6. Cálculo seguro do Valor em EUR sempre consistente com a taxa real da XRS
-  let amountEUR = 0;
-  if (amountBRL > 0 && exchangeRate > 0) {
-    // Valor em EUR correspondente ao que foi cobrado/faturado em BRL
-    amountEUR = amountBRL / exchangeRate;
-  } else if (carCurrency === 'EUR' && car?.totalRateEstimate && !isNaN(parseFloat(car.totalRateEstimate))) {
-    amountEUR = parseFloat(car.totalRateEstimate);
-    if (amountBRL === 0 && exchangeRate > 0) {
-      amountBRL = amountEUR * exchangeRate;
-    }
-  } else if (amountBRL > 0) {
-    amountEUR = amountBRL / exchangeRate;
-  }
-
-  // Contrato total XRS (quando o XML da XRS confirmar a cotação total de veículo + acessórios)
-  const rawContractEUR = car?.totalRateEstimate && !isNaN(parseFloat(car.totalRateEstimate))
-    ? parseFloat(car.totalRateEstimate)
-    : 0;
-  const contractTotalEUR = rawContractEUR > 0 ? rawContractEUR : amountEUR;
-  const contractTotalBRL = isBrazilStation || carCurrency === 'BRL'
-    ? contractTotalEUR
-    : (contractTotalEUR * exchangeRate);
-
-  const counterDueEUR = Math.max(0, contractTotalEUR - amountEUR);
-  const counterDueBRL = Math.max(0, contractTotalBRL - amountBRL);
-
-  // 7. Classificação Confiável da Forma de Pagamento
+  // 5. Classificação Confiável da Forma de Pagamento
   const rawPm = String(parsed?.paymentMethod || parsed?.paymentData?.method || '').toUpperCase().trim();
   let paymentMethod: 'PIX' | 'CREDIT' | 'BALCAO' | 'VOUCHER' | 'UNKNOWN' = 'UNKNOWN';
 
@@ -141,6 +97,56 @@ export function computeReservationMetrics(res: any, parsedCustomerData?: any): P
   const isCounter = paymentMethod === 'BALCAO' && !isCancelled;
   const isVoucher = paymentMethod === 'VOUCHER' && !isCancelled;
   const isPrepaid = isPixPaid || isCreditCard;
+
+  // 6. Cálculo seguro do Valor em BRL
+  let amountBRL = 0;
+  const isBalcaoBooking = paymentMethod === 'BALCAO';
+  const xrsRateBRL = parseFloat(car?.totalRateEstimateInBookingCurrency || '0');
+
+  if (isBalcaoBooking && xrsRateBRL > 0) {
+    // Para reservas no balcão, a cotação total do XRS é a fonte da verdade da reserva
+    // (evita amountInCents inflado por somas duplicadas de opcionais)
+    amountBRL = xrsRateBRL;
+  } else if (res?.amountInCents && Number(res.amountInCents) > 0) {
+    amountBRL = Number(res.amountInCents) / 100;
+  } else if (xrsRateBRL > 0) {
+    amountBRL = xrsRateBRL;
+  } else if (car?.totalRateInBookingCurrency && !isNaN(parseFloat(car.totalRateInBookingCurrency))) {
+    amountBRL = parseFloat(car.totalRateInBookingCurrency);
+  } else if (car?.totalRateEstimate && !isNaN(parseFloat(car.totalRateEstimate))) {
+    const rawVal = parseFloat(car.totalRateEstimate);
+    // Se a estação for no Brasil, totalRateEstimate já está em BRL (NUNCA multiplicar pelo câmbio!)
+    if (isBrazilStation || carCurrency === 'BRL') {
+      amountBRL = rawVal;
+    } else {
+      amountBRL = rawVal * exchangeRate;
+    }
+  }
+
+  // 7. Cálculo seguro do Valor em EUR sempre consistente com a taxa real da XRS
+  let amountEUR = 0;
+  if (carCurrency === 'EUR' && car?.totalRateEstimate && !isNaN(parseFloat(car.totalRateEstimate))) {
+    amountEUR = parseFloat(car.totalRateEstimate);
+    if (amountBRL === 0 && exchangeRate > 0) {
+      amountBRL = amountEUR * exchangeRate;
+    }
+  } else if (amountBRL > 0 && exchangeRate > 0) {
+    amountEUR = amountBRL / exchangeRate;
+  } else if (amountBRL > 0) {
+    amountEUR = amountBRL / exchangeRate;
+  }
+
+  // Contrato total XRS (quando o XML da XRS confirmar a cotação total de veículo + acessórios)
+  const rawContractEUR = car?.totalRateEstimate && !isNaN(parseFloat(car.totalRateEstimate))
+    ? parseFloat(car.totalRateEstimate)
+    : 0;
+  const contractTotalEUR = rawContractEUR > 0 ? rawContractEUR : amountEUR;
+  const contractTotalBRL = isBrazilStation || carCurrency === 'BRL'
+    ? contractTotalEUR
+    : (contractTotalEUR * exchangeRate);
+
+  const counterDueEUR = Math.max(0, contractTotalEUR - amountEUR);
+  const counterDueBRL = Math.max(0, contractTotalBRL - amountBRL);
 
   const days = booking?.duration ? parseInt(booking.duration, 10) : (booking?.days ? parseInt(booking.days, 10) : 0);
 

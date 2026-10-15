@@ -256,19 +256,32 @@ export function buildReservationEmailVars(params: {
   // que é a tarifa NET — o markup (eto_margin_percent) é aplicado só na tela de veículos e fica apenas
   // no valor efetivamente cobrado (amountInCents). Em reservas pré-pagas o valor cobrado é a fonte da
   // verdade: total completo = cobrado online + o que é pago no balcão (ex.: sobretaxa de aeroporto).
-  const prepaidWithPaid = paymentMethod !== 'BALCAO' && paidBRL > 0;
+  const isBalcao = paymentMethod === 'BALCAO';
+  const extrasTotalBRL = insBRL + equipBRL;
+
+  const prepaidWithPaid = !isBalcao && paidBRL > 0;
   const fullPrepaidBRL = prepaidWithPaid
     ? paidBRL + calcCounterBRL(booking, car, rateForCounter)
     : 0;
-  const vehicleBRL = prepaidWithPaid
-    ? Math.max(0, fullPrepaidBRL - insBRL - equipBRL)
-    : vehicleBRLNet;
 
-  const totalBRL = params.preferPaidAmount && paidBRL > 0
-    ? paidBRL
-    : prepaidWithPaid
-      ? fullPrepaidBRL
-      : ((vehicleBRL + insBRL + equipBRL) || paidBRL);
+  // Em reservas BALCAO, vehicleBRLNet é frequentemente a cotação consolidada do XRS (veículo + proteções + extras).
+  // Se vehicleBRLNet > extrasTotalBRL, o veículo puro é (vehicleBRLNet - extrasTotalBRL).
+  let vehicleBRL = vehicleBRLNet;
+  let totalBRL = 0;
+
+  if (prepaidWithPaid) {
+    vehicleBRL = Math.max(0, fullPrepaidBRL - insBRL - equipBRL);
+    totalBRL = params.preferPaidAmount ? paidBRL : fullPrepaidBRL;
+  } else if (isBalcao) {
+    if (extrasTotalBRL > 0 && vehicleBRLNet > extrasTotalBRL) {
+      vehicleBRL = Math.max(0, vehicleBRLNet - extrasTotalBRL);
+      totalBRL = vehicleBRLNet;
+    } else {
+      totalBRL = (vehicleBRL + extrasTotalBRL) || paidBRL;
+    }
+  } else {
+    totalBRL = (vehicleBRL + extrasTotalBRL) || paidBRL;
+  }
 
   const cv = buildDestinationCurrencyVars(totalBRL, booking, car, params.xrs);
 
