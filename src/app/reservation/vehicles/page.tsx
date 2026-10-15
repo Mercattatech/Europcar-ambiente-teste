@@ -56,7 +56,102 @@ function CarImage({ sample, code, alt, imageUrl, overrideUrl }: { sample: string
   );
 }
 
-
+// Visual ilustrativo dos extras nos mesmos moldes do site oficial da Europcar
+function EquipmentVisual({ code, icon }: { code: string; icon?: string }) {
+  const c = (code || '').toUpperCase();
+  if (c === 'ADD' || c === 'ADR') {
+    return (
+      <svg className="w-10 h-10" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="22" fill="#F0FDF4" />
+        <circle cx="24" cy="18" r="6" fill="#008d36" />
+        <path d="M12 36c0-5 5.3-8 12-8s12 3 12 8" fill="#008d36" opacity="0.85" />
+        <circle cx="34" cy="30" r="7" fill="#1F2937" />
+        <circle cx="34" cy="30" r="5" stroke="#FFFFFF" strokeWidth="1.5" strokeDasharray="3 2" fill="none" />
+        <circle cx="34" cy="30" r="2" fill="#FFFFFF" />
+      </svg>
+    );
+  }
+  if (c === 'NVS' || c === 'NAV') {
+    return (
+      <svg className="w-10 h-10" viewBox="0 0 48 48" fill="none">
+        <rect x="6" y="11" width="36" height="25" rx="4" fill="#1F2937" />
+        <rect x="9" y="14" width="30" height="19" rx="2" fill="#E0F2FE" />
+        <path d="M11 28l9-7 7 4 10-10" stroke="#0284C7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="35" cy="17" r="3" fill="#EF4444" />
+        <path d="M19 36l-2 5h14l-2-5" fill="#6B7280" />
+      </svg>
+    );
+  }
+  if (c === 'CSB' || c === 'CSI') {
+    return (
+      <svg className="w-10 h-10" viewBox="0 0 48 48" fill="none">
+        <rect x="13" y="7" width="22" height="32" rx="6" fill="#DC2626" />
+        <rect x="16" y="10" width="16" height="18" rx="4" fill="#1F2937" />
+        <path d="M11 26h26v10a4 4 0 01-4 4H15a4 4 0 01-4-4v-10z" fill="#1F2937" />
+        <path d="M24 16v13M19 23h10" stroke="#FBBF24" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (c === 'CST') {
+    return (
+      <svg className="w-10 h-10" viewBox="0 0 48 48" fill="none">
+        <rect x="14" y="6" width="20" height="34" rx="5" fill="#374151" />
+        <rect x="17" y="9" width="14" height="17" rx="3" fill="#111827" />
+        <path d="M12 26h24v9a4 4 0 01-4 4H16a4 4 0 01-4-4v-9z" fill="#111827" />
+        <circle cx="24" cy="23" r="2.5" fill="#008d36" />
+      </svg>
+    );
+  }
+  if (c === 'CBS' || c === 'BST') {
+    return (
+      <svg className="w-10 h-10" viewBox="0 0 48 48" fill="none">
+        <rect x="8" y="22" width="32" height="14" rx="4" fill="#1F2937" />
+        <path d="M8 25c0-5 3.5-9 8-9h16c4.5 0 8 4 8 9" stroke="#4B5563" strokeWidth="3" />
+        <rect x="12" y="24" width="24" height="8" rx="2" fill="#374151" />
+      </svg>
+    );
+  }
+  if (c === 'YOU' || c === 'JAC') {
+    return (
+      <svg className="w-10 h-10" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="22" fill="#FEF3C7" />
+        <circle cx="24" cy="18" r="6" fill="#D97706" />
+        <path d="M13 36c0-5 5-8 11-8s11 3 11 8" fill="#D97706" />
+        <path d="M18 15c2-4 10-4 12 0" stroke="#92400E" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (c === 'CBF' || c === 'LRC') {
+    return (
+      <svg className="w-10 h-10" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="20" fill="#E0F2FE" stroke="#0284C7" strokeWidth="2" />
+        <ellipse cx="24" cy="24" rx="10" ry="20" stroke="#0284C7" strokeWidth="1.5" />
+        <path d="M4 24h40M7 14h34M7 34h34" stroke="#0284C7" strokeWidth="1.5" />
+      </svg>
+    );
+  }
+  if (c === 'SNO' || c === 'CHN') {
+    return (
+      <svg className="w-10 h-10" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="20" fill="#1F2937" />
+        <circle cx="24" cy="24" r="12" fill="#374151" />
+        <circle cx="24" cy="24" r="5" fill="#9CA3AF" />
+        <path d="M13 14l22 20M13 34l22-20M6 24h36M24 6v36" stroke="#E5E7EB" strokeWidth="1.5" strokeDasharray="3 2" />
+      </svg>
+    );
+  }
+  if (c === 'SKR' || c === 'SKB' || c === 'SKV') {
+    return (
+      <svg className="w-10 h-10" viewBox="0 0 48 48" fill="none">
+        <rect x="6" y="27" width="36" height="4" rx="2" fill="#1F2937" />
+        <rect x="10" y="31" width="4" height="6" rx="1" fill="#4B5563" />
+        <rect x="34" y="31" width="4" height="6" rx="1" fill="#4B5563" />
+        <path d="M12 11l20 20M17 9l20 20" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return <span className="text-2xl">{icon || '📦'}</span>;
+}
 
 // ---- Inner component (needs useSearchParams inside Suspense) ----
 function VehiclesContent() {
@@ -760,13 +855,13 @@ function VehiclesContent() {
     setLoadingEquipment(true);
 
     // ── Step 3a: Equipment from getMultipleRates (already loaded in Step 2) ──
-    // Friendly name / icon catalog (same as getEquipmentList route had)
+    // Friendly name / icon catalog (mesmos nomes e categorias do site oficial da Europcar)
     const EQUIPMENT_CATALOG: Record<string, { name: string; icon: string; description: string; maxQty: number }> = {
-      CSB: { name: 'Assento de bebê (0–12 meses)', icon: '👶', description: 'Cadeira infantil para bebês de 0 a 12 meses (grupo 0).', maxQty: 3 },
-      CSI: { name: 'Assento criança (1–3 anos)', icon: '🧒', description: 'Cadeira para crianças de 1 a 3 anos (grupo I, 9–18 kg).', maxQty: 3 },
+      CSB: { name: 'Assento de bebê (1–3 anos)', icon: '👶', description: 'Cadeira infantil para crianças de 1 a 3 anos (grupo 1, 9–18 kg).', maxQty: 3 },
+      CSI: { name: 'Bebê conforto (0–12 meses)', icon: '👶', description: 'Cadeira infantil voltada para trás para bebês de 0 a 12 meses (até 13 kg).', maxQty: 3 },
       CST: { name: 'Assento criança (4–7 anos)', icon: '🧒', description: 'Cadeira para crianças de 4 a 7 anos (15–30 kg).', maxQty: 3 },
-      CBS: { name: 'Assento de bebê (0–12 meses)', icon: '👶', description: 'Cadeira infantil para bebês de 0 a 12 meses.', maxQty: 3 },
-      BST: { name: 'Assento elevatório (4–7 anos)', icon: '💺', description: 'Booster para crianças de 4 a 7 anos (15–30 kg).', maxQty: 3 },
+      CBS: { name: 'Assento de elevação Booster (8–12 anos)', icon: '💺', description: 'Assento de elevação para crianças de 8 a 12 anos (até 150 cm / 22–36 kg).', maxQty: 3 },
+      BST: { name: 'Assento de elevação Booster (8–12 anos)', icon: '💺', description: 'Assento de elevação para crianças de 8 a 12 anos (até 150 cm / 22–36 kg).', maxQty: 3 },
       NVS: { name: 'Sistema de navegação GPS', icon: '🗺️', description: 'Navegador GPS portátil com mapas atualizados.', maxQty: 1 },
       NAV: { name: 'Sistema de navegação GPS', icon: '🗺️', description: 'GPS com mapeamento local e internacional.', maxQty: 1 },
       TOL: { name: 'Ativação de pedágio eletrônico (Via Verde / Toll)', icon: '🛣️', description: 'Taxa de ativação do dispositivo eletrônico para pedágios e portagens (ex: Via Verde). O valor do consumo será cobrado pela locadora.', maxQty: 1 },
@@ -775,18 +870,18 @@ function VehiclesContent() {
       ETL: { name: 'Ativação de pedágio eletrônico', icon: '🛣️', description: 'Taxa de ativação de dispositivo eletrônico para pedágios.', maxQty: 1 },
       ADD: { name: 'Condutor adicional', icon: '👤', description: 'Permite compartilhar a direção em longas viagens.', maxQty: 3 },
       ADR: { name: 'Condutor adicional', icon: '👤', description: 'Condutor extra habilitado a dirigir o veículo alugado.', maxQty: 3 },
-      JAC: { name: 'Sobretaxa motorista jovem', icon: '🧑‍🦱', description: 'Exigida para motoristas com menos de 25 anos.', maxQty: 1 },
-      YOU: { name: 'Sobretaxa motorista jovem', icon: '🧑‍🦱', description: 'Taxa para motoristas com menos de 25 anos.', maxQty: 1 },
+      JAC: { name: 'Sobretaxa motorista jovem', icon: '🧑‍🦱', description: 'Exigida para motoristas com menos de 25 anos.', maxQty: 2 },
+      YOU: { name: 'Sobretaxa motorista jovem', icon: '🧑‍🦱', description: 'Taxa para motoristas com menos de 25 anos.', maxQty: 2 },
       TRH: { name: 'Engate para reboque', icon: '🔗', description: 'Suporte para reboque de trailers ou caravanas.', maxQty: 1 },
       CBF: { name: 'Taxa transfronteiriça', icon: '🌍', description: 'Permite conduzir o veículo em países adicionais.', maxQty: 1 },
       LRC: { name: 'Taxa transfronteiriça', icon: '🌍', description: 'Autorização para condução em países adicionais.', maxQty: 1 },
       DVD: { name: 'Diesel garantido', icon: '⛽', description: 'Disponível apenas para categorias EDMR, CDMR, EVMR, IVMR e SDMR.', maxQty: 1 },
-      SKR: { name: 'Rack de esqui', icon: '🎿', description: 'Suporte para transporte de esquis no teto do veículo.', maxQty: 1 },
-      SKB: { name: 'Rack de esqui', icon: '🎿', description: 'Rack para esquis ou snowboards.', maxQty: 1 },
-      SKV: { name: 'Rack de esqui', icon: '🎿', description: 'Rack para transporte de esquis.', maxQty: 1 },
-      SNO: { name: 'Correntes para neve', icon: '⛓️', description: 'Correntes para pneus — obrigatórias em certas regiões.', maxQty: 1 },
+      SKR: { name: 'Rack de esqui', icon: '🎿', description: 'Suporte para transporte de esquis no teto do veículo.', maxQty: 2 },
+      SKB: { name: 'Rack de esqui', icon: '🎿', description: 'Rack para esquis ou snowboards.', maxQty: 2 },
+      SKV: { name: 'Rack de esqui', icon: '🎿', description: 'Rack para transporte de esquis.', maxQty: 2 },
+      SNO: { name: 'Correntes para neve', icon: '⛓️', description: 'Correntes para pneus — obrigatórias em certas regiões.', maxQty: 2 },
       SNR: { name: 'Sobretaxa motorista sênior', icon: '👴', description: 'Taxa para motoristas acima da idade máxima.', maxQty: 1 },
-      CHN: { name: 'Correntes para neve', icon: '⛓️', description: 'Correntes para pneus em condições de neve.', maxQty: 1 },
+      CHN: { name: 'Correntes para neve', icon: '⛓️', description: 'Correntes para pneus em condições de neve.', maxQty: 2 },
       WFI: { name: 'Wi-Fi portátil', icon: '📶', description: 'Hotspot Wi-Fi móvel com dados inclusos.', maxQty: 1 },
       LUG: { name: 'Proteção de bagagem', icon: '🧳', description: 'Cobertura para danos ou roubo de bagagem.', maxQty: 1 },
       HEL: { name: 'Capacete de motocicleta', icon: '🪖', description: 'Capacete fornecido junto com o veículo.', maxQty: 2 },
@@ -798,10 +893,13 @@ function VehiclesContent() {
       LSR: { name: 'Cinta de amarração com catraca', icon: '🔧', description: 'Cinta para fixação de carga.', maxQty: 1 },
     };
 
+    // Exclui equipamentos internos de furgões de carga / vinhetas internas que o site oficial da Europcar não oferece em carros de passeio
+    const EXCLUDED_EQUIPMENT_CODES = new Set(['ETR', 'VIG', 'LSR', 'TRH', 'HEL']);
+
     // Build stationEquipment from ratesEquipment (already loaded in Step 2)
     // Only include type "O" (optional) — mandatory/included are automatic
     const stationEquipment = ratesEquipment
-      .filter((eq: any) => eq.type === 'O')
+      .filter((eq: any) => eq.type === 'O' && !EXCLUDED_EQUIPMENT_CODES.has(eq.code))
       .map((eq: any) => {
         const meta = EQUIPMENT_CATALOG[eq.code];
         const isToll = ['TOL', 'TOLL', 'VVR', 'ETL'].includes(eq.code);
@@ -2911,73 +3009,78 @@ function VehiclesContent() {
                         return (
                           <div
                             key={eq.code}
-                            className={`bg-white border rounded-lg p-5 flex flex-col h-full transition-all duration-200 relative
-                              ${isUnavailable ? 'opacity-60 cursor-not-allowed' : qty > 0 ? 'ring-2 ring-[#008d36] border-transparent shadow-sm' : 'border-gray-200 hover:border-[#008d36]'}`}
+                            className={`bg-white border rounded-xl p-5 flex flex-col justify-between h-full transition-all duration-200 relative
+                              ${isUnavailable ? 'opacity-60 cursor-not-allowed' : qty > 0 ? 'ring-2 ring-[#008d36] border-transparent shadow-md' : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'}`}
                           >
                             {/* "Limitado" badge for on-request items */}
                             {isOnRequest && !isUnavailable && (
-                              <div className="absolute -top-3 left-3 bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1 uppercase">
+                              <div className="absolute -top-3 left-4 bg-gray-900 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 uppercase tracking-wide">
                                 Sob Consulta ℹ️
                               </div>
                             )}
 
-                            {/* Header: icon + title + code tag */}
-                             <div className="flex gap-3 mb-3 mt-1">
-                              <div className={`w-12 h-12 shrink-0 flex items-center justify-center rounded-lg text-3xl bg-gray-50 border border-gray-100 ${isUnavailable ? 'opacity-40 grayscale' : ''}`}>
-                                {eq.icon || '📦'}
+                            <div>
+                              {/* Header: ilustração do extra + título (sem código técnico) */}
+                              <div className="flex items-start gap-3.5 mb-2.5">
+                                <div className={`w-14 h-14 shrink-0 rounded-xl flex items-center justify-center bg-gray-50 border border-gray-100 ${isUnavailable ? 'opacity-40 grayscale' : ''}`}>
+                                  <EquipmentVisual code={eq.code} icon={eq.icon} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className={`text-sm font-bold leading-snug line-clamp-2 ${isUnavailable ? 'text-gray-400' : 'text-gray-900'}`}>
+                                    {eq.name}
+                                  </h4>
+                                </div>
                               </div>
-                              <div className="flex flex-col flex-1 min-w-0">
-                                <h4 className={`text-sm font-bold leading-tight mb-1 ${isUnavailable ? 'text-gray-400' : 'text-gray-900'}`}>
-                                {eq.name}
-                                </h4>
-                                <span className="self-start text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-500 px-2 py-0.5 rounded border border-gray-200">
-                                  {eq.code}
-                                </span>
-                              </div>
+
+                              {/* Description */}
+                              {eq.description && (
+                                <p className={`text-xs leading-relaxed line-clamp-3 mb-4 min-h-[2.5rem] ${isUnavailable ? 'text-gray-400' : 'text-gray-500'}`}>
+                                  {eq.description}
+                                </p>
+                              )}
                             </div>
 
-                            {/* Description */}
-                            {eq.description && (
-                              <p className={`text-xs mb-3 line-clamp-3 ${isUnavailable ? 'text-gray-400' : 'text-gray-500'}`}>
-                                {eq.description}
-                              </p>
-                            )}
-
                             {/* Price + Controls */}
-                            <div className="mt-auto">
+                            <div className="mt-auto pt-2">
                               {loadingEquipment ? (
                                 <div className="flex items-center gap-2 text-sm text-gray-400 mb-3">
                                   <div className="w-3 h-3 border-2 border-[#008d36] border-t-transparent rounded-full animate-spin" />
                                   Buscando preço...
                                 </div>
                               ) : isUnavailable ? (
-                                <span className="inline-block text-xs bg-red-50 text-red-500 font-bold px-3 py-1 rounded-full border border-red-200 mt-1">
+                                <span className="inline-block text-xs bg-red-50 text-red-500 font-bold px-3 py-1 rounded-full border border-red-200">
                                   Indisponível
                                 </span>
                               ) : (
                                 <>
-                                  {/* Price */}
-                                  <div className="text-xl font-black text-gray-900 mb-4">
-                                    R$ {priceBRL.toFixed(2).replace('.', ',')}
+                                  {/* Price igual ao oficial: R$ XXX,XX / total */}
+                                  <div className="mb-3">
+                                    <span className="text-xl font-black text-gray-900">
+                                      R$ {priceBRL.toFixed(2).replace('.', ',')}
+                                    </span>
                                     <span className="text-xs font-normal text-gray-400 ml-1">/ total</span>
                                   </div>
 
-                                  {/* Controls: +/- or Adicionar */}
+                                  {/* Controls: Seletor [- 0 +] ou Botão Amarelo "Adicionar" */}
                                   {eq.maxQty > 1 ? (
-                                    <div className="flex items-center justify-between border border-gray-200 rounded-lg p-1">
+                                    <div className="flex items-center justify-between border border-gray-200 rounded-lg p-1 bg-white">
                                       <button
                                         onClick={() => handleEquipmentQuantity(eq.code, -1, eq.maxQty)}
                                         disabled={qty === 0}
-                                        className={`w-10 h-10 flex items-center justify-center rounded text-lg font-bold transition-colors
-                                          ${qty > 0 ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-gray-50 text-gray-300 cursor-not-allowed'}`}
-                                      >−</button>
-                                      <span className="font-black text-base text-gray-900">{qty}</span>
+                                        className={`w-10 h-9 rounded flex items-center justify-center text-lg font-bold transition-colors
+                                          ${qty > 0 ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 cursor-pointer' : 'bg-gray-50 text-gray-300 cursor-not-allowed'}`}
+                                      >
+                                        −
+                                      </button>
+                                      <span className="font-bold text-sm text-gray-900 px-2">{qty}</span>
                                       <button
                                         onClick={() => handleEquipmentQuantity(eq.code, 1, eq.maxQty)}
                                         disabled={!canAdd}
-                                        className={`w-10 h-10 flex items-center justify-center rounded text-lg font-bold transition-colors
-                                          ${canAdd ? 'border border-[#008d36] text-[#008d36] hover:bg-green-50' : 'bg-gray-50 text-gray-300 cursor-not-allowed'}`}
-                                      >+</button>
+                                        className={`w-10 h-9 rounded flex items-center justify-center text-lg font-bold transition-colors
+                                          ${canAdd ? 'border border-[#008d36] text-[#008d36] hover:bg-green-50 cursor-pointer' : 'border border-gray-200 text-gray-300 bg-gray-50 cursor-not-allowed'}`}
+                                      >
+                                        +
+                                      </button>
                                     </div>
                                   ) : (
                                     <button
@@ -2986,16 +3089,16 @@ function VehiclesContent() {
                                         : handleEquipmentQuantity(eq.code, 1, eq.maxQty)
                                       }
                                       disabled={qty === 0 && !canAdd}
-                                      className={`w-full font-bold py-3 rounded-lg text-sm transition-all
+                                      className={`w-full font-bold py-2.5 rounded-lg text-sm transition-all shadow-xs
                                         ${qty > 0
-                                          ? 'bg-[#008d36] text-white hover:bg-[#007a2d]'
+                                          ? 'bg-[#008d36] text-white hover:bg-[#007a2d] cursor-pointer'
                                           : canAdd
-                                            ? 'bg-[#ffcc00] hover:bg-[#e6b800] text-gray-900 cursor-pointer'
+                                            ? 'bg-[#FFCC00] hover:bg-[#e6b800] text-gray-900 cursor-pointer'
                                             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                         }`}
                                     >
                                       {qty > 0
-                                        ? (['TOL', 'TOLL', 'VVR', 'ETL'].includes(eq.code) ? '✓ Ativado — Remover' : '✓ Selecionado — Remover')
+                                        ? (['TOL', 'TOLL', 'VVR', 'ETL'].includes(eq.code) ? '✓ Ativado' : '✓ Adicionado')
                                         : (['TOL', 'TOLL', 'VVR', 'ETL'].includes(eq.code) ? 'Ativar Pedágio' : 'Adicionar')}
                                     </button>
                                   )}
