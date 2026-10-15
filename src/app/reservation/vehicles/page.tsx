@@ -549,6 +549,17 @@ function VehiclesContent() {
                 deductibleCurrency = anyWithDeductible.deductibleCurrency || attrs.currency || "BRL";
               }
             }
+            // XRS informa a franquia em excessWithPOM (moeda local) / bkExcessWithPOM (moeda de pagamento).
+            // Usa a proteção incluída/obrigatória (pacote Básico) com franquia > 0.
+            if (!deductibleAmount) {
+              const basicWithExcess = allInsForDeductible.find((ins: any) =>
+                (ins.type === 'I' || ins.type === 'M') && parseFloat(ins.excessWithPOM || '0') > 0
+              );
+              if (basicWithExcess) {
+                deductibleAmount = basicWithExcess.excessWithPOM;
+                deductibleCurrency = attrs.currency || 'BRL';
+              }
+            }
 
             // Extract ageLimit from the reservationRate node
             const ageLimit = r.ageLimit?.$ || r.ageLimit || {};
@@ -2763,10 +2774,13 @@ function VehiclesContent() {
                                     <div className="text-gray-500 text-xs leading-relaxed mb-3">
                                       <p>{shortDesc}</p>
                                     </div>
-                                    {/* Excess / zero excess badge */}
-                                    {excessBRL > 0 && !isIncluded && (
-                                      <p className="text-xs text-gray-400 mb-1">Franquia: R$ {fmtPrice(excessBRL)}</p>
-                                    )}
+                                    {/* Excess / zero excess badge — inclui as proteções do pacote Básico (incluídas):
+                                        é justamente nelas que o cliente precisa ver a franquia padrão */}
+                                    {excessBRL > 0 ? (
+                                      <p className={`text-xs mb-1 ${isIncluded ? 'font-bold text-gray-800' : 'text-gray-400'}`}>Franquia: R$ {fmtPrice(excessBRL)}</p>
+                                    ) : (ins.excessWithPOM || 0) > 0 ? (
+                                      <p className={`text-xs mb-1 ${isIncluded ? 'font-bold text-gray-800' : 'text-gray-400'}`}>Franquia: {selectedCar?.currency || 'EUR'} {fmtPrice(ins.excessWithPOM)}</p>
+                                    ) : null}
                                     {ins.excessWithPOM === 0 && !isIncluded && insId !== 'RSA' && insId !== 'PAI' && (
                                       <span className="text-[10px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full mb-2 self-start uppercase tracking-wide">{t('extras.noExcess')}</span>
                                     )}
