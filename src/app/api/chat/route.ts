@@ -32,7 +32,8 @@ export async function POST(req: Request) {
     // DB not connected fallback
   }
 
-  const isActive = config?.isActive ?? true;
+  // Fail-closed: sem configuração ou com erro de banco, o agente fica desligado
+  const isActive = config?.isActive === true;
   if (!isActive) {
     return new Response("O agente está desativado temporariamente.", { status: 403 });
   }

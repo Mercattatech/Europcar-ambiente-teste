@@ -48,9 +48,11 @@ export default function AIChatWidget() {
   }, [error]);
 
   useEffect(() => {
-    fetch('/api/admin/ai-config')
-      .then(res => res.json())
-      .then(data => setIsActive(data?.isActive ?? true))
+    // Rota pública (visitantes não acessam /api/admin/ai-config → 401 deixava o robô sempre ligado).
+    // Só exibe se o painel disser explicitamente que está ativo.
+    fetch('/api/config/ai-chat', { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : { isActive: false }))
+      .then(data => setIsActive(data?.isActive === true))
       .catch(() => setIsActive(false));
   }, []);
 

@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/authOptions';
 import { callXRS } from '@/lib/europcar/xrsClient';
 import { isValidXRSDate, isValidXRSTime } from '@/lib/europcar/validate';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
-import { getReservationOwnerEmail } from '@/lib/europcar/ownership';
+import { checkReservationAccess } from '@/lib/europcar/ownership';
 import prisma from '@/lib/prisma';
 import { sendTransactionalEmail } from '@/lib/emailService';
 export const dynamic = 'force-dynamic';
@@ -33,9 +33,9 @@ export async function POST(request: Request) {
       if (!session?.user?.email) {
         return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
       }
-      const ownerEmail = await getReservationOwnerEmail(resNumber);
-      if (!ownerEmail || ownerEmail.toLowerCase() !== session.user.email.toLowerCase()) {
-        return NextResponse.json({ error: 'Você não tem permissão para modificar esta reserva' }, { status: 403 });
+      const access = await checkReservationAccess(resNumber, { sessionEmail: session.user.email });
+      if (!access.ok) {
+        return NextResponse.json({ error: access.error }, { status: access.status });
       }
     }
 

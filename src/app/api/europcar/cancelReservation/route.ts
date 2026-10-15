@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import { cancelXRSReservation, voidCieloPaymentForLocalReservation } from '@/lib/europcar/cancelService';
-import { getReservationOwnerEmail } from '@/lib/europcar/ownership';
+import { checkReservationAccess } from '@/lib/europcar/ownership';
 import prisma from '@/lib/prisma';
 import { sendTransactionalEmail } from '@/lib/emailService';
 
@@ -11,19 +11,21 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { resNumber } = body;
+    const { email } = body;
+    const resNumber = String(body.resNumber || '').trim();
 
     if (!resNumber) {
       return NextResponse.json({ error: 'resNumber é obrigatório para cancelamento' }, { status: 400 });
     }
 
+    // Cliente logado (sessão) OU cliente sem login (nº da reserva + e-mail da compra)
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
-    const ownerEmail = await getReservationOwnerEmail(resNumber);
-    if (!ownerEmail || ownerEmail.toLowerCase() !== session.user.email.toLowerCase()) {
-      return NextResponse.json({ error: 'Você não tem permissão para cancelar esta reserva' }, { status: 403 });
+    const access = await checkReservationAccess(resNumber, {
+      sessionEmail: session?.user?.email,
+      guestEmail: email,
+    });
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
     const { hasError, returnCode, errorMsg, raw: xrsResponse } = await cancelXRSReservation(resNumber);
@@ -41,7 +43,8 @@ export async function POST(request: Request) {
           voidCieloPaymentForLocalReservation(localRes.id).catch(() => {});
 
           if (localRes?.customerData) {
-             const cd: any = localRes.customerData;
+             // customerData é gravado como string JSON — sem o parse, cd.email era undefined e o e-mail nunca saía
+             const cd: any = typeof localRes.customerData === 'string' ? JSON.parse(localRes.customerData) : localRes.customerData;
              if (cd.email) {
                 const booking = cd.booking || {};
                 const car = booking.car || {};
@@ -118,7 +121,8 @@ export async function POST(request: Request) {
 
         // Trigger Email
         if (localRes?.customerData) {
-           const cd: any = localRes.customerData;
+           // customerData é gravado como string JSON — sem o parse, cd.email era undefined e o e-mail nunca saía
+           const cd: any = typeof localRes.customerData === 'string' ? JSON.parse(localRes.customerData) : localRes.customerData;
            if (cd.email) {
               const booking = cd.booking || {};
               const car = booking.car || {};

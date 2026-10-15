@@ -3,24 +3,26 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import { callXRS } from '@/lib/europcar/xrsClient';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
-import { getReservationOwnerEmail } from '@/lib/europcar/ownership';
+import { checkReservationAccess } from '@/lib/europcar/ownership';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const { resNumber } = await request.json();
+    const { resNumber: rawResNumber, email } = await request.json();
+    const resNumber = String(rawResNumber || '').trim();
 
     if (!resNumber) {
       return NextResponse.json({ error: 'resNumber é obrigatório' }, { status: 400 });
     }
 
+    // Cliente logado (sessão) OU cliente sem login (nº da reserva + e-mail da compra)
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
-    const ownerEmail = await getReservationOwnerEmail(resNumber);
-    if (!ownerEmail || ownerEmail.toLowerCase() !== session.user.email.toLowerCase()) {
-      return NextResponse.json({ error: 'Você não tem permissão para consultar esta reserva' }, { status: 403 });
+    const access = await checkReservationAccess(resNumber, {
+      sessionEmail: session?.user?.email,
+      guestEmail: email,
+    });
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
     const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>

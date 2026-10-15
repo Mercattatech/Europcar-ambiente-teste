@@ -85,6 +85,7 @@ export default function MeuPerfil() {
 
   // Manual search
   const [searchNum, setSearchNum]   = useState('');
+  const [searchEmail, setSearchEmail] = useState(''); // usado quando o cliente não está logado
   const [searching, setSearching]   = useState(false);
   const [searchResult, setSearchResult] = useState<any>(null);
   const [searchError, setSearchError]   = useState('');
@@ -214,6 +215,10 @@ export default function MeuPerfil() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchNum.trim()) return;
+    if (sessionStatus !== 'authenticated' && !searchEmail.trim()) {
+      setSearchError('Informe o e-mail utilizado na compra da reserva.');
+      return;
+    }
     setSearching(true);
     setSearchResult(null);
     setSearchError('');
@@ -221,7 +226,7 @@ export default function MeuPerfil() {
       const res = await fetch('/api/europcar/searchById', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resNumber: searchNum.trim() })
+        body: JSON.stringify({ resNumber: searchNum.trim(), email: searchEmail.trim() || undefined })
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'Reserva não encontrada');
@@ -278,15 +283,18 @@ export default function MeuPerfil() {
       const res = await fetch('/api/europcar/cancelReservation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resNumber: cancelTarget.resNumber })
+        body: JSON.stringify({ resNumber: cancelTarget.resNumber, email: searchEmail.trim() || undefined })
       });
       const data = await res.json();
       if (data.success) {
-        setCancelMsg('✅ Reserva cancelada com sucesso!');
+        setCancelMsg('✅ Reserva cancelada com sucesso! Você receberá a confirmação por e-mail.');
         // Update local status
         setReservas(prev => prev.map(r =>
           r.resNumber === cancelTarget.resNumber ? { ...r, status: 'CANCELLED' } : r
         ));
+        setSearchResult((prev: any) =>
+          prev && prev.resNumber === cancelTarget.resNumber ? { ...prev, cancelled: true, confirmed: false, onRequest: false, statusCode: 'CC' } : prev
+        );
         setTimeout(() => { setCancelTarget(null); setCancelMsg(''); }, 2000);
       } else {
         setCancelMsg(`❌ Erro: ${data.error || data.returnCode || 'Falha ao cancelar'}`);
@@ -923,24 +931,37 @@ export default function MeuPerfil() {
             </h2>
 
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <form onSubmit={handleSearch} className="flex gap-3">
+              <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
                 <input
                   id="searchResNumber"
                   type="text"
-                  placeholder="Ex: 1201272521"
+                  placeholder="Nº da reserva (ex: 1201272521)"
                   value={searchNum}
                   onChange={e => setSearchNum(e.target.value)}
                   className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-emerald-500 transition-colors"
                 />
+                {sessionStatus !== 'authenticated' && (
+                  <input
+                    id="searchResEmail"
+                    type="email"
+                    placeholder="E-mail usado na compra"
+                    value={searchEmail}
+                    onChange={e => setSearchEmail(e.target.value)}
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-emerald-500 transition-colors"
+                  />
+                )}
                 <button
                   type="submit"
-                  disabled={searching || !searchNum.trim()}
-                  className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors flex items-center gap-2"
+                  disabled={searching || !searchNum.trim() || (sessionStatus !== 'authenticated' && !searchEmail.trim())}
+                  className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
                 >
                   {searching ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : null}
                   Buscar
                 </button>
               </form>
+              {sessionStatus !== 'authenticated' && (
+                <p className="mt-2 text-xs text-gray-500">Não precisa de login: informe o número da reserva e o mesmo e-mail usado na compra.</p>
+              )}
 
               {searchError && (
                 <div className="mt-4 bg-red-900/20 border border-red-700/40 rounded-xl p-4 text-red-300 text-sm">{searchError}</div>
@@ -966,6 +987,15 @@ export default function MeuPerfil() {
                         <p key={i} className="text-yellow-300 text-xs">{w.msg || JSON.stringify(w)}</p>
                       ))}
                     </div>
+                  )}
+                  {!searchResult.cancelled && (
+                    <button
+                      id="searchResultCancel"
+                      onClick={() => { setCancelMsg(''); setCancelTarget({ resNumber: searchResult.resNumber } as Reserva); }}
+                      className="w-full mt-2 bg-red-600/90 hover:bg-red-500 text-white font-bold py-2.5 rounded-xl text-sm transition-colors"
+                    >
+                      Cancelar esta reserva
+                    </button>
                   )}
                 </div>
               )}
