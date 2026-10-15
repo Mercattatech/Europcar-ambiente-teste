@@ -5,12 +5,15 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import LoginModal from "@/components/auth/LoginModal";
 import { calculateRentalDays, formatRentalDays } from "@/lib/europcar/rentalDuration";
+import { isZeroExcessBooking } from "@/lib/europcar/protectionSummary";
 
 export default function CheckoutPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [booking, setBooking] = useState<any>(null);
   const [carCategoryOverrides, setCarCategoryOverrides] = useState<Record<string, string>>({});
+  const [pickupStationName, setPickupStationName] = useState<string>("");
+  const [returnStationName, setReturnStationName] = useState<string>("");
 
   // Condutor
   const [nome, setNome] = useState("");
@@ -169,6 +172,8 @@ export default function CheckoutPage() {
     if (data) {
       const parsed = JSON.parse(data);
       setBooking(parsed);
+      if (parsed.pickupStationName) setPickupStationName(parsed.pickupStationName);
+      if (parsed.returnStationName) setReturnStationName(parsed.returnStationName);
       // ETO tariff: force payment method to CREDIT (no Balcão allowed)
       if (parsed.tariffType === 'ETO' && paymentMethod === 'BALCAO') {
         setPaymentMethod('CREDIT');
@@ -247,6 +252,34 @@ export default function CheckoutPage() {
       })
       .catch(console.error);
   }, []);
+
+  // Resolução de nomes amigáveis para as estações caso não tenham vindo no payload
+  useEffect(() => {
+    const pickup = booking?.pickupStation || booking?.car?.pickupLoc;
+    const ret = booking?.returnStation || pickup;
+    if (pickup && !pickupStationName) {
+      fetch(`/api/europcar/getStations?q=${pickup}`)
+        .then(r => r.json())
+        .then(d => {
+          const s = d.stations?.find((x: any) => x.code === pickup);
+          if (s?.name) setPickupStationName(s.name);
+        })
+        .catch(() => { });
+    }
+    if (ret && !returnStationName) {
+      if (ret === pickup && pickupStationName) {
+        setReturnStationName(pickupStationName);
+      } else {
+        fetch(`/api/europcar/getStations?q=${ret}`)
+          .then(r => r.json())
+          .then(d => {
+            const s = d.stations?.find((x: any) => x.code === ret);
+            if (s?.name) setReturnStationName(s.name);
+          })
+          .catch(() => { });
+      }
+    }
+  }, [booking, pickupStationName, returnStationName]);
 
   // Carrega o script Braspag MPI para autenticação 3DS 2.2.
   //
@@ -616,6 +649,8 @@ export default function CheckoutPage() {
   // Pickup/return info
   const pickupStation = booking.pickupStation || car.pickupLoc || "";
   const returnStation = booking.returnStation || booking.pickupStation || "";
+  const displayPickupStationName = pickupStationName || booking.pickupStationName || pickupStation;
+  const displayReturnStationName = returnStationName || booking.returnStationName || (returnStation === pickupStation ? displayPickupStationName : returnStation);
   const pickupDate = booking.pickupDate || "";
   const returnDate = booking.returnDate || "";
   const pickupTime = booking.pickupTime || "1000";
@@ -1291,15 +1326,21 @@ export default function CheckoutPage() {
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-500 font-bold">Retirada</span>
                   <span className="font-black text-gray-900 text-right">
-                    {pickupStation}<br />
-                    <span className="font-normal text-gray-500">{formatDate(pickupDate)}</span>
+                    {displayPickupStationName}
+                    {pickupStation && displayPickupStationName !== pickupStation && (
+                      <span className="text-[10px] text-gray-400 font-normal block">({pickupStation})</span>
+                    )}
+                    <span className="font-normal text-gray-500 block">{formatDate(pickupDate)}</span>
                   </span>
                 </div>
                 <div className="flex justify-between text-xs mt-1">
                   <span className="text-gray-500 font-bold">Devolução</span>
                   <span className="font-black text-gray-900 text-right">
-                    {returnStation || pickupStation}<br />
-                    <span className="font-normal text-gray-500">{formatDate(returnDate)}</span>
+                    {displayReturnStationName}
+                    {(returnStation || pickupStation) && displayReturnStationName !== (returnStation || pickupStation) && (
+                      <span className="text-[10px] text-gray-400 font-normal block">({returnStation || pickupStation})</span>
+                    )}
+                    <span className="font-normal text-gray-500 block">{formatDate(returnDate)}</span>
                   </span>
                 </div>
                 <div className="flex justify-between text-xs mt-1">
@@ -1821,27 +1862,7 @@ export default function CheckoutPage() {
 
             {/* ═══════════════ SEÇÃO 1: VEÍCULO ═══════════════ */}
             <div className="p-5 pb-4">
-              {/* Header: Veículo + preço */}
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="font-bold text-gray-900 text-base">Veículo</h3>
-                <div className="text-right">
-                  <span className="font-bold text-gray-900 text-base">
-                    {totalBRL > 0
-                      ? `R$ ${totalBRL.toFixed(2).replace('.', ',')}`
-                      : `${currency} ${totalRateXRS.toFixed(2).replace('.', ',')}`}
-                  </span>
-                  {currency !== 'BRL' && totalRateXRS > 0 && (() => {
-                    const exchRate = parseFloat(car?.exchangeRate || '1');
-                    const localSymbol = currency === 'EUR' ? '€' : currency;
-                    const localVal = totalBRL > 0 ? totalBRL / exchRate : totalRateXRS;
-                    return (
-                      <div className="text-[11px] text-gray-400 mt-0.5">
-                        ≈ {localSymbol} {localVal.toFixed(2).replace('.', ',')}
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
+
 
               {/* Nome do carro + imagem */}
               <div className="flex items-start gap-3 mb-3">
@@ -1956,6 +1977,12 @@ export default function CheckoutPage() {
                     <span>Quilometragem {car?.mileageType === 'Livre' ? 'Ilimitada' : 'Limitada'}</span>
                     <span className="text-gray-400">Incluída</span>
                   </div>
+                  {isZeroExcessBooking(booking) && (
+                    <div className="flex justify-between font-bold text-[#008d36]">
+                      <span>🛡️ Proteção Premium (Franquia Zero)</span>
+                      <span>Incluída</span>
+                    </div>
+                  )}
                   {/* Itens inclusos da API — excluindo sobretaxa de aeroporto (exibida separadamente) quando NÃO é BALCAO */}
                   {booking?.quoteInsurances?.filter((i: any) => {
                     const d = (i.descr || '').toLowerCase();
@@ -1976,13 +2003,19 @@ export default function CheckoutPage() {
               <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden">
                 <div className="p-3 border-b border-gray-100">
                   <div className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Retirada</div>
-                  <div className="text-sm font-bold text-gray-900">{pickupStation}</div>
-                  <div className="text-xs text-gray-500">{formatDate(pickupDate)} · {(booking.pickupTime || '1000').slice(0,2)}:{(booking.pickupTime || '1000').slice(2)}</div>
+                  <div className="text-sm font-bold text-gray-900 leading-snug">{displayPickupStationName}</div>
+                  {pickupStation && displayPickupStationName !== pickupStation && (
+                    <div className="text-[11px] text-gray-400 font-medium">({pickupStation})</div>
+                  )}
+                  <div className="text-xs text-gray-500 mt-0.5">{formatDate(pickupDate)} · {(booking.pickupTime || '1000').slice(0,2)}:{(booking.pickupTime || '1000').slice(2)}</div>
                 </div>
                 <div className="p-3">
                   <div className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Devolução</div>
-                  <div className="text-sm font-bold text-gray-900">{returnStation || pickupStation}</div>
-                  <div className="text-xs text-gray-500">{formatDate(returnDate)} · {(booking.returnTime || '1000').slice(0,2)}:{(booking.returnTime || '1000').slice(2)}</div>
+                  <div className="text-sm font-bold text-gray-900 leading-snug">{displayReturnStationName}</div>
+                  {(returnStation || pickupStation) && displayReturnStationName !== (returnStation || pickupStation) && (
+                    <div className="text-[11px] text-gray-400 font-medium">({returnStation || pickupStation})</div>
+                  )}
+                  <div className="text-xs text-gray-500 mt-0.5">{formatDate(returnDate)} · {(booking.returnTime || '1000').slice(0,2)}:{(booking.returnTime || '1000').slice(2)}</div>
                 </div>
               </div>
 
@@ -2083,95 +2116,7 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* ═══════════════ SEÇÃO 2: PROTEÇÃO E EXTRAS (PAGO NO BALCÃO) ═══════════════ */}
-            {(extrasDetails.length > 0 || booking?.xrsEquipment?.length > 0) && (
-              <div className="border-t border-gray-200 p-5">
-                {/* Header */}
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-gray-900 text-base">Proteção e extras</h3>
-                    {paymentMethod !== 'BALCAO' && (
-                      <span className="text-[9px] bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full uppercase whitespace-nowrap">🏪 Pago no balcão</span>
-                    )}
-                  </div>
-                  <span className="font-bold text-gray-900 text-base">
-                    R$ {(() => {
-                      const extrasVal = extrasDetails.reduce((s: number, e: any) => {
-                        const val = e.isTotal ? e.pricePerDay : e.pricePerDay * days;
-                        return s + val * e.qty;
-                      }, 0);
-                      const equipVal = (booking?.xrsEquipment || []).reduce((s: number, eq: any) => {
-                        const eqTotalBRL2 = parseFloat(eq.totalBRL || 0);
-                        const eqDailyBRL2 = parseFloat(eq.priceBRL || 0);
-                        const p2 = eqTotalBRL2 > 0 ? eqTotalBRL2 : eqDailyBRL2 * days;
-                        return s + p2 * (eq.qty || 1);
-                      }, 0);
-
-                      return (extrasVal + equipVal).toFixed(2).replace('.', ',');
-                    })()}
-                  </span>
-                </div>
-
-                {/* Extras (proteções/seguros) */}
-                {extrasDetails.length > 0 && (
-                  <div className="space-y-0">
-                    {extrasDetails.map((extra: any, idx: number) => {
-                      const insNames: Record<string, string> = {
-                        PREMIUM: "Cobertura Premium", PREMPRE: "Premium Pré-pago", PREMUP: "Premium Plus",
-                        SPCDW: "Super Proteção CDW", SPTHW: "Super Proteção THW", STHW: "Proteção THW+",
-                        SCDW: "Proteção CDW+", MEDIUM: "Cobertura Média", RSA: "Assistência na Estrada",
-                        APP: "Proteção de Aparência", WWI: "Proteção de para-brisas", PAI: "Proteção acidentes pessoais",
-                        PREMPLUS: "Proteção Premium Plus", SPAI: "Super PAI",
-                      };
-                      const totalExtra = (extra.isTotal ? extra.pricePerDay : extra.pricePerDay * days) * extra.qty;
-                      return (
-                        <div key={extra.id} className={`py-3 ${idx > 0 ? 'border-t border-gray-100' : ''}`}>
-                          <div className="flex justify-between items-start">
-                            <span className="text-sm text-gray-900 font-medium flex-1 pr-2">{insNames[extra.id] || extra.id}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-xs text-gray-500 mt-1">
-                            <span>{extra.isTotal ? 'Total do período' : `Por ${formatRentalDays(days)}`}</span>
-                            <div className="flex items-center gap-4">
-                              <span>{extra.qty}</span>
-                              <span className="font-bold text-gray-900">R$ {totalExtra.toFixed(2).replace('.', ',')}</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Equipamentos/Acessórios */}
-                {booking?.xrsEquipment?.length > 0 && (
-                  <div className={`space-y-0 ${extrasDetails.length > 0 ? 'mt-0' : ''}`}>
-                    {booking.xrsEquipment.map((eq: any, idx: number) => {
-                      const eqTotalBRL = parseFloat(eq.totalBRL || 0);
-                      const eqDailyBRL = parseFloat(eq.priceBRL || 0);
-                      // totalBRL = real period total from XRS (rentalPriceInBookingCurrencyAI)
-                      const eqTotal = (eqTotalBRL > 0 ? eqTotalBRL : eqDailyBRL * days) * (eq.qty || 1);
-
-                      return (
-                        <div key={eq.code} className={`py-3 ${(idx > 0 || extrasDetails.length > 0) ? 'border-t border-gray-100' : ''}`}>
-                          <div className="flex justify-between items-start">
-                            <span className="text-sm text-gray-900 font-medium flex-1 pr-2">{eq.icon || '📦'} {eq.name || eq.code}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-xs text-gray-500 mt-1">
-                            <span>{eqTotalBRL > 0 ? 'Total do período' : `Por ${formatRentalDays(days)}`}</span>
-                            <div className="flex items-center gap-4">
-                              <span>{eq.qty || 1}</span>
-                              <span className="font-bold text-gray-900">R$ {eqTotal.toFixed(2).replace('.', ',')}</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ═══════════════ SEÇÃO 3: RESUMO FINANCEIRO (DIRETRIZES DE PAGAMENTO) ═══════════════ */}
+            {/* ═══════════════ RESUMO FINANCEIRO (DIRETRIZES DE PAGAMENTO) ═══════════════ */}
             <div className="border-t border-gray-200 p-5 bg-gradient-to-b from-gray-50/60 to-white">
               {(() => {
                 const exchangeRate = parseFloat(car?.exchangeRate || '1');
@@ -2238,6 +2183,41 @@ export default function CheckoutPage() {
                   }
                 };
 
+                const isZeroExcess = isZeroExcessBooking(booking);
+
+                // Determinar o nome da proteção e valor da franquia para o resumo Pagar Online
+                let protectionTitle = "Proteção Básica";
+                let franchiseText = "";
+
+                if (isZeroExcess) {
+                  protectionTitle = "Proteção Premium";
+                  franchiseText = "Franquia: R$ 0";
+                } else {
+                  if (booking?.selectedProtectionPackage === 'medium') {
+                    protectionTitle = "Proteção Média";
+                  } else if (booking?.selectedProtectionPackage === 'premium') {
+                    protectionTitle = "Proteção Premium";
+                  }
+
+                  const dedRaw = parseFloat(car?.deductibleAmount || car?.deductible || '0');
+                  const basicInsWithExcess = (booking?.quoteInsurances || []).find(
+                    (ins: any) => (ins.type === 'I' || ins.type === 'M') && parseFloat(ins.excessWithPOM || ins.deductible || '0') > 0
+                  );
+                  const dedVal = dedRaw > 0 ? dedRaw : parseFloat(basicInsWithExcess?.excessWithPOM || '0');
+                  const dedCur = car?.deductibleCurrency || currency || 'EUR';
+                  const dedBRL = parseFloat(basicInsWithExcess?.bkExcessWithPOM || '0') || (exchangeRate > 0 ? dedVal * exchangeRate : 0);
+
+                  if (dedVal > 0) {
+                    const localFmt = `${dedCur} ${dedVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    const brlFmt = dedBRL > 0 && dedCur !== 'BRL'
+                      ? ` ≈ R$ ${dedBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : '';
+                    franchiseText = `Franquia: ${localFmt}${brlFmt}`;
+                  } else {
+                    franchiseText = "com franquia";
+                  }
+                }
+
                 return (
                   <div className="space-y-3.5">
                     {/* ── 1. PAGAR ONLINE ── */}
@@ -2270,7 +2250,10 @@ export default function CheckoutPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-emerald-700 font-bold">-</span>
-                            <span>Proteção (Franquia)</span>
+                            <span>
+                              <span className="text-gray-900 font-medium">{protectionTitle}</span>{' '}
+                              <span className={isZeroExcess ? "text-emerald-700 font-bold" : "text-gray-500"}>({franchiseText})</span>
+                            </span>
                           </div>
                           {paymentMethod === 'CREDIT' && ccInstallments > 1 && (
                             <div className="mt-2 bg-emerald-50 border border-emerald-200/70 rounded-lg px-2.5 py-1 flex items-center justify-between text-[11px]">
