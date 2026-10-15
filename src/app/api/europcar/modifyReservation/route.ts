@@ -189,6 +189,32 @@ export async function POST(request: Request) {
       } catch (syncErr: any) {
         console.error(`[modifyReservation] Erro ao sincronizar/enviar e-mail para ${resNumber}:`, syncErr.message);
       }
+    } else if (isAdminCall && checkoutParts.length === 0 && checkinParts.length === 0 && !carCategory && hasFlightChange) {
+      // Se era apenas alteração do número de voo e a Europcar rejeitou no XRS (reserva com voucher/tarifa fechada),
+      // salva no banco local para manter o voo no voucher, e-mail e painel
+      try {
+        const localRes = await prisma.localReservation.findFirst({
+          where: { resNumber }
+        });
+        if (localRes) {
+          const cd: any = typeof localRes.customerData === 'string'
+            ? JSON.parse(localRes.customerData as string)
+            : localRes.customerData;
+          if (cleanFlight) cd.flightNumber = cleanFlight;
+          else delete cd.flightNumber;
+          await prisma.localReservation.update({
+            where: { id: localRes.id },
+            data: { customerData: JSON.stringify(cd), updatedAt: new Date() }
+          });
+          return NextResponse.json({
+            success: true,
+            warning: 'O XRS da Europcar bloqueia alteração remota nesta reserva (reserva fechada/voucher), mas o número do voo foi salvo com sucesso no sistema local.',
+            savedLocally: true
+          });
+        }
+      } catch (saveErr: any) {
+        console.error('[modifyReservation] Erro ao salvar voo localmente:', saveErr.message);
+      }
     }
 
     return NextResponse.json({

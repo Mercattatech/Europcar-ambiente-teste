@@ -590,17 +590,54 @@ export default function PainelReservas() {
             firstName: parsed?.nome || parsed?.firstName || 'Admin',
             lastName: parsed?.sobrenome || parsed?.lastName || 'Europcar',
          };
-         // Only send fields that differ from original
-         if (adminModifyData.pickupDate) payload.pickupDate = adminModifyData.pickupDate.replace(/-/g, '');
-         if (adminModifyData.pickupTime) payload.pickupTime = adminModifyData.pickupTime;
-         if (adminModifyData.pickupStationID) payload.pickupStationID = adminModifyData.pickupStationID;
-         if (adminModifyData.returnDate) payload.returnDate = adminModifyData.returnDate.replace(/-/g, '');
-         if (adminModifyData.returnTime) payload.returnTime = adminModifyData.returnTime;
-         if (adminModifyData.returnStationID) payload.returnStationID = adminModifyData.returnStationID;
-         if (adminModifyData.carCategory) payload.carCategory = adminModifyData.carCategory;
+         const origPickupDate = (parsed?.booking?.pickupDate || '').replace(/-/g, '');
+         const newPickupDate = (adminModifyData.pickupDate || '').replace(/-/g, '');
+         if (newPickupDate && newPickupDate !== origPickupDate) {
+            payload.pickupDate = newPickupDate;
+         }
+
+         const origPickupTime = String(parsed?.booking?.pickupTime || '');
+         const newPickupTime = String(adminModifyData.pickupTime || '');
+         if (newPickupTime && newPickupTime !== origPickupTime) {
+            payload.pickupTime = newPickupTime;
+         }
+
+         const origPickupStation = String(parsed?.booking?.pickupStation || '').trim();
+         const newPickupStation = String(adminModifyData.pickupStationID || '').trim();
+         if (newPickupStation && newPickupStation !== origPickupStation) {
+            payload.pickupStationID = newPickupStation;
+         }
+
+         const origReturnDate = (parsed?.booking?.returnDate || '').replace(/-/g, '');
+         const newReturnDate = (adminModifyData.returnDate || '').replace(/-/g, '');
+         if (newReturnDate && newReturnDate !== origReturnDate) {
+            payload.returnDate = newReturnDate;
+         }
+
+         const origReturnTime = String(parsed?.booking?.returnTime || '');
+         const newReturnTime = String(adminModifyData.returnTime || '');
+         if (newReturnTime && newReturnTime !== origReturnTime) {
+            payload.returnTime = newReturnTime;
+         }
+
+         const origReturnStation = String(parsed?.booking?.returnStation || parsed?.booking?.pickupStation || '').trim();
+         const newReturnStation = String(adminModifyData.returnStationID || '').trim();
+         if (newReturnStation && newReturnStation !== origReturnStation) {
+            payload.returnStationID = newReturnStation;
+         }
+
+         const origCarCategory = String(parsed?.booking?.car?.carCategoryCode || '').trim();
+         const newCarCategory = String(adminModifyData.carCategory || '').trim();
+         if (newCarCategory && newCarCategory !== origCarCategory) {
+            payload.carCategory = newCarCategory;
+         }
+
          // Número do voo: só envia se foi alterado (permite também apagar)
+         const origFlight = String(parsed?.flightNumber || '').trim().toUpperCase();
          const newFlight = adminModifyData.flightNumber.trim().toUpperCase();
-         if (newFlight !== String(parsed?.flightNumber || '').trim().toUpperCase()) payload.flightNumber = newFlight;
+         if (newFlight !== origFlight) {
+            payload.flightNumber = newFlight;
+         }
 
          const res = await fetch('/api/europcar/modifyReservation', {
             method: 'POST',
@@ -609,8 +646,8 @@ export default function PainelReservas() {
          });
          const data = await res.json();
          if (data.success) {
-            setAdminModifyMsg('✅ Reserva modificada com sucesso no XRS e banco local!');
-            setTimeout(() => { setModifyModal(null); setAdminModifyMsg(''); fetchReservations(); }, 2000);
+            setAdminModifyMsg(data.warning ? `⚠️ ${data.warning}` : '✅ Reserva modificada com sucesso!');
+            setTimeout(() => { setModifyModal(null); setAdminModifyMsg(''); fetchReservations(); }, 2500);
          } else {
             setAdminModifyMsg(`❌ Erro: ${data.error || data.returnCode || 'Falha ao modificar'}`);
          }
