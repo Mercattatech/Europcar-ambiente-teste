@@ -1372,25 +1372,41 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              {/* Grand total — PIX (online) */}
-              <div className="bg-[#008d36] rounded-lg p-4 mt-auto">
-                <div className="text-[10px] font-bold text-green-200 uppercase mb-1">💳 Valor cobrado via PIX</div>
-                <div className="text-2xl font-black text-white">
-                  R$ {baseAmountBRL.toFixed(2).replace(".", ",")}
-                </div>
-                <div className="text-[10px] text-green-200 mt-0.5">Aluguel + proteções incluídas, taxas e impostos</div>
-              </div>
-
-              {/* Balcão items */}
+              {/* Grand total — PIX (online vs balcão) */}
               {(() => {
                 const totalBalcaoPIX = airportSurchargeBRL + extrasAndEquipTotal;
-                if (totalBalcaoPIX <= 0) return null;
+                const totalReservaPIX = baseAmountBRL + totalBalcaoPIX;
                 return (
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mt-3">
-                    <div className="flex justify-between items-center mb-1.5">
-                      <span className="text-[10px] font-bold text-orange-700 uppercase">🏪 A pagar no balcão</span>
-                      <span className="text-sm font-black text-orange-800">R$ {totalBalcaoPIX.toFixed(2).replace(".", ",")}</span>
+                  <>
+                    <div className="bg-[#008d36] rounded-xl p-4 mt-auto text-white shadow-xs">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="text-[10px] font-black text-green-200 uppercase tracking-wide mb-0.5">
+                            💳 Pagar Agora via PIX
+                          </div>
+                          <div className="text-2xl font-black text-white">
+                            R$ {baseAmountBRL.toFixed(2).replace(".", ",")}
+                          </div>
+                          <div className="text-[10px] text-green-100 mt-1">Aluguel + proteções incluídas, taxas e impostos</div>
+                        </div>
+                        {totalBalcaoPIX > 0 && (
+                          <div className="text-right pl-2">
+                            <span className="text-[10px] font-bold text-green-200 uppercase block">Total Geral</span>
+                            <span className="text-sm font-black text-white whitespace-nowrap">
+                              R$ {totalReservaPIX.toFixed(2).replace(".", ",")}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Balcão items */}
+                    {totalBalcaoPIX > 0 && (
+                      <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 mt-3">
+                        <div className="flex justify-between items-center mb-1.5">
+                          <span className="text-[10px] font-black text-amber-900 uppercase">🏪 Pagar no Balcão (Destino)</span>
+                          <span className="text-sm font-black text-amber-950">R$ {totalBalcaoPIX.toFixed(2).replace(".", ",")}</span>
+                        </div>
                     <div className="space-y-0.5">
                       {airportSurchargeBRL > 0 && (
                         <div className="flex justify-between text-[10px] text-orange-700">
@@ -1423,8 +1439,10 @@ export default function CheckoutPage() {
                       Cobrado diretamente no balcão de retirada.
                     </p>
                   </div>
-                );
-              })()}
+                )}
+              </>
+            );
+          })()}
             </div>
 
           </div>
@@ -2153,219 +2171,226 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* ═══════════════ SEÇÃO 3: TOTAL — ONLINE vs BALCÃO ═══════════════ */}
-            <div className="border-t border-gray-200 p-5">
-              {/* ── BLOCO 1: PAGAMENTO ONLINE ── */}
-              {paymentMethod !== 'BALCAO' ? (
-                <>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
-                        {paymentMethod === 'PIX' ? '💳 Pagamento via PIX' : '💳 Pagamento Online'}
-                      </h3>
-                      <span className="text-xs text-gray-500">
-                        {paymentMethod === 'PIX' ? 'Valor cobrado via PIX' : 'Valor cobrado no cartão de crédito'}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xl font-black text-gray-900">
-                        R$ {baseAmountBRL.toFixed(2).replace('.', ',')}
-                      </div>
-                      {totalRateXRS > 0 && currency !== 'BRL' && (() => {
-                        const exchangeRate = parseFloat(car?.exchangeRate || '1');
-                        if (!exchangeRate || exchangeRate <= 0) return null;
-                        // Para Pagamento Online: converte APENAS o valor cobrado no cartão (baseAmountBRL)
-                        const onlineLocal = baseAmountBRL / exchangeRate;
-                        const localSymbol = currency === 'EUR' ? '€' : currency;
-                        // Total completo da reserva em EUR (referência)
-                        const insValBRL  = (booking?.xrsInsurances || []).reduce((s: number, ins: any) => s + parseFloat(ins.priceBRL || 0), 0);
-                        const equipValBRL = (booking?.xrsEquipment || []).reduce((s: number, eq: any) => {
-                          const t = parseFloat(eq.totalBRL || 0);
-                          const d = parseFloat(eq.priceBRL || 0);
-                          return s + (t > 0 ? t : d * days) * (eq.qty || 1);
-                        }, 0);
-                        const extrasValBRL = extrasDetails.reduce((s: number, e: any) => {
-                          const v = e.isTotal ? e.pricePerDay : e.pricePerDay * days;
-                          return s + v * e.qty;
-                        }, 0);
-                        const fullBRL = (totalBRL > 0 ? totalBRL : totalRateXRS) + insValBRL + equipValBRL + extrasValBRL;
-                        const fullLocal = fullBRL / exchangeRate;
-                        return (
-                          <div className="text-right mt-0.5">
-                            <div className="text-xs text-gray-400">
-                              ≈ {localSymbol} {onlineLocal.toFixed(2).replace('.', ',')}
+            {/* ═══════════════ SEÇÃO 3: RESUMO FINANCEIRO (TOTAL, ONLINE E DESTINO/BALCÃO) ═══════════════ */}
+            <div className="border-t border-gray-200 p-5 bg-gradient-to-b from-gray-50/60 to-white">
+              {(() => {
+                const exchangeRate = parseFloat(car?.exchangeRate || '1');
+                const hasLocal = currency !== 'BRL' && exchangeRate > 0;
+                const localSymbol = currency === 'EUR' ? '€' : currency;
+
+                // Extras e equipamentos
+                const extrasVal = extrasDetails.reduce((s: number, e: any) => {
+                  const val = e.isTotal ? e.pricePerDay : e.pricePerDay * days;
+                  return s + val * e.qty;
+                }, 0);
+                const equipVal = (booking?.xrsEquipment || []).reduce((s: number, eq: any) => {
+                  const eqT = parseFloat(eq.totalBRL || 0);
+                  const eqD = parseFloat(eq.priceBRL || 0);
+                  return s + (eqT > 0 ? eqT : eqD * days) * (eq.qty || 1);
+                }, 0);
+
+                const isBalcaoOnly = paymentMethod === 'BALCAO';
+                const vehicleTotalBRL = totalBRL > 0 ? totalBRL : totalRateXRS;
+
+                // Valores em BRL
+                const balcaoAmountBRL = isBalcaoOnly
+                  ? (vehicleTotalBRL + extrasVal + equipVal)
+                  : (airportSurchargeBRL + extrasVal + equipVal);
+                const onlineAmountBRL = isBalcaoOnly ? 0 : baseAmountBRL;
+                const totalGeralBRL = onlineAmountBRL + balcaoAmountBRL;
+
+                // Formatação para moeda local
+                const toLocalStr = (valBRL: number) => hasLocal ? `≈ ${localSymbol} ${(valBRL / exchangeRate).toFixed(2).replace('.', ',')}` : '';
+
+                return (
+                  <div className="space-y-3.5">
+                    {/* ── CARD PRINCIPAL: VALOR TOTAL DA RESERVA ── */}
+                    <div className="bg-gray-900 text-white rounded-xl p-4 shadow-sm relative overflow-hidden">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-wider text-green-400 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-400"></span>
+                            Valor Total da Reserva
+                          </span>
+                          <p className="text-[11px] text-gray-300 mt-0.5">
+                            {balcaoAmountBRL > 0 && onlineAmountBRL > 0
+                              ? 'Valor completo da sua locação'
+                              : 'Total previsto para a locação'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-black tracking-tight text-white">
+                            R$ {totalGeralBRL.toFixed(2).replace('.', ',')}
+                          </div>
+                          {hasLocal && (
+                            <div className="text-xs font-semibold text-gray-300 mt-0.5">
+                              {toLocalStr(totalGeralBRL)}
                             </div>
-                            {fullLocal > onlineLocal && (
-                              <div className="text-[10px] text-gray-400 mt-0.5">
-                                Total da reserva: {localSymbol} {fullLocal.toFixed(2).replace('.', ',')}
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Resumo rápido de composição */}
+                      {onlineAmountBRL > 0 && balcaoAmountBRL > 0 && (
+                        <div className="mt-3 pt-2.5 border-t border-gray-800 text-[11px] flex justify-between items-center text-gray-300">
+                          <span>
+                            Online: <strong className="text-white">R$ {onlineAmountBRL.toFixed(2).replace('.', ',')}</strong>
+                          </span>
+                          <span>+</span>
+                          <span>
+                            No Destino: <strong className="text-amber-400">R$ {balcaoAmountBRL.toFixed(2).replace('.', ',')}</strong>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── CARD 1: VALOR PAGO ONLINE (ANTECIPADO) ── */}
+                    {!isBalcaoOnly && (
+                      <div className="bg-white border-2 border-emerald-500/30 rounded-xl p-3.5 shadow-2xs">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="bg-emerald-100 text-[#008d36] text-[10px] font-black uppercase px-2 py-0.5 rounded-md">
+                                Pagar Agora
+                              </span>
+                              <h4 className="font-bold text-gray-900 text-sm">
+                                {paymentMethod === 'PIX' ? '💳 Pagamento via PIX' : '💳 Pagamento Online'}
+                              </h4>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              {paymentMethod === 'PIX' ? 'Cobrado imediatamente via PIX' : 'Cobrado no cartão de crédito'}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-black text-gray-900">
+                              R$ {onlineAmountBRL.toFixed(2).replace('.', ',')}
+                            </div>
+                            {hasLocal && (
+                              <div className="text-xs text-gray-500 mt-0.5 font-medium">
+                                {toLocalStr(onlineAmountBRL)}
                               </div>
                             )}
                           </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    Inclui aluguel do veículo, proteções incluídas, taxas e impostos.
-                  </p>
-                  {airportSurchargeBRL > 0 && (
-                    <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                      <span className="text-amber-500 text-sm mt-0.5 shrink-0">✈</span>
-                      <p className="text-[11px] text-amber-800 leading-snug">
-                        <strong>Sobretaxa de aeroporto</strong> (R$ {airportSurchargeBRL.toFixed(2).replace('.', ',')}) foi <strong>descontada</strong> do valor online — será cobrada separadamente no balcão de retirada.
-                      </p>
-                    </div>
-                  )}
-                  {paymentMethod === 'CREDIT' && ccInstallments > 1 && (
-                    <div className="mt-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-center">
-                      <span className="text-sm font-black text-[#008d36]">
-                        {ccInstallments}x de R$ {(baseAmountBRL / ccInstallments).toFixed(2).replace('.', ',')}
-                      </span>
-                      <span className="text-xs text-green-700 ml-1">sem juros</span>
-                    </div>
-                  )}
+                        </div>
 
-                  {/* ── BLOCO 2: PAGAMENTO NO BALCÃO ── */}
-                  {(() => {
-                    const extrasVal = extrasDetails.reduce((s: number, e: any) => {
-                      const val = e.isTotal ? e.pricePerDay : e.pricePerDay * days;
-                      return s + val * e.qty;
-                    }, 0);
-                    const equipVal = (booking?.xrsEquipment || []).reduce((s: number, eq: any) => {
-                      const eqT = parseFloat(eq.totalBRL || 0);
-                      const eqD = parseFloat(eq.priceBRL || 0);
-                      return s + (eqT > 0 ? eqT : eqD * days) * (eq.qty || 1);
-                    }, 0);
-                    const totalBalcao = airportSurchargeBRL + extrasVal + equipVal;
-                    if (totalBalcao <= 0) return null;
+                        {paymentMethod === 'CREDIT' && ccInstallments > 1 && (
+                          <div className="mt-2.5 bg-emerald-50 border border-emerald-200/70 rounded-lg px-3 py-1.5 flex items-center justify-between">
+                            <span className="text-xs text-emerald-800 font-medium">Parcelamento:</span>
+                            <span className="text-xs font-black text-[#008d36]">
+                              {ccInstallments}x de R$ {(onlineAmountBRL / ccInstallments).toFixed(2).replace('.', ',')} <span className="font-normal text-[10px] text-emerald-700">sem juros</span>
+                            </span>
+                          </div>
+                        )}
 
-                    return (
-                      <div className="mt-4 bg-orange-50 border border-orange-200 rounded-lg p-4">
-                        {/* Header: título + total BRL + total EUR */}
-                        {(() => {
-                          const exchRate = parseFloat(car?.exchangeRate || '1');
-                          const hasLocal = currency !== 'BRL' && exchRate > 0;
-                          const localSymbol = currency === 'EUR' ? '€' : currency;
-                          const toLocal = (brl: number) => hasLocal ? `≈ ${localSymbol} ${(brl / exchRate).toFixed(2).replace('.', ',')}` : '';
-                          return (
-                            <>
-                              <div className="flex justify-between items-start mb-2">
-                                <h3 className="font-bold text-orange-800 text-sm flex items-center gap-1.5">
-                                  🏪 Pagamento no Balcão
-                                </h3>
-                                <div className="text-right">
-                                  <span className="font-black text-orange-800 text-base">
-                                    R$ {totalBalcao.toFixed(2).replace('.', ',')}
-                                  </span>
-                                  {hasLocal && (
-                                    <div className="text-[10px] text-orange-600 mt-0.5">
-                                      {toLocal(totalBalcao)}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                        <div className="mt-2.5 pt-2 border-t border-gray-100 text-[11px] text-gray-500 flex items-center gap-1">
+                          <span className="text-emerald-600 font-bold">✓</span>
+                          <span>Inclui aluguel do veículo, proteções contratadas e taxas.</span>
+                        </div>
 
-                              <div className="space-y-1">
-                                {/* Sobretaxa aeroporto */}
-                                {airportSurchargeBRL > 0 && (
-                                  <div className="flex justify-between text-xs text-orange-700">
-                                    <span>✈ Sobretaxa de aeroporto</span>
-                                    <span className="font-bold">R$ {airportSurchargeBRL.toFixed(2).replace('.', ',')}</span>
-                                  </div>
-                                )}
-
-                                {/* Proteções/extras adicionais */}
-                                {extrasDetails.map((extra: any, idx: number) => {
-                                  const insNamesBalcao: Record<string, string> = {
-                                    PREMIUM: "Cobertura Premium", PREMPRE: "Premium Pré-pago", PREMUP: "Premium Plus",
-                                    SPCDW: "Super CDW", SPTHW: "Super THW", STHW: "THW+",
-                                    SCDW: "CDW+", MEDIUM: "Cobertura Média", RSA: "Assistência na Estrada",
-                                    APP: "Proteção Aparência", WWI: "Proteção para-brisas", PAI: "Acidentes pessoais",
-                                  };
-                                  const totalExtra = (extra.isTotal ? extra.pricePerDay : extra.pricePerDay * days) * extra.qty;
-                                  return (
-                                    <div key={`e-${idx}`} className="flex justify-between text-xs text-orange-700">
-                                      <span>🛡️ {insNamesBalcao[extra.id] || extra.id}</span>
-                                      <span className="font-bold">R$ {totalExtra.toFixed(2).replace('.', ',')}</span>
-                                    </div>
-                                  );
-                                })}
-
-                                {/* Equipamentos/acessórios */}
-                                {booking?.xrsEquipment?.map((eq: any) => {
-                                  const eqT = parseFloat(eq.totalBRL || 0);
-                                  const eqD = parseFloat(eq.priceBRL || 0);
-                                  const eqTotal = (eqT > 0 ? eqT : eqD * days) * (eq.qty || 1);
-                                  return (
-                                    <div key={`eq-${eq.code}`} className="flex justify-between text-xs text-orange-700">
-                                      <span>{eq.icon || '📦'} {eq.name || eq.code} ×{eq.qty || 1}</span>
-                                      <span className="font-bold">R$ {eqTotal.toFixed(2).replace('.', ',')}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-
-                              <p className="text-[9px] text-orange-600 mt-2 pt-2 border-t border-orange-200 leading-tight">
-                                ⓘ Estes valores são cobrados no balcão na moeda local ({localSymbol}).
-                              </p>
-                            </>
-                          );
-                        })()}
+                        {airportSurchargeBRL > 0 && (
+                          <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                            <span className="text-amber-500 text-xs mt-0.5 shrink-0">✈</span>
+                            <p className="text-[11px] text-amber-800 leading-snug">
+                              <strong>Sobretaxa de aeroporto</strong> (R$ {airportSurchargeBRL.toFixed(2).replace('.', ',')}) foi <strong>descontada</strong> do valor online — será cobrada no balcão de retirada.
+                            </p>
+                          </div>
+                        )}
                       </div>
-                    );
-                  })()}
-                </>
-              ) : (
-                /* ── BALCÃO: tudo junto ── */
-                <>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-bold text-gray-900 text-lg">Total</h3>
-                      <span className="text-xs text-gray-500">A pagar no balcão, na moeda local</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xl font-black text-gray-900">
-                       {(() => {
-                          const vehicleTotal = totalBRL > 0 ? totalBRL : totalRateXRS;
-                          // extrasDetails inclui proteções (xrsInsurances) convertidas para BRL
-                          const insAndExtrasVal = extrasDetails.reduce((s: number, e: any) => {
-                            const val = e.isTotal ? e.pricePerDay : e.pricePerDay * days;
-                            return s + val * e.qty;
-                          }, 0);
-                          const equipVal = (booking?.xrsEquipment || []).reduce((s: number, eq: any) => {
+                    )}
+
+                    {/* ── CARD 2: VALOR PAGO NO DESTINO (NO BALCÃO) ── */}
+                    {balcaoAmountBRL > 0 ? (
+                      <div className="bg-amber-50/80 border-2 border-amber-300 rounded-xl p-3.5 shadow-2xs">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="bg-amber-200 text-amber-900 text-[10px] font-black uppercase px-2 py-0.5 rounded-md">
+                                Pagar no Destino
+                              </span>
+                              <h4 className="font-bold text-amber-950 text-sm">
+                                🏪 Pagamento no Balcão
+                              </h4>
+                            </div>
+                            <p className="text-xs text-amber-800">
+                              Pago presencialmente na retirada do veículo
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-black text-amber-950">
+                              R$ {balcaoAmountBRL.toFixed(2).replace('.', ',')}
+                            </div>
+                            {hasLocal && (
+                              <div className="text-xs font-semibold text-amber-800 mt-0.5">
+                                {toLocalStr(balcaoAmountBRL)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Itens detalhados do balcão */}
+                        <div className="mt-3 pt-2.5 border-t border-amber-200/80 space-y-1">
+                          {airportSurchargeBRL > 0 && (
+                            <div className="flex justify-between text-xs text-amber-900">
+                              <span>✈ Sobretaxa de aeroporto</span>
+                              <span className="font-bold">R$ {airportSurchargeBRL.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                          )}
+
+                          {extrasDetails.map((extra: any, idx: number) => {
+                            const insNamesBalcao: Record<string, string> = {
+                              PREMIUM: "Cobertura Premium", PREMPRE: "Premium Pré-pago", PREMUP: "Premium Plus",
+                              SPCDW: "Super CDW", SPTHW: "Super THW", STHW: "THW+",
+                              SCDW: "CDW+", MEDIUM: "Cobertura Média", RSA: "Assistência na Estrada",
+                              APP: "Proteção Aparência", WWI: "Proteção para-brisas", PAI: "Acidentes pessoais",
+                            };
+                            const totalExtra = (extra.isTotal ? extra.pricePerDay : extra.pricePerDay * days) * extra.qty;
+                            return (
+                              <div key={`e-${idx}`} className="flex justify-between text-xs text-amber-900">
+                                <span>🛡️ {insNamesBalcao[extra.id] || extra.id}</span>
+                                <span className="font-bold">R$ {totalExtra.toFixed(2).replace('.', ',')}</span>
+                              </div>
+                            );
+                          })}
+
+                          {booking?.xrsEquipment?.map((eq: any) => {
                             const eqT = parseFloat(eq.totalBRL || 0);
                             const eqD = parseFloat(eq.priceBRL || 0);
-                            return s + (eqT > 0 ? eqT : eqD * days) * (eq.qty || 1);
-                          }, 0);
-                          return `R$ ${(vehicleTotal + insAndExtrasVal + equipVal).toFixed(2).replace('.', ',')}`;
-                        })()}
+                            const eqTotal = (eqT > 0 ? eqT : eqD * days) * (eq.qty || 1);
+                            return (
+                              <div key={`eq-${eq.code}`} className="flex justify-between text-xs text-amber-900">
+                                <span>{eq.icon || '📦'} {eq.name || eq.code} ×{eq.qty || 1}</span>
+                                <span className="font-bold">R$ {eqTotal.toFixed(2).replace('.', ',')}</span>
+                              </div>
+                            );
+                          })}
+
+                          {isBalcaoOnly && (
+                            <div className="flex justify-between text-xs text-amber-900">
+                              <span>🚗 Aluguel do veículo + taxas</span>
+                              <span className="font-bold">R$ {vehicleTotalBRL.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-3 pt-2 border-t border-amber-200/80 flex items-start gap-1.5 text-[11px] text-amber-800 leading-tight">
+                          <span className="shrink-0 text-amber-600 font-bold">ℹ</span>
+                          <span>
+                            Estes valores serão cobrados diretamente pela <strong>Europcar</strong> no balcão de atendimento na moeda local ({localSymbol}).
+                          </span>
+                        </div>
                       </div>
-                      {totalRateXRS > 0 && currency !== 'BRL' && (() => {
-                        // EUR = MESMO cálculo do total BRL exibido (veículo + extrasDetails + equipamentos)
-                        const vehicleTotal = totalBRL > 0 ? totalBRL : totalRateXRS;
-                        const insAndExtrasVal = extrasDetails.reduce((s: number, e: any) => {
-                          const val = e.isTotal ? e.pricePerDay : e.pricePerDay * days;
-                          return s + val * e.qty;
-                        }, 0);
-                        const equipVal = (booking?.xrsEquipment || []).reduce((s: number, eq: any) => {
-                          const eqT = parseFloat(eq.totalBRL || 0);
-                          const eqD = parseFloat(eq.priceBRL || 0);
-                          return s + (eqT > 0 ? eqT : eqD * days) * (eq.qty || 1);
-                        }, 0);
-                        const fullBRL = vehicleTotal + insAndExtrasVal + equipVal;
-                        const exchRate = parseFloat(car?.exchangeRate || '1');
-                        const fullLocal = exchRate > 0 ? fullBRL / exchRate : fullBRL;
-                        const localSymbol = currency === 'EUR' ? '€' : currency;
-                        return (
-                          <div className="text-xs text-gray-400 mt-0.5">
-                            ≈ {localSymbol} {fullLocal.toFixed(2).replace('.', ',')}
-                          </div>
-                        );
-                      })()}
-                    </div>
+                    ) : (
+                      /* Quando não há nada a pagar no balcão */
+                      !isBalcaoOnly && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[11px] text-gray-500 flex items-center gap-1.5">
+                          <span className="text-green-600 font-bold">✓</span>
+                          <span><strong>Pagar no Balcão:</strong> R$ 0,00 — Nenhum valor adicional a pagar na retirada.</span>
+                        </div>
+                      )
+                    )}
                   </div>
-                </>
-              )}
+                );
+              })()}
             </div>
 
           </div>
