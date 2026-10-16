@@ -21,7 +21,27 @@ export default function PainelFrotaPage() {
   const [catFriendlyName, setCatFriendlyName] = useState("");
   const [catOnRequest, setCatOnRequest] = useState(false);
   const [catSaving, setCatSaving] = useState(false);
+  const [syncingCategories, setSyncingCategories] = useState(false);
   const [catMessage, setCatMessage] = useState<{ type: string; text: string } | null>(null);
+
+  const handleSyncCategories = async () => {
+    setSyncingCategories(true);
+    setCatMessage(null);
+    try {
+      const r = await fetch("/api/cars/sync-categories", { method: "POST" });
+      const d = await r.json();
+      if (d.success) {
+        setCatMessage({ type: "success", text: d.message || "Categorias sincronizadas da XRS!" });
+        await fetchCategories();
+      } else {
+        setCatMessage({ type: "error", text: d.error || d.message || "Erro ao sincronizar categorias" });
+      }
+    } catch {
+      setCatMessage({ type: "error", text: "Erro de conexão ao sincronizar categorias" });
+    } finally {
+      setSyncingCategories(false);
+    }
+  };
 
   const fetchCategories = async () => {
     setCatLoading(true);
@@ -96,10 +116,32 @@ export default function PainelFrotaPage() {
 
       {/* ═══ ON-REQUEST ═══ */}
       <section>
-        <h1 className="text-2xl font-black text-white mb-1">Veículos Sob Consulta (LIMITED)</h1>
-        <p className="text-gray-400 text-sm mb-4">
-          Marque os códigos ACRISS que são <strong className="text-white">on-request</strong>. Eles mostrarão a badge <span className="bg-black text-white text-[9px] font-black px-2 py-0.5 rounded-full">LIMITED</span> e um popup de aviso ao cliente antes de reservar.
-        </p>
+        <div className="flex items-center justify-between mb-1">
+          <h1 className="text-2xl font-black text-white">Veículos Sob Consulta (LIMITED)</h1>
+          <button
+            onClick={handleSyncCategories}
+            disabled={syncingCategories}
+            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 shadow-sm"
+            title="Consulta a API XRS Europcar para descobrir novos códigos ACRISS, nomes de modelos e marcar on-request"
+          >
+            {syncingCategories ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Sincronizando da XRS...
+              </>
+            ) : (
+              "🔄 Sincronizar da XRS"
+            )}
+          </button>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-gray-400 mb-4 gap-2">
+          <p>
+            Marque os códigos ACRISS que são <strong className="text-white">on-request</strong>. Eles mostrarão a badge <span className="bg-black text-white text-[9px] font-black px-2 py-0.5 rounded-full">LIMITED</span> e um popup de aviso ao cliente antes de reservar.
+          </p>
+          <span className="shrink-0 text-emerald-400 font-semibold bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-1 rounded inline-flex items-center gap-1.5" title="Rotina automática diária agendada via cron">
+            <span>⏰</span> Auto: todos os dias às 00:00h
+          </span>
+        </div>
 
         {catMessage && <div className={`mb-4 p-3 rounded-lg border text-sm font-bold ${catMessage.type === "success" ? "bg-green-900/30 border-green-800 text-green-400" : "bg-red-900/30 border-red-800 text-red-400"}`}>{catMessage.text}</div>}
 
