@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório Explicativo: Margens Negativas e Validação de NET — Europcar / Mercatta</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 14mm 14mm 14mm 14mm;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #1e293b;
+      background: #ffffff;
+      font-size: 11pt;
+      line-height: 1.5;
+    }
+    .header {
+      border-bottom: 3px solid #008d36;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .brand-title {
+      font-size: 20pt;
+      font-weight: 900;
+      color: #008d36;
+      letter-spacing: -0.5px;
+    }
+    .brand-subtitle {
+      font-size: 10pt;
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+    }
+    .meta-box {
+      text-align: right;
+      font-size: 9pt;
+      color: #475569;
+    }
+    .meta-box strong {
+      color: #0f172a;
+    }
+    .doc-title-block {
+      background: linear-gradient(135deg, #0b192c 0%, #1e293b 100%);
+      color: white;
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .doc-title-block h1 {
+      font-size: 15pt;
+      font-weight: 800;
+      margin-bottom: 4px;
+      color: #f8fafc;
+    }
+    .doc-title-block p {
+      font-size: 9.5pt;
+      color: #94a3b8;
+    }
+    .section {
+      margin-bottom: 18px;
+      page-break-inside: avoid;
+    }
+    .section-title {
+      font-size: 12pt;
+      font-weight: 800;
+      color: #0f172a;
+      border-left: 4px solid #008d36;
+      padding-left: 10px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .summary-card {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-left: 4px solid #16a34a;
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 10pt;
+      color: #14532d;
+    }
+    .summary-card strong {
+      color: #166534;
+    }
+    .formula-box {
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      padding: 12px 16px;
+      border-radius: 6px;
+      text-align: center;
+      margin: 12px 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 10.5pt;
+      color: #0f172a;
+    }
+    .formula-box span.highlight {
+      color: #008d36;
+      font-weight: 700;
+    }
+    .reasons-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 12px 0;
+    }
+    .reason-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 12px 14px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .reason-card.featured {
+      border-left: 4px solid #e67e00;
+      background: #fffdfa;
+    }
+    .reason-header {
+      font-weight: 700;
+      font-size: 10.5pt;
+      color: #0f172a;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .reason-desc {
+      font-size: 9.5pt;
+      color: #475569;
+      line-height: 1.45;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9pt;
+      margin-top: 8px;
+      margin-bottom: 12px;
+    }
+    th {
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: 700;
+      text-align: left;
+      padding: 8px 10px;
+      border: 1px solid #cbd5e1;
+    }
+    td {
+      padding: 8px 10px;
+      border: 1px solid #e2e8f0;
+      color: #1e293b;
+    }
+    tr:nth-child(even) {
+      background: #f8fafc;
+    }
+    .badge-error {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #fee2e2;
+      color: #991b1b;
+      font-weight: 700;
+      font-size: 8pt;
+      text-transform: uppercase;
+      border: 1px solid #fecaca;
+    }
+    .badge-warn {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #ffedd5;
+      color: #9a3412;
+      font-weight: 700;
+      font-size: 8pt;
+      text-transform: uppercase;
+      border: 1px solid #fed7aa;
+    }
+    .step-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-left: 4px solid #2563eb;
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-top: 14px;
+      font-size: 9.5pt;
+      color: #1e3a8a;
+    }
+    .step-box ol {
+      margin-left: 18px;
+      margin-top: 6px;
+    }
+    .step-box li {
+      margin-bottom: 4px;
+    }
+    .footer {
+      margin-top: 25px;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8pt;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- CABEÇALHO CORPORATIVO -->
+  <div class="header">
+    <div>
+      <div class="brand-title">EUROPCAR BRASIL</div>
+      <div class="brand-subtitle">Mercatta Tecnologia &middot; Painel Administrativo de Comissões</div>
+    </div>
+    <div class="meta-box">
+      <div><strong>Destinatário:</strong> Luiz (Diretoria / Gestão)</div>
+      <div><strong>Assunto:</strong> Relatório de Margens e Custo NET (API XRS)</div>
+      <div><strong>Data:</strong> Outubro de 2026 &middot; <strong>Status:</strong> Informativo Oficial</div>
+    </div>
+  </div>
+
+  <!-- TÍTULO DO DOCUMENTO -->
+  <div class="doc-title-block">
+    <h1>Por que aparecem "Margens Negativas" e o aviso "SEM NET REAL"?</h1>
+    <p>Esclarecimento técnico e operacional sobre a trava de integridade contábil nas reservas reconsultadas via API.</p>
+  </div>
+
+  <!-- RESUMO EXECUTIVO -->
+  <div class="summary-card">
+    <strong>RESUMO EXECUTIVO:</strong><br>
+    Nenhuma venda da Mercatta foi realizada com prejuízo. No contrato ETO ("Pagar Agora"), o site sempre aplica a margem de lucro positiva configurada (ex: 15%, 20%, 25%) sobre o custo líquido da diária.
+    <br><br>
+    O aviso <span class="badge-warn">SEM NET REAL &middot; Resultado Implaus&iacute;vel</span> é uma <strong>trava de segurança do sistema</strong> ativada para proteger os números da empresa: ele impede que valores distorcidos por adições de balcão ou flutuação cambial gerem prejuízos falsos ou cálculos incorretos de comissão.
+  </div>
+
+  <!-- SEÇÃO 1: A FÓRMULA -->
+  <div class="section">
+    <div class="section-title">1. Como o Sistema Calcula a Margem no Relatório</div>
+    <p style="font-size: 9.5pt; color: #475569;">
+      Para reservas antigas (que foram emitidas antes de o sistema registrar o custo exato no segundo da compra), o painel roda uma rotina de sincronização (<em>Backfill</em>) que consulta a reserva diretamente na API Europcar (XRS):
+    </p>
+
+    <div class="formula-box">
+      <strong>Markup (R$)</strong> = Valor Cobrado do Cliente Online &minus; <span class="highlight">Custo NET devolvido pelo XRS</span><br>
+      <strong>Margem (%)</strong> = (Markup &divide; Custo NET) &times; 100
+    </div>
+
+    <p style="font-size: 9.5pt; color: #475569;">
+      Quando o cálculo resulta em um percentual negativo (ex: <strong>-1,4%</strong>, <strong>-17,8%</strong>, <strong>-24,0%</strong>), a conta matemática indica apenas uma coisa: <strong>o valor total que a API Europcar devolveu hoje na consulta é maior do que o cliente pagou no site na data da compra</strong>.
+    </p>
+  </div>
+
+  <!-- SEÇÃO 2: POR QUE O VALOR DA API FICOU MAIOR? -->
+  <div class="section">
+    <div class="section-title">2. As 3 Causas Reais da Divergência na Consulta</div>
+    
+    <div class="reasons-grid">
+      <div class="reason-card featured">
+        <div class="reason-header">
+          <span>🚗</span> 1ª Causa Principal: Itens Adicionados no Balcão da Loja (Check-out)
+        </div>
+        <div class="reason-desc">
+          Observe que reservas com essa divergência já estão com status <strong>CO (Checked Out)</strong> ou <strong>S (Sold)</strong>. Quando o cliente retira o carro na Europa e contrata qualquer adicional no balcão (upgrade de carro, condutor adicional, GPS, combustível pré-pago, pedágios locais ou extensão de diária), a Europcar <strong>atualiza a cotação total da reserva dentro do XRS</strong>.<br>
+          Como nosso sistema guardou apenas o valor original cobrado online, ao consultar o XRS hoje o custo total da locadora aparece inflado com os extras do balcão, gerando a falsa impressão de custo maior que a venda online.
+        </div>
+      </div>
+
+      <div class="reason-card">
+        <div class="reason-header">
+          <span>💱</span> 2ª Causa: Flutuação Cambial (Câmbio BRL &times; EUR / CHF)
+        </div>
+        <div class="reason-desc">
+          As reservas exibidas no print são internacionais (Portugal <code>LISC07</code>, <code>LIST01</code> e Holanda <code>AMST02</code>), cujo custo original na locadora é em <strong>Euros (EUR)</strong>. O cliente pagou em Reais com o câmbio da época da compra. Quando a API é reconsultada semanas depois, o XRS converte o valor em Euros para Reais com a <strong>cotação cambial do dia da reconsulta</strong>. Se o Euro valorizou perante o Real no período, o valor em BRL devolvido pelo XRS fica superior ao valor em Reais pago pelo cliente na época.
+        </div>
+      </div>
+
+      <div class="reason-card">
+        <div class="reason-header">
+          <span>🏢</span> 3ª Causa: Taxas Locais de Aeroporto e Estação Embutidas na Cotação Cheia
+        </div>
+        <div class="reason-desc">
+          Em determinadas estações europeias, a API XRS devolve o nó <code>totalRateEstimate</code> somando taxas de aeroporto e sobretaxas locais que contratualmente são pagas no balcão pelo cliente, distorcendo o custo líquido isolado da diária.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO 3: CASOS REAIS DO PRINT -->
+  <div class="section">
+    <div class="section-title">3. Análise dos Casos Reais Apontados no Painel</div>
+    
+    <table>
+      <thead>
+        <tr>
+          <th>Nº Reserva</th>
+          <th>Cliente</th>
+          <th>Estação</th>
+          <th>Status</th>
+          <th>Valor Pago</th>
+          <th>Retorno da API XRS</th>
+          <th>Motivo da Trava</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>1207187629</strong></td>
+          <td>Lourdes Santos</td>
+          <td>LISC07 (Lisboa)</td>
+          <td><span class="badge-warn">CO - Checked Out</span></td>
+          <td>R$ 734,42</td>
+          <td>R$ 744,80</td>
+          <td><span class="badge-error">-1,4%</span> Câmbio / taxa local</td>
+        </tr>
+        <tr>
+          <td><strong>1207149607</strong></td>
+          <td>Masaki Kitano</td>
+          <td>LIST01 (Aerop. Lisboa)</td>
+          <td><span class="badge-warn">S - Sold</span></td>
+          <td>R$ 1.235,93</td>
+          <td>R$ 1.455,90</td>
+          <td><span class="badge-error">-17,8%</span> Item de balcão / aeroporto</td>
+        </tr>
+        <tr>
+          <td><strong>1207146560</strong></td>
+          <td>Marcus Aurelio</td>
+          <td>AMST02 (Amsterdã)</td>
+          <td><span class="badge-warn">S - Sold</span></td>
+          <td>R$ 1.117,25</td>
+          <td>R$ 1.385,40</td>
+          <td><span class="badge-error">-24,0%</span> Item de balcão / upgrade</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SEÇÃO 4: A TRAVA DE SEGURANÇA E O PROCEDIMENTO OFICIAL -->
+  <div class="section">
+    <div class="section-title">4. Por que a Trava é Essencial e Como Validar Oficialmente</div>
+    <p style="font-size: 9.5pt; color: #475569;">
+      Para evitar que números incorretos entrem nos relatórios contábeis da Mercatta, o código possui a seguinte regra de corte:
+      <code style="background:#f1f5f9; padding:2px 5px; border-radius:3px; color:#c026d3;">if (pct &lt; -0.5 || pct &gt; 80) return "Resultado implausível — conferir manualmente"</code>.
+      O sistema recusa-se a gravar margem negativa porque sabe que o valor devolvido pela API não é o custo de venda original.
+    </p>
+
+    <div class="step-box">
+      <strong>PROCEDIMENTO OPERACIONAL PADRÃO (Conciliação Financeira):</strong>
+      <ol>
+        <li>No painel de comissões, acesse a aba <strong>"Importar NET"</strong>.</li>
+        <li>Consulte o extrato oficial de faturamento mensal enviado pela Europcar (relatório <strong>Greenway / Click4</strong>), que contém o valor NET exato faturado para cada número de reserva.</li>
+        <li>Insira o valor NET oficial da reserva ou suba a planilha mensal.</li>
+        <li>O sistema substitui automaticamente a estimativa da API pelo valor auditado da locadora, calculando o markup exato e liberando a comissão devida sem distorções.</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- RODAPÉ -->
+  <div class="footer">
+    <div>Mercatta Tecnologia &middot; Plataforma Europcar Brasil</div>
+    <div>Documento gerado para alinhamento de diretoria e conciliação financeira</div>
+  </div>
+
+</body>
+</html>

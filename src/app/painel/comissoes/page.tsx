@@ -123,6 +123,34 @@ export default function PainelComissoes() {
       fetchReport();
    };
 
+   // Aplica a margem nominal (25%) para destravar reservas sem NET real com 1 clique
+   const [applyingNominal, setApplyingNominal] = useState<string | boolean>(false);
+   const handleApplyNominalMargin = async (resNumber?: string) => {
+      const confirmMsg = resNumber
+         ? `Deseja aplicar a margem nominal (25%) na reserva ${resNumber} para destravar o cálculo?`
+         : `Deseja aplicar a margem nominal (25%) em todas as reservas sem NET real pendentes?`;
+      if (!confirm(confirmMsg)) return;
+
+      setApplyingNominal(resNumber || true);
+      try {
+         const res = await fetch('/api/admin/comissoes/apply-nominal-margin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(resNumber ? { resNumber } : { applyAllSemNet: true }),
+         });
+         const d = await res.json();
+         if (!res.ok || d.error) {
+            alert(`Erro: ${d.error || 'Falha ao aplicar margem'}`);
+         } else {
+            fetchReport();
+         }
+      } catch (err: any) {
+         alert(`Erro de conexão: ${err.message}`);
+      } finally {
+         setApplyingNominal(false);
+      }
+   };
+
    // Ao abrir a tela, busca automaticamente no XRS o NET real das reservas que ainda não têm (uma vez por visita)
    const autoBackfillDone = useRef(false);
    useEffect(() => {
@@ -204,7 +232,7 @@ export default function PainelComissoes() {
             r.resNumber || '', new Date(r.createdAt).toLocaleDateString('pt-BR'), `${p?.nome || ''} ${p?.sobrenome || ''}`.trim(),
             r.tipoPagamento, `${opOf(r)} - ${OP_STATUS[opOf(r)]?.label || ''}`, n(r.valorCalculado), n(r.netBRL), n(r.netLocal), r.netCurrency || '',
             r.markupPercent == null ? '' : String(r.markupPercent).replace('.', ','), n(r.markupBRL), r.cupom || '', n(r.descontoCupom), n(r.markupLiquidoBRL), n(commissionOf(r)),
-            r.semNetReal ? `SEM NET REAL${r.netErro ? ` (${r.netErro})` : ''}` : r.netSource === 'XRS_QUOTE' ? 'API (registrado na venda)' : r.netSource === 'XRS_BACKFILL' ? 'API (reconsultado no XRS)' : r.netSource === 'EUROPCAR_EXTRATO' ? 'Europcar (extrato oficial)' : r.netSource === 'SEM_MARKUP' ? 'Tarifa sem markup (POA)' : '',
+            r.semNetReal ? `SEM NET REAL${r.netErro ? ` (${r.netErro})` : ''}` : r.netSource === 'XRS_QUOTE' ? 'API (registrado na venda)' : r.netSource === 'XRS_BACKFILL' ? 'API (reconsultado no XRS)' : r.netSource === 'EUROPCAR_EXTRATO' ? 'Europcar (extrato oficial)' : r.netSource === 'NOMINAL_FALLBACK' ? 'Margem Nominal (25%)' : r.netSource === 'SEM_MARKUP' ? 'Tarifa sem markup (POA)' : '',
          ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(';');
       });
       const blob = new Blob(['\uFEFF' + [header.join(';'), ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -401,6 +429,14 @@ export default function PainelComissoes() {
                                  Tentar de novo as falhas
                               </button>
                            )}
+                           <button
+                              onClick={() => handleApplyNominalMargin()}
+                              disabled={!!applyingNominal || backfilling}
+                              className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-1.5 shadow-sm"
+                              title="Aplica a margem nominal (25%) em todas as reservas sem NET real para destravar a comissão"
+                           >
+                              {applyingNominal === true ? '⏳ Aplicando...' : '⚡ Aplicar margem nominal (25%) em lote'}
+                           </button>
                         </div>
                      </div>
                      {backfillFails.length > 0 && (
@@ -542,12 +578,26 @@ export default function PainelComissoes() {
                                              <div className="text-[10px] font-bold text-red-400 uppercase" title={res.netErro || ''}>
                                                 Sem NET real
                                                 {res.netErro && <div className="normal-case font-normal text-red-300/80 max-w-[180px] ml-auto">{res.netErro}</div>}
+                                                <button
+                                                   type="button"
+                                                   onClick={() => handleApplyNominalMargin(res.resNumber)}
+                                                   disabled={applyingNominal === res.resNumber || !!applyingNominal}
+                                                   className="mt-1.5 inline-block bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold px-2 py-0.5 rounded text-[9px] normal-case tracking-normal transition-colors cursor-pointer shadow-sm"
+                                                   title="Aplica a margem nominal de 25% para calcular o NET e destravar a comissão desta reserva"
+                                                >
+                                                   {applyingNominal === res.resNumber ? '⏳ Aplicando...' : '⚡ Aplicar margem 25%'}
+                                                </button>
                                              </div>
                                           ) : res.netBRL == null ? (
                                              <span className="text-gray-600">—</span>
                                           ) : (
                                              <>
-                                                <div className="font-bold text-slate-200">{fmt(res.netBRL)}</div>
+                                                <div className="font-bold text-slate-200">
+                                                   {fmt(res.netBRL)}
+                                                   {res.netSource === 'NOMINAL_FALLBACK' && (
+                                                      <span className="ml-1 text-[9px] font-normal text-emerald-400 bg-emerald-950/60 border border-emerald-700/50 px-1 py-0.5 rounded" title="NET calculado com margem nominal de 25%">nominal</span>
+                                                   )}
+                                                </div>
                                                 {res.netLocal != null && res.netCurrency && res.netCurrency !== 'BRL' && (
                                                    <div className="text-[10px] text-gray-500">{res.netCurrency} {res.netLocal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
                                                 )}

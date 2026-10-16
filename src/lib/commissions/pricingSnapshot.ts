@@ -22,7 +22,7 @@ export interface PricingSnapshot {
   markupPercent: number;
   markupBRL: number;
   capturedAt: string;
-  source: 'XRS_QUOTE' | 'XRS_BACKFILL' | 'EUROPCAR_EXTRATO' | 'SEM_MARKUP';
+  source: 'XRS_QUOTE' | 'XRS_BACKFILL' | 'EUROPCAR_EXTRATO' | 'NOMINAL_FALLBACK' | 'SEM_MARKUP';
 }
 
 const num = (v: any): number => {
@@ -213,3 +213,37 @@ export function buildManualSnapshot(
     },
   };
 }
+
+/**
+ * Snapshot calculando o NET retroativamente a partir da margem nominal (ex.: 25%):
+ * NET = gross / (1 + marginPercent / 100)
+ * Markup = gross - NET
+ */
+export function buildNominalMarginSnapshot(
+  customerData: any,
+  amountInCents: number | null | undefined,
+  marginPercentInput?: number
+): { snapshot: PricingSnapshot; grossBRL: number } | { error: string } {
+  const cd = customerData || {};
+  const booking = cd.booking || {};
+  const gross = round2((amountInCents || 0) / 100 + counterChargesBRL(booking));
+  if (gross <= 0) return { error: 'Reserva sem valor cobrado' };
+
+  const margin = marginPercentInput && marginPercentInput > 0 ? marginPercentInput : 25;
+  const netBRL = round2(gross / (1 + (margin / 100)));
+  const markupBRL = round2(gross - netBRL);
+
+  return {
+    grossBRL: gross,
+    snapshot: {
+      netBRL,
+      netLocal: null,
+      netCurrency: 'BRL',
+      markupPercent: round2(margin),
+      markupBRL,
+      capturedAt: new Date().toISOString(),
+      source: 'NOMINAL_FALLBACK',
+    },
+  };
+}
+
