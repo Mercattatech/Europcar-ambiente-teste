@@ -218,6 +218,8 @@ export async function GET(request: Request) {
       countryName: s.countryName,
       prestige: s.flag_prestige,
       address1: s.address1,
+      address2: s.address2,
+      postalCode: s.postalCode,
       latitude: s.latitude,
       longitude: s.longitude,
       truckAvailable: s.isTruckAvailable,
@@ -312,6 +314,7 @@ export async function GET(request: Request) {
        (code.length >= 4 && (code[3] === 'T' || code[3] === 'O')) ||
        /\b(airport|aeroporto|aeropuerto|flughafen|aéroport)\b/i.test(name));
 
+    const fullAddress = [s.address1, s.address2, s.postalCode].map(x => (x || '').trim()).filter(Boolean).join(', ');
     return {
       code,
       name,
@@ -319,7 +322,7 @@ export async function GET(request: Request) {
       country: COUNTRY_NAMES[s.countryCode] ?? s.countryName ?? s.countryCode ?? '',
       countryCode: s.countryCode ?? '',
       type: isAirport ? 'airport' : 'city',
-      address: s.address1 ?? s.address ?? '',
+      address: fullAddress || s.address1 || s.address || '',
       features: s.features ?? [],
       hours: s.hours ?? [],
     };

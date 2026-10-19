@@ -14,6 +14,8 @@ export default function CheckoutPage() {
   const [carCategoryOverrides, setCarCategoryOverrides] = useState<Record<string, string>>({});
   const [pickupStationName, setPickupStationName] = useState<string>("");
   const [returnStationName, setReturnStationName] = useState<string>("");
+  const [pickupStationAddress, setPickupStationAddress] = useState<string>("");
+  const [returnStationAddress, setReturnStationAddress] = useState<string>("");
 
   // Condutor
   const [nome, setNome] = useState("");
@@ -174,6 +176,8 @@ export default function CheckoutPage() {
       setBooking(parsed);
       if (parsed.pickupStationName) setPickupStationName(parsed.pickupStationName);
       if (parsed.returnStationName) setReturnStationName(parsed.returnStationName);
+      if (parsed.pickupStationAddress) setPickupStationAddress(parsed.pickupStationAddress);
+      if (parsed.returnStationAddress) setReturnStationAddress(parsed.returnStationAddress);
       // ETO tariff: force payment method to CREDIT (no Balcão allowed)
       if (parsed.tariffType === 'ETO' && paymentMethod === 'BALCAO') {
         setPaymentMethod('CREDIT');
@@ -253,33 +257,36 @@ export default function CheckoutPage() {
       .catch(console.error);
   }, []);
 
-  // Resolução de nomes amigáveis para as estações caso não tenham vindo no payload
+  // Resolução de nomes amigáveis e endereços para as estações caso não tenham vindo no payload
   useEffect(() => {
     const pickup = booking?.pickupStation || booking?.car?.pickupLoc;
     const ret = booking?.returnStation || pickup;
-    if (pickup && !pickupStationName) {
+    if (pickup && (!pickupStationName || !pickupStationAddress)) {
       fetch(`/api/europcar/getStations?q=${pickup}`)
         .then(r => r.json())
         .then(d => {
-          const s = d.stations?.find((x: any) => x.code === pickup);
-          if (s?.name) setPickupStationName(s.name);
+          const s = d.stations?.find((x: any) => x.code === pickup) || d.stations?.[0];
+          if (s?.name && !pickupStationName) setPickupStationName(s.name);
+          if (s?.address) setPickupStationAddress(s.address);
         })
         .catch(() => { });
     }
-    if (ret && !returnStationName) {
-      if (ret === pickup && pickupStationName) {
-        setReturnStationName(pickupStationName);
+    if (ret && (!returnStationName || !returnStationAddress)) {
+      if (ret === pickup) {
+        if (pickupStationName && !returnStationName) setReturnStationName(pickupStationName);
+        if (pickupStationAddress && !returnStationAddress) setReturnStationAddress(pickupStationAddress);
       } else {
         fetch(`/api/europcar/getStations?q=${ret}`)
           .then(r => r.json())
           .then(d => {
-            const s = d.stations?.find((x: any) => x.code === ret);
-            if (s?.name) setReturnStationName(s.name);
+            const s = d.stations?.find((x: any) => x.code === ret) || d.stations?.[0];
+            if (s?.name && !returnStationName) setReturnStationName(s.name);
+            if (s?.address) setReturnStationAddress(s.address);
           })
           .catch(() => { });
       }
     }
-  }, [booking, pickupStationName, returnStationName]);
+  }, [booking, pickupStationName, returnStationName, pickupStationAddress, returnStationAddress]);
 
   // Carrega o script Braspag MPI para autenticação 3DS 2.2.
   //
@@ -649,8 +656,11 @@ export default function CheckoutPage() {
   // Pickup/return info
   const pickupStation = booking.pickupStation || car.pickupLoc || "";
   const returnStation = booking.returnStation || booking.pickupStation || "";
+  const isSameStation = !returnStation || returnStation === pickupStation;
   const displayPickupStationName = pickupStationName || booking.pickupStationName || pickupStation;
-  const displayReturnStationName = returnStationName || booking.returnStationName || (returnStation === pickupStation ? displayPickupStationName : returnStation);
+  const displayReturnStationName = returnStationName || booking.returnStationName || (isSameStation ? displayPickupStationName : returnStation);
+  const displayPickupStationAddress = pickupStationAddress || booking.pickupStationAddress || booking.pickupAddress || "";
+  const displayReturnStationAddress = returnStationAddress || booking.returnStationAddress || booking.returnAddress || (isSameStation ? displayPickupStationAddress : "");
   const pickupDate = booking.pickupDate || "";
   const returnDate = booking.returnDate || "";
   const pickupTime = booking.pickupTime || "1000";
@@ -1327,9 +1337,11 @@ export default function CheckoutPage() {
                   <span className="text-gray-500 font-bold">Retirada</span>
                   <span className="font-black text-gray-900 text-right">
                     {displayPickupStationName}
-                    {pickupStation && displayPickupStationName !== pickupStation && (
+                    {displayPickupStationAddress ? (
+                      <span className="text-[10px] text-gray-500 font-normal block">📍 {displayPickupStationAddress}</span>
+                    ) : pickupStation && displayPickupStationName !== pickupStation ? (
                       <span className="text-[10px] text-gray-400 font-normal block">({pickupStation})</span>
-                    )}
+                    ) : null}
                     <span className="font-normal text-gray-500 block">{formatDate(pickupDate)}</span>
                   </span>
                 </div>
@@ -1337,9 +1349,11 @@ export default function CheckoutPage() {
                   <span className="text-gray-500 font-bold">Devolução</span>
                   <span className="font-black text-gray-900 text-right">
                     {displayReturnStationName}
-                    {(returnStation || pickupStation) && displayReturnStationName !== (returnStation || pickupStation) && (
+                    {!isSameStation && displayReturnStationAddress ? (
+                      <span className="text-[10px] text-gray-500 font-normal block">📍 {displayReturnStationAddress}</span>
+                    ) : !isSameStation && (returnStation || pickupStation) && displayReturnStationName !== (returnStation || pickupStation) ? (
                       <span className="text-[10px] text-gray-400 font-normal block">({returnStation || pickupStation})</span>
-                    )}
+                    ) : null}
                     <span className="font-normal text-gray-500 block">{formatDate(returnDate)}</span>
                   </span>
                 </div>
@@ -1924,42 +1938,10 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Tarifa por X diárias + preço */}
-              <div className="flex justify-between items-center text-sm text-gray-700 mb-1">
-                <span className="font-medium">
-                  {hasContract ? 'Tarifa contratada' : 'Tarifa'} (por {formatRentalDays(days)})
-                </span>
-                <span className="font-bold">
-                  {totalBRL > 0
-                    ? `R$ ${totalBRL.toFixed(2).replace('.', ',')}`
-                    : `${currency} ${totalRateXRS.toFixed(2).replace('.', ',')}`}
-                </span>
+              {/* Total de diárias contratadas */}
+              <div className="text-sm font-semibold text-gray-700 mb-2">
+                ({days} {days === 1 ? 'diária contratada' : 'diárias contratadas'})
               </div>
-
-              {/* Economia com contrato */}
-              {hasDiscountValue && (
-                <div className="flex justify-between items-center text-xs text-green-700 bg-green-50 rounded px-2 py-1 mb-1">
-                  <span className="font-bold">💰 Economia com contrato</span>
-                  <span className="font-bold">
-                    - {currency} {discountXRS.toFixed(2).replace('.', ',')}{discountBRL > 0 ? ` / -R$ ${discountBRL.toFixed(2).replace('.', ',')}` : ''}
-                  </span>
-                </div>
-              )}
-
-              {/* Preço original riscado */}
-              {hasDiscountValue && (
-                <div className="flex justify-between text-xs text-gray-400 line-through mb-1">
-                  <span>Preço sem contrato</span>
-                  <span>{currency} {standardTotalXRS.toFixed(2).replace('.', ',')}</span>
-                </div>
-              )}
-
-              {/* Câmbio */}
-              {car.exchangeRate && (
-                <div className="text-[10px] text-gray-400 mb-2">
-                  Câmbio: 1 {currency} = {bookingCurrency} {parseFloat(car.exchangeRate).toFixed(4)}
-                </div>
-              )}
 
               {/* O QUE ESTÁ INCLUÍDO? — colapsável */}
               <button
@@ -2004,18 +1986,26 @@ export default function CheckoutPage() {
                 <div className="p-3 border-b border-gray-100">
                   <div className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Retirada</div>
                   <div className="text-sm font-bold text-gray-900 leading-snug">{displayPickupStationName}</div>
-                  {pickupStation && displayPickupStationName !== pickupStation && (
+                  {displayPickupStationAddress ? (
+                    <div className="text-[11px] text-gray-500 font-normal mt-0.5 leading-tight">
+                      📍 {displayPickupStationAddress}
+                    </div>
+                  ) : pickupStation && displayPickupStationName !== pickupStation ? (
                     <div className="text-[11px] text-gray-400 font-medium">({pickupStation})</div>
-                  )}
-                  <div className="text-xs text-gray-500 mt-0.5">{formatDate(pickupDate)} · {(booking.pickupTime || '1000').slice(0,2)}:{(booking.pickupTime || '1000').slice(2)}</div>
+                  ) : null}
+                  <div className="text-xs text-gray-500 mt-1">{formatDate(pickupDate)} · {(booking.pickupTime || '1000').slice(0,2)}:{(booking.pickupTime || '1000').slice(2)}</div>
                 </div>
                 <div className="p-3">
                   <div className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Devolução</div>
                   <div className="text-sm font-bold text-gray-900 leading-snug">{displayReturnStationName}</div>
-                  {(returnStation || pickupStation) && displayReturnStationName !== (returnStation || pickupStation) && (
+                  {!isSameStation && displayReturnStationAddress ? (
+                    <div className="text-[11px] text-gray-500 font-normal mt-0.5 leading-tight">
+                      📍 {displayReturnStationAddress}
+                    </div>
+                  ) : !isSameStation && (returnStation || pickupStation) && displayReturnStationName !== (returnStation || pickupStation) ? (
                     <div className="text-[11px] text-gray-400 font-medium">({returnStation || pickupStation})</div>
-                  )}
-                  <div className="text-xs text-gray-500 mt-0.5">{formatDate(returnDate)} · {(booking.returnTime || '1000').slice(0,2)}:{(booking.returnTime || '1000').slice(2)}</div>
+                  ) : null}
+                  <div className="text-xs text-gray-500 mt-1">{formatDate(returnDate)} · {(booking.returnTime || '1000').slice(0,2)}:{(booking.returnTime || '1000').slice(2)}</div>
                 </div>
               </div>
 
