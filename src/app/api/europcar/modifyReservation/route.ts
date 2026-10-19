@@ -37,6 +37,25 @@ export async function POST(request: Request) {
       if (!access.ok) {
         return NextResponse.json({ error: access.error }, { status: access.status });
       }
+
+      // Impedir modificação se o veículo já foi retirado, entregue ou cancelado
+      const localRes = await prisma.localReservation.findUnique({
+        where: { resNumber: String(resNumber) }
+      });
+      if (localRes) {
+        if (localRes.status === 'CHECKED_OUT' || localRes.operationalStatus === 'CO') {
+          return NextResponse.json(
+            { error: 'Não é possível modificar uma reserva cujo veículo já foi retirado ou entregue.' },
+            { status: 400 }
+          );
+        }
+        if (localRes.status === 'CANCELLED' || localRes.status === 'CANCELLED_GREENWAY' || localRes.status === 'ON_REQUEST_REJECTED') {
+          return NextResponse.json(
+            { error: 'Não é possível modificar uma reserva que já foi cancelada.' },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     // Validate dates/times if provided

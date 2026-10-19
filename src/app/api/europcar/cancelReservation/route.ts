@@ -28,6 +28,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
+    // Impedir cancelamento se o veículo já foi retirado ou entregue
+    const localRes = await prisma.localReservation.findUnique({
+      where: { resNumber: String(resNumber) }
+    });
+    if (localRes) {
+      if (localRes.status === 'CHECKED_OUT' || localRes.operationalStatus === 'CO') {
+        return NextResponse.json(
+          { error: 'Não é possível cancelar uma reserva cujo veículo já foi retirado ou entregue.' },
+          { status: 400 }
+        );
+      }
+    }
+
     const { hasError, returnCode, errorMsg, raw: xrsResponse } = await cancelXRSReservation(resNumber);
 
     if (hasError) {

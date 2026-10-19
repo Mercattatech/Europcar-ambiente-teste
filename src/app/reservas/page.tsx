@@ -65,15 +65,102 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
   ON_REQUEST:            { label: '⏳ Sob Consulta',   color: 'text-blue-400',    bg: 'bg-blue-400/10 border-blue-400/30' },
   ON_REQUEST_REJECTED:   { label: '❌ Recusada (OR)',  color: 'text-orange-400',  bg: 'bg-orange-400/10 border-orange-400/30' },
   CANCELLED:             { label: 'Cancelada',         color: 'text-red-400',     bg: 'bg-red-400/10 border-red-400/30' },
+  CANCELLED_GREENWAY:    { label: 'Cancelada',         color: 'text-red-400',     bg: 'bg-red-400/10 border-red-400/30' },
+  NO_SHOW:               { label: 'Não Compareceu',    color: 'text-gray-400',    bg: 'bg-gray-400/10 border-gray-400/30' },
+  CHECKED_OUT:           { label: '🚗 Veículo Retirado', color: 'text-purple-300', bg: 'bg-purple-500/20 border-purple-500/40' },
 };
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, isReturned }: { status: string; isReturned?: boolean }) {
+  if (status === 'CHECKED_OUT' && isReturned) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border text-gray-300 bg-gray-700/40 border-gray-600/40">
+        🏁 Locação Concluída
+      </span>
+    );
+  }
   const s = STATUS_MAP[status] || { label: status, color: 'text-gray-400', bg: 'bg-gray-400/10 border-gray-400/30' };
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${s.color} ${s.bg}`}>
       {s.label}
     </span>
   );
+}
+
+function parseReservationDateTime(d?: string, t?: string): Date | null {
+  if (!d) return null;
+  const cleanD = d.replace(/\D/g, '');
+  if (cleanD.length !== 8) return null;
+  const y = parseInt(cleanD.slice(0, 4), 10);
+  const m = parseInt(cleanD.slice(4, 6), 10) - 1;
+  const day = parseInt(cleanD.slice(6, 8), 10);
+  let h = 0;
+  let min = 0;
+  if (t) {
+    const cleanT = t.replace(/\D/g, '');
+    if (cleanT.length >= 2) h = parseInt(cleanT.slice(0, 2), 10);
+    if (cleanT.length >= 4) min = parseInt(cleanT.slice(2, 4), 10);
+  }
+  return new Date(y, m, day, h, min);
+}
+
+function getReservationRentalState(r: Reserva): {
+  isPickedUpOrReturned: boolean;
+  isReturned: boolean;
+  isPickedUp: boolean;
+  isNoShow: boolean;
+  noticeTitle?: string;
+  noticeDesc?: string;
+} {
+  const isCancelled = r.status === 'CANCELLED' || r.status === 'CANCELLED_GREENWAY' || r.status === 'ON_REQUEST_REJECTED';
+  if (isCancelled) {
+    return { isPickedUpOrReturned: false, isReturned: false, isPickedUp: false, isNoShow: false };
+  }
+
+  const isNoShow = r.status === 'NO_SHOW';
+  if (isNoShow) {
+    return {
+      isPickedUpOrReturned: true,
+      isReturned: false,
+      isPickedUp: false,
+      isNoShow: true,
+      noticeTitle: 'Reserva não comparecida (No-show)',
+      noticeDesc: 'O horário previsto para a retirada expirou sem comparecimento ao balcão. Não é mais possível modificar ou cancelar.'
+    };
+  }
+
+  const isCheckedOut = r.status === 'CHECKED_OUT';
+  const now = new Date();
+  const pickupDt = parseReservationDateTime(r.pickupDate, r.pickupTime);
+  const returnDt = parseReservationDateTime(r.returnDate, r.returnTime);
+
+  const isPastReturn = returnDt ? now.getTime() > returnDt.getTime() : false;
+  const isPastPickup = pickupDt ? now.getTime() > pickupDt.getTime() : false;
+
+  // Se já passou da data de devolução (ou status CHECKED_OUT e data devolução passada)
+  if (isPastReturn) {
+    return {
+      isPickedUpOrReturned: true,
+      isReturned: true,
+      isPickedUp: false,
+      isNoShow: false,
+      noticeTitle: 'Veículo já entregue (locação finalizada)',
+      noticeDesc: 'Esta locação foi concluída. As opções de alteração e cancelamento não estão mais disponíveis para esta reserva.'
+    };
+  }
+
+  // Se o status é CHECKED_OUT ou a data/hora de retirada já passou
+  if (isCheckedOut || isPastPickup) {
+    return {
+      isPickedUpOrReturned: true,
+      isReturned: false,
+      isPickedUp: true,
+      isNoShow: false,
+      noticeTitle: 'Veículo já retirado (locação em andamento)',
+      noticeDesc: 'A alteração ou cancelamento da reserva só é permitida antes da retirada do veículo. Caso necessite de qualquer assistência, alteração de devolução ou suporte durante a sua locação, por favor dirija-se ou entre em contato diretamente com o balcão da estação Europcar.'
+    };
+  }
+
+  return { isPickedUpOrReturned: false, isReturned: false, isPickedUp: false, isNoShow: false };
 }
 
 // ─── Modal Components ─────────────────────────────────────────────────────────
@@ -811,7 +898,8 @@ export default function MeuPerfil() {
               {!loading && reservas.length > 0 && (
                 <div className="grid gap-4">
                   {reservas.map(r => {
-                    const isCancelled = r.status === 'CANCELLED';
+                    const isCancelled = r.status === 'CANCELLED' || r.status === 'CANCELLED_GREENWAY' || r.status === 'ON_REQUEST_REJECTED';
+                    const rentalState = getReservationRentalState(r);
                     return (
                       <div
                         key={r.id}
@@ -823,7 +911,7 @@ export default function MeuPerfil() {
                               <span className="font-mono font-bold text-white text-lg">
                                 {r.resNumber || '—'}
                               </span>
-                              <StatusBadge status={r.status} />
+                              <StatusBadge status={r.status} isReturned={rentalState.isReturned} />
                             </div>
 
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
@@ -848,29 +936,48 @@ export default function MeuPerfil() {
                                 </div>
                               )}
                             </div>
+
+                            {/* Aviso ao cliente se o veículo já foi retirado ou entregue */}
+                            {rentalState.isPickedUpOrReturned && rentalState.noticeTitle && (
+                              <div className="mt-4 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 sm:p-3.5 flex items-start gap-2.5">
+                                <span className="text-base leading-none mt-0.5 shrink-0">ℹ️</span>
+                                <div className="text-xs">
+                                  <p className="font-bold text-amber-200">{rentalState.noticeTitle}</p>
+                                  <p className="text-amber-300/80 mt-1 leading-relaxed">{rentalState.noticeDesc}</p>
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           {!isCancelled && r.resNumber && (
                             <div className="flex flex-col gap-2 shrink-0">
-
                               <button
                                 onClick={() => { setResendTarget(r); setResendDone(false); setResendError(''); }}
                                 className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-400 text-xs font-bold rounded-lg transition-all"
                               >
                                 ✉️ Reenviar E-mail
                               </button>
-                              <button
-                                onClick={() => setConfirmModifyTarget(r)}
-                                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-400 text-xs font-bold rounded-lg transition-all"
-                              >
-                                ✏️ Modificar
-                              </button>
-                              <button
-                                onClick={() => { setCancelTarget(r); setCancelMsg(''); }}
-                                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-400 text-xs font-bold rounded-lg transition-all"
-                              >
-                                ❌ Cancelar
-                              </button>
+
+                              {!rentalState.isPickedUpOrReturned ? (
+                                <>
+                                  <button
+                                    onClick={() => setConfirmModifyTarget(r)}
+                                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-400 text-xs font-bold rounded-lg transition-all"
+                                  >
+                                    ✏️ Modificar
+                                  </button>
+                                  <button
+                                    onClick={() => { setCancelTarget(r); setCancelMsg(''); }}
+                                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-400 text-xs font-bold rounded-lg transition-all"
+                                  >
+                                    ❌ Cancelar
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-[11px] text-gray-500 italic text-center px-1 py-1">
+                                  Não modificável
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>
@@ -988,9 +1095,10 @@ export default function MeuPerfil() {
                       searchResult.cancelled ? 'bg-red-400/10 border-red-400/30 text-red-400' :
                       searchResult.confirmed ? 'bg-emerald-400/10 border-emerald-400/30 text-emerald-400' :
                       searchResult.onRequest ? 'bg-blue-400/10 border-blue-400/30 text-blue-400' :
+                      searchResult.statusCode === 'CO' ? 'bg-purple-500/20 border-purple-500/40 text-purple-300' :
                       'bg-gray-400/10 border-gray-400/30 text-gray-400'
                     }`}>
-                      {searchResult.cancelled ? 'Cancelada' : searchResult.confirmed ? 'Confirmada' : searchResult.onRequest ? 'Sob Consulta' : searchResult.statusCode}
+                      {searchResult.cancelled ? 'Cancelada' : searchResult.confirmed ? 'Confirmada' : searchResult.onRequest ? 'Sob Consulta' : searchResult.statusCode === 'CO' ? '🚗 Veículo Retirado' : searchResult.statusCode}
                     </span>
                   </div>
                   <p className="text-gray-500 text-xs">Status XRS: <span className="text-gray-300 font-mono">{searchResult.statusCode}</span></p>
@@ -1001,7 +1109,12 @@ export default function MeuPerfil() {
                       ))}
                     </div>
                   )}
-                  {!searchResult.cancelled && (
+                  {searchResult.statusCode === 'CO' ? (
+                    <div className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-200">
+                      <p className="font-bold text-amber-200">ℹ️ Veículo já retirado</p>
+                      <p className="text-amber-300/80 mt-1">Esta locação já foi iniciada ou concluída. Cancelamentos e alterações online não são permitidos após a retirada.</p>
+                    </div>
+                  ) : !searchResult.cancelled && (
                     <button
                       id="searchResultCancel"
                       onClick={() => { setCancelMsg(''); setCancelTarget({ resNumber: searchResult.resNumber } as Reserva); }}
