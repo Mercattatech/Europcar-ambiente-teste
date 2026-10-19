@@ -2037,84 +2037,6 @@ export default function CheckoutPage() {
               )}
             </div>
 
-            {/* ═══════════════ COBRANÇAS PAGAS NO BALCÃO (via XRS paidBy) ═══════════════ */}
-            {paymentMethod !== 'BALCAO' && (() => {
-              // Cobranças que o XRS atribui à BA (business account) = pago no balcão
-              const balcaoFees = counterCharges;
-              
-              // Se não há dados de paidBy do XRS E a estação pode ter sobretaxa, exibir aviso genérico
-              if (!hasXRSPayerData) {
-                // Verificar se alguma cobrança parece ser de aeroporto (apenas para exibir aviso)
-                const mayHaveAirportFee = (booking?.quoteInsurances || []).some((i: any) => {
-                  const d = (i.descr || '').toLowerCase();
-                  return d.includes('aeroporto') || d.includes('airport') ||
-                    d.includes('ferroviária') || d.includes('railway');
-                });
-                if (mayHaveAirportFee) {
-                  return (
-                    <div className="mx-5 mb-3 flex flex-col gap-1 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">ⓘ Aviso sobre sobretaxa</span>
-                      </div>
-                      <p className="text-[10px] text-amber-700 leading-tight mt-1">
-                        Esta estação pode cobrar uma sobretaxa de aeroporto/estação ferroviária.
-                        Consulte diretamente com a Europcar no balcão de retirada para confirmar o valor.
-                      </p>
-                    </div>
-                  );
-                }
-                return null;
-              }
-
-              if (balcaoFees.length === 0) return null;
-              return (
-                <div className="mx-5 mb-3 flex flex-col gap-1 bg-orange-50 border border-orange-200 rounded-lg p-3">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">✈ Cobranças pagas no balcão</span>
-                  </div>
-                  {balcaoFees.map((ins: any, idx: number) => {
-                    const val = ins.rentalPriceInBookingCurrencyAI > 0
-                      ? ins.rentalPriceInBookingCurrencyAI
-                      : (ins.priceInBookingCurrency > 0 ? ins.priceInBookingCurrency : ins.price);
-                    const curr = bookingCurrency || currency || 'EUR';
-                    return (
-                      <div key={idx} className="flex justify-between text-[10px] text-orange-800">
-                        <span className="flex-1 pr-2">{ins.descr || ins.code}</span>
-                        {val > 0 ? (
-                          <span className="font-bold whitespace-nowrap">{curr} {val.toFixed(2).replace('.', ',')}</span>
-                        ) : (
-                          <span className="text-orange-500 italic">Verificar na retirada</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                  <p className="text-[9px] text-orange-600 mt-1 leading-tight border-t border-orange-200 pt-1">
-                    ⓘ Estes valores são definidos pela Europcar e cobrados no balcão de retirada.
-                  </p>
-                </div>
-              );
-            })()}
-
-            {/* Taxas locais a pagar na estação */}
-            {parseFloat(car?.amountToPayOnArrivalInBookingCurrency || car?.amountToPayOnArrival || '0') > 0 && (
-              <div className="mx-5 mb-3 flex flex-col text-xs font-bold text-[#e67e00] bg-[#fff8f0] p-3 rounded-lg border border-orange-100">
-                <div className="flex justify-between">
-                  <span>A ser pago na Estação (Taxas Locais)</span>
-                  <span>
-                    {(car?.amountToPayOnArrivalInBookingCurrency ? bookingCurrency : currency) || 'BRL'}{' '}
-                    {parseFloat(car?.amountToPayOnArrivalInBookingCurrency || car?.amountToPayOnArrival || '0').toFixed(2).replace('.', ',')}
-                  </span>
-                </div>
-                {booking?.quoteInsurances?.filter((i: any) => i.type === 'M' && ['APF', 'APT', 'AIRPORTFEE', 'CITYFEE', 'LOC', 'PRM', 'YSC'].includes(i.code)).map((ins: any, idx: number) => (
-                  <div key={idx} className="text-[10px] text-gray-500 font-normal flex justify-between mt-1.5 border-t border-[#e67e00]/10 pt-1.5">
-                    <span className="flex-1 truncate pr-2">- {ins.descr || 'Suplemento de Estação Premium'} ({ins.code})</span>
-                    {ins.rentalPriceInBookingCurrencyAI > 0 && (
-                      <span className="whitespace-nowrap">{(car?.amountToPayOnArrivalInBookingCurrency ? bookingCurrency : currency) || 'BRL'} {ins.rentalPriceInBookingCurrencyAI.toFixed(2).replace('.', ',')}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
 
             {/* ═══════════════ RESUMO FINANCEIRO (DIRETRIZES DE PAGAMENTO) ═══════════════ */}
             <div className="border-t border-gray-200 p-5 bg-gradient-to-b from-gray-50/60 to-white">
@@ -2210,7 +2132,7 @@ export default function CheckoutPage() {
                   if (dedVal > 0) {
                     const localFmt = `${dedCur} ${dedVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                     const brlFmt = dedBRL > 0 && dedCur !== 'BRL'
-                      ? ` ≈ R$ ${dedBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      ? ` Aprox. R$ ${dedBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : '';
                     franchiseText = `Franquia: ${localFmt}${brlFmt}`;
                   } else {
@@ -2222,20 +2144,20 @@ export default function CheckoutPage() {
                   <div className="space-y-3.5">
                     {/* ── 1. PAGAR ONLINE ── */}
                     <div className="bg-white border-2 border-emerald-500/30 rounded-xl p-4 shadow-2xs">
-                      <div className="flex flex-wrap items-baseline justify-between gap-1 mb-1">
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-base">💳</span>
-                          <span className="text-xs font-black uppercase tracking-wider text-emerald-950">
+                          <span className="text-xs font-black uppercase tracking-wider text-emerald-950 whitespace-nowrap">
                             PAGAR ONLINE:
                           </span>
                         </div>
                         <div className="text-right">
-                          <span className="text-base sm:text-lg font-black text-gray-900">
+                          <span className="text-base sm:text-lg font-black text-gray-900 whitespace-nowrap">
                             {fmtBRL(onlineAmountBRL)}
                           </span>
                           {hasLocal && (
-                            <span className="text-xs font-semibold text-gray-500 ml-1.5">
-                              (≈ {fmtLocal(onlineLocal)})
+                            <span className="text-xs font-semibold text-gray-500 ml-1.5 whitespace-nowrap">
+                              (Aprox. {fmtLocal(onlineLocal)})
                             </span>
                           )}
                         </div>
@@ -2274,20 +2196,20 @@ export default function CheckoutPage() {
 
                     {/* ── 2. PAGAR NA RETIRADA ── */}
                     <div className="bg-amber-50/80 border-2 border-amber-300 rounded-xl p-4 shadow-2xs">
-                      <div className="flex flex-wrap items-baseline justify-between gap-1 mb-1">
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-base">🏪</span>
-                          <span className="text-xs font-black uppercase tracking-wider text-amber-950">
+                          <span className="text-xs font-black uppercase tracking-wider text-amber-950 whitespace-nowrap">
                             PAGAR NA RETIRADA:
                           </span>
                         </div>
                         <div className="text-right">
-                          <span className="text-base sm:text-lg font-black text-amber-950">
+                          <span className="text-base sm:text-lg font-black text-amber-950 whitespace-nowrap">
                             {hasLocal ? fmtLocal(balcaoLocal) : fmtBRL(balcaoAmountBRL)}
                           </span>
                           {hasLocal && (
-                            <span className="text-xs font-semibold text-amber-800 ml-1.5">
-                              (≈ {fmtBRL(balcaoAmountBRL)})
+                            <span className="text-xs font-semibold text-amber-800 ml-1.5 whitespace-nowrap">
+                              (Aprox. {fmtBRL(balcaoAmountBRL)})
                             </span>
                           )}
                         </div>
@@ -2359,20 +2281,20 @@ export default function CheckoutPage() {
 
                     {/* ── 3. VALOR TOTAL ── */}
                     <div className="bg-gray-950 text-white rounded-xl p-4 shadow-sm relative overflow-hidden">
-                      <div className="flex flex-wrap items-baseline justify-between gap-1 mb-1">
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-base">🟢</span>
-                          <span className="text-xs font-black uppercase tracking-wider text-green-400">
+                          <span className="text-xs font-black uppercase tracking-wider text-green-400 whitespace-nowrap">
                             VALOR TOTAL:
                           </span>
                         </div>
                         <div className="text-right">
-                          <span className="text-lg sm:text-xl font-black text-white">
+                          <span className="text-lg sm:text-xl font-black text-white whitespace-nowrap">
                             {fmtBRL(totalGeralBRL)}
                           </span>
                           {hasLocal && (
-                            <span className="text-xs font-semibold text-gray-300 ml-1.5">
-                              (≈ {fmtLocal(totalGeralLocal)})
+                            <span className="text-xs font-semibold text-gray-300 ml-1.5 whitespace-nowrap">
+                              (Aprox. {fmtLocal(totalGeralLocal)})
                             </span>
                           )}
                         </div>
