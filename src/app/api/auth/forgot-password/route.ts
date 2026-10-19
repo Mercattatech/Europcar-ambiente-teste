@@ -41,6 +41,41 @@ function buildResetEmailHtml(nome: string, resetLink: string): string {
 </html>`;
 }
 
+function getBaseUrl(req: Request): string {
+  // 1. Origin do request do cliente (ex: https://www.europcar.com.br)
+  const origin = req.headers.get("origin");
+  if (origin && !origin.includes("sslip.io") && !origin.includes("localhost")) {
+    return origin.replace(/\/$/, "");
+  }
+
+  // 2. Host encaminhado pelo proxy
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  if (host && !host.includes("sslip.io") && !host.includes("localhost")) {
+    return `${proto}://${host}`.replace(/\/$/, "");
+  }
+
+  // 3. Referer do navegador
+  const referer = req.headers.get("referer");
+  if (referer) {
+    try {
+      const u = new URL(referer);
+      if (!u.host.includes("sslip.io") && !u.host.includes("localhost")) {
+        return u.origin.replace(/\/$/, "");
+      }
+    } catch {}
+  }
+
+  // 4. Se NEXTAUTH_URL for um domínio de produção válido (sem sslip.io ou localhost)
+  const envUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || "";
+  if (envUrl && !envUrl.includes("sslip.io") && !envUrl.includes("localhost")) {
+    return envUrl.replace(/\/$/, "");
+  }
+
+  // 5. Fallback padrão seguro de produção
+  return "https://www.europcar.com.br";
+}
+
 export async function POST(req: Request) {
   try {
     const { email } = await req.json();
@@ -55,7 +90,7 @@ export async function POST(req: Request) {
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
     await prisma.passwordResetToken.create({ data: { email, token, expiresAt } });
 
-    const baseUrl = process.env.NEXTAUTH_URL || "https://europcar.com.br";
+    const baseUrl = getBaseUrl(req);
     const resetLink = `${baseUrl}/reset-senha?token=${token}`;
     const nome = user.name || '';
     const subject = 'Redefinição de Senha — Europcar Brasil';
