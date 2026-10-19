@@ -45,6 +45,19 @@ function formatCurrency(v?: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 }
 
+const TIME_OPTIONS_24H = Array.from({ length: 48 }, (_, i) => {
+  const h = String(Math.floor(i / 2)).padStart(2, '0');
+  const m = i % 2 === 0 ? '00' : '30';
+  return `${h}${m}`;
+});
+
+function getTimeOptions(current?: string) {
+  if (current && !TIME_OPTIONS_24H.includes(current) && /^\d{4}$/.test(current)) {
+    return [...TIME_OPTIONS_24H, current].sort();
+  }
+  return TIME_OPTIONS_24H;
+}
+
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
   CONFIRMED_PREPAID:     { label: 'Confirmada',        color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/30' },
   CONFIRMED_NON_PREPAID: { label: 'Confirmada',        color: 'text-emerald-400', bg: 'bg-emerald-400/10 border-emerald-400/30' },
@@ -501,7 +514,7 @@ export default function MeuPerfil() {
                     onChange={e => setModifyTime(e.target.value)}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
                   >
-                    {['0800','0900','1000','1100','1200','1300','1400','1500','1600','1700','1800'].map(t =>
+                    {getTimeOptions(modifyTime).map(t =>
                       <option key={t} value={t}>{t.slice(0,2)}:{t.slice(2)}</option>
                     )}
                   </select>
@@ -527,7 +540,7 @@ export default function MeuPerfil() {
                     onChange={e => setModifyReturnTime(e.target.value)}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
                   >
-                    {['0800','0900','1000','1100','1200','1300','1400','1500','1600','1700','1800'].map(t =>
+                    {getTimeOptions(modifyReturnTime).map(t =>
                       <option key={t} value={t}>{t.slice(0,2)}:{t.slice(2)}</option>
                     )}
                   </select>

@@ -68,6 +68,19 @@ const OP_STATUS_FILTER_OPTIONS = [
    { value: "NS", label: "NS - No Show", color: "bg-gray-500/20 text-gray-500" },
 ];
 
+const TIME_OPTIONS_24H = Array.from({ length: 48 }, (_, i) => {
+   const h = String(Math.floor(i / 2)).padStart(2, '0');
+   const m = i % 2 === 0 ? '00' : '30';
+   return `${h}${m}`;
+});
+
+function getTimeOptions(current?: string) {
+   if (current && !TIME_OPTIONS_24H.includes(current) && /^\d{4}$/.test(current)) {
+      return [...TIME_OPTIONS_24H, current].sort();
+   }
+   return TIME_OPTIONS_24H;
+}
+
 export default function PainelReservas() {
    const [reservations, setReservations] = useState<any[]>([]);
    const [loading, setLoading] = useState(true);
@@ -870,7 +883,7 @@ export default function PainelReservas() {
                         <div>
                            <label className="block text-[10px] font-medium text-gray-400 mb-1">Horário</label>
                            <select value={adminModifyData.pickupTime} onChange={e => setAdminModifyData(p => ({ ...p, pickupTime: e.target.value }))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-white text-xs focus:outline-none focus:border-blue-500 transition-colors">
-                              {['0800','0900','1000','1100','1200','1300','1400','1500','1600','1700','1800'].map(t => <option key={t} value={t}>{t.slice(0,2)}:{t.slice(2)}</option>)}
+                              {getTimeOptions(adminModifyData.pickupTime).map(t => <option key={t} value={t}>{t.slice(0,2)}:{t.slice(2)}</option>)}
                            </select>
                         </div>
                         <div>
@@ -889,7 +902,7 @@ export default function PainelReservas() {
                         <div>
                            <label className="block text-[10px] font-medium text-gray-400 mb-1">Horário</label>
                            <select value={adminModifyData.returnTime} onChange={e => setAdminModifyData(p => ({ ...p, returnTime: e.target.value }))} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-white text-xs focus:outline-none focus:border-blue-500 transition-colors">
-                              {['0800','0900','1000','1100','1200','1300','1400','1500','1600','1700','1800'].map(t => <option key={t} value={t}>{t.slice(0,2)}:{t.slice(2)}</option>)}
+                              {getTimeOptions(adminModifyData.returnTime).map(t => <option key={t} value={t}>{t.slice(0,2)}:{t.slice(2)}</option>)}
                            </select>
                         </div>
                         <div>
@@ -1060,7 +1073,7 @@ export default function PainelReservas() {
                                  onChange={e => setManualForm(p => ({ ...p, pickupTime: e.target.value }))}
                                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
                               >
-                                 {['0800','0900','1000','1100','1200','1300','1400','1500','1600','1700','1800','1900','2000','2100','2200'].map(t => (
+                                 {getTimeOptions(manualForm.pickupTime).map(t => (
                                     <option key={t} value={t}>{t.slice(0,2)}:{t.slice(2)}</option>
                                  ))}
                               </select>
@@ -1096,7 +1109,7 @@ export default function PainelReservas() {
                                  onChange={e => setManualForm(p => ({ ...p, returnTime: e.target.value }))}
                                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
                               >
-                                 {['0800','0900','1000','1100','1200','1300','1400','1500','1600','1700','1800','1900','2000','2100','2200'].map(t => (
+                                 {getTimeOptions(manualForm.returnTime).map(t => (
                                     <option key={t} value={t}>{t.slice(0,2)}:{t.slice(2)}</option>
                                  ))}
                               </select>
