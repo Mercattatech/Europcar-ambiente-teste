@@ -2144,19 +2144,19 @@ export default function CheckoutPage() {
                   <div className="space-y-3.5">
                     {/* ── 1. PAGAR ONLINE ── */}
                     <div className="bg-white border-2 border-emerald-500/30 rounded-xl p-4 shadow-2xs">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
                           <span className="text-base">💳</span>
                           <span className="text-xs font-black uppercase tracking-wider text-emerald-950 whitespace-nowrap">
                             PAGAR ONLINE:
                           </span>
                         </div>
-                        <div className="text-right">
-                          <span className="text-base sm:text-lg font-black text-gray-900 whitespace-nowrap">
+                        <div className="text-right shrink-0">
+                          <span className="text-base sm:text-lg font-black text-gray-900 whitespace-nowrap block">
                             {fmtBRL(onlineAmountBRL)}
                           </span>
                           {hasLocal && (
-                            <span className="text-xs font-semibold text-gray-500 ml-1.5 whitespace-nowrap">
+                            <span className="text-xs font-semibold text-gray-500 whitespace-nowrap block mt-0.5">
                               (Aprox. {fmtLocal(onlineLocal)})
                             </span>
                           )}
@@ -2170,12 +2170,12 @@ export default function CheckoutPage() {
                             <span className="text-emerald-700 font-bold">-</span>
                             <span>Diárias ({days} {days === 1 ? 'diária' : 'diárias'})</span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-emerald-700 font-bold">-</span>
-                            <span>
+                          <div className="flex items-start gap-2">
+                            <span className="text-emerald-700 font-bold mt-0.5">-</span>
+                            <div>
                               <span className="text-gray-900 font-medium">{protectionTitle}</span>{' '}
                               <span className={isZeroExcess ? "text-emerald-700 font-bold" : "text-gray-500"}>({franchiseText})</span>
-                            </span>
+                            </div>
                           </div>
                           {paymentMethod === 'CREDIT' && ccInstallments > 1 && (
                             <div className="mt-2 bg-emerald-50 border border-emerald-200/70 rounded-lg px-2.5 py-1 flex items-center justify-between text-[11px]">
@@ -2196,19 +2196,19 @@ export default function CheckoutPage() {
 
                     {/* ── 2. PAGAR NA RETIRADA ── */}
                     <div className="bg-amber-50/80 border-2 border-amber-300 rounded-xl p-4 shadow-2xs">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
                           <span className="text-base">🏪</span>
                           <span className="text-xs font-black uppercase tracking-wider text-amber-950 whitespace-nowrap">
                             PAGAR NA RETIRADA:
                           </span>
                         </div>
-                        <div className="text-right">
-                          <span className="text-base sm:text-lg font-black text-amber-950 whitespace-nowrap">
+                        <div className="text-right shrink-0">
+                          <span className="text-base sm:text-lg font-black text-amber-950 whitespace-nowrap block">
                             {hasLocal ? fmtLocal(balcaoLocal) : fmtBRL(balcaoAmountBRL)}
                           </span>
                           {hasLocal && (
-                            <span className="text-xs font-semibold text-amber-800 ml-1.5 whitespace-nowrap">
+                            <span className="text-xs font-semibold text-amber-800 whitespace-nowrap block mt-0.5">
                               (Aprox. {fmtBRL(balcaoAmountBRL)})
                             </span>
                           )}
@@ -2281,19 +2281,19 @@ export default function CheckoutPage() {
 
                     {/* ── 3. VALOR TOTAL ── */}
                     <div className="bg-gray-950 text-white rounded-xl p-4 shadow-sm relative overflow-hidden">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
                           <span className="text-base">🟢</span>
                           <span className="text-xs font-black uppercase tracking-wider text-green-400 whitespace-nowrap">
                             VALOR TOTAL:
                           </span>
                         </div>
-                        <div className="text-right">
-                          <span className="text-lg sm:text-xl font-black text-white whitespace-nowrap">
+                        <div className="text-right shrink-0">
+                          <span className="text-lg sm:text-xl font-black text-white whitespace-nowrap block">
                             {fmtBRL(totalGeralBRL)}
                           </span>
                           {hasLocal && (
-                            <span className="text-xs font-semibold text-gray-300 ml-1.5 whitespace-nowrap">
+                            <span className="text-xs font-semibold text-gray-300 whitespace-nowrap block mt-0.5">
                               (Aprox. {fmtLocal(totalGeralLocal)})
                             </span>
                           )}
