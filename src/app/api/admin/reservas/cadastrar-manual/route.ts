@@ -41,6 +41,8 @@ export async function POST(req: Request) {
       carCategory,
       carName,
       amountBRL,
+      amountCounter,
+      taxaDevolucao,
       paymentMethod = 'BALCAO',
       status: explicitStatus,
       operationalStatus: explicitOpStatus,
@@ -97,6 +99,9 @@ export async function POST(req: Request) {
     // Resolução de status operacional inicial
     const finalOpStatus = explicitOpStatus || (finalStatus === 'ON_REQUEST' ? 'R' : 'CF');
 
+    const numTaxaDevolucao = parseFloat(String(taxaDevolucao || 0)) || 0;
+    const numAmountCounter = parseFloat(String(amountCounter || 0)) || 0;
+
     // Montar objeto booking
     const booking = {
       pickupStation: cleanPickupStation,
@@ -106,6 +111,8 @@ export async function POST(req: Request) {
       returnDate: cleanReturnDate,
       returnTime: cleanReturnTime,
       contractID: contractID || '57269673',
+      taxaDevolucao: numTaxaDevolucao > 0 ? numTaxaDevolucao : undefined,
+      oneWayFee: numTaxaDevolucao > 0 ? numTaxaDevolucao : undefined,
       car: {
         carCategoryCode: cleanCarCategory,
         name: carName || cleanCarCategory,
@@ -123,6 +130,8 @@ export async function POST(req: Request) {
       cpf: String(cpf || '').trim(),
       paisEmissao: String(paisEmissao || 'BR').trim().toUpperCase(),
       paymentMethod,
+      amountCounter: numAmountCounter > 0 ? numAmountCounter : undefined,
+      taxaDevolucao: numTaxaDevolucao > 0 ? numTaxaDevolucao : undefined,
       isManual: true,
       createdVia: cleanResNumber ? 'GW_SYNC_IMPORT' : 'MANUAL_PANEL',
       createdAdmin: session.user.email,

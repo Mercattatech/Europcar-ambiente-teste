@@ -134,6 +134,8 @@ export default function PainelReservas() {
       carCategory: 'EDMR',
       carName: '',
       amountBRL: '',
+      amountCounter: '',
+      taxaDevolucao: '',
       paymentMethod: 'BALCAO',
       status: 'CONFIRMED_NON_PREPAID',
       operationalStatus: 'CF',
@@ -162,6 +164,8 @@ export default function PainelReservas() {
       carCategory: '',
       carName: '',
       amountBRL: '',
+      amountCounter: '',
+      taxaDevolucao: '',
       paymentMethod: 'BALCAO',
       operationalStatus: 'CF',
       status: 'CONFIRMED_NON_PREPAID',
@@ -184,6 +188,8 @@ export default function PainelReservas() {
          carCategory: 'EDMR',
          carName: '',
          amountBRL: '',
+         amountCounter: '',
+         taxaDevolucao: '',
          paymentMethod: 'BALCAO',
          status: 'CONFIRMED_NON_PREPAID',
          operationalStatus: 'CF',
@@ -1116,6 +1122,13 @@ export default function PainelReservas() {
                            </div>
                         </div>
 
+                        {manualForm.pickupStation && manualForm.returnStation && manualForm.pickupStation.trim().toUpperCase() !== manualForm.returnStation.trim().toUpperCase() && (
+                           <div className="mt-3 p-2.5 bg-amber-950/40 border border-amber-600/40 rounded-lg flex items-center gap-2 text-xs text-amber-300">
+                              <span>🔄</span>
+                              <span><strong>Locação One-Way detectada:</strong> devolução em estação diferente. Preencha a taxa de devolução no bloco de valores abaixo se aplicável.</span>
+                           </div>
+                        )}
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                            <div>
                               <label className="block text-[11px] font-medium text-gray-300 mb-1">Categoria Veículo (ACRISS) *</label>
@@ -1148,7 +1161,7 @@ export default function PainelReservas() {
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                            <div>
-                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Valor Total (R$)</label>
+                              <label className="block text-[11px] font-medium text-gray-300 mb-1">Valor Pago Online (Cielo/PIX R$)</label>
                               <input
                                  type="number"
                                  step="0.01"
@@ -1159,6 +1172,33 @@ export default function PainelReservas() {
                                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
                               />
                            </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-amber-300 mb-1">A Pagar no Balcão (€ ou R$)</label>
+                              <input
+                                 type="number"
+                                 step="0.01"
+                                 min="0"
+                                 value={manualForm.amountCounter}
+                                 onChange={e => setManualForm(p => ({ ...p, amountCounter: e.target.value }))}
+                                 placeholder="Ex: 45.00"
+                                 className="w-full bg-gray-800 border border-amber-700/50 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-amber-500"
+                              />
+                           </div>
+                           <div>
+                              <label className="block text-[11px] font-medium text-purple-300 mb-1">Taxa Devolução One-Way (€ ou R$)</label>
+                              <input
+                                 type="number"
+                                 step="0.01"
+                                 min="0"
+                                 value={manualForm.taxaDevolucao}
+                                 onChange={e => setManualForm(p => ({ ...p, taxaDevolucao: e.target.value }))}
+                                 placeholder="Ex: 35.00"
+                                 className="w-full bg-gray-800 border border-purple-700/50 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-purple-500"
+                              />
+                           </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                            <div>
                               <label className="block text-[11px] font-medium text-gray-300 mb-1">Forma de Pagamento</label>
                               <select
@@ -1174,8 +1214,8 @@ export default function PainelReservas() {
                                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-500"
                               >
                                  <option value="BALCAO">🏪 Pagar no Balcão (NP)</option>
-                                 <option value="PIX">🔑 PIX</option>
-                                 <option value="CREDIT">💳 Cartão de Crédito Online</option>
+                                 <option value="PIX">🔑 PIX (Online)</option>
+                                 <option value="CREDIT">💳 Cartão de Crédito Online (Cielo)</option>
                                  <option value="VOUCHER">🎟️ Voucher / Faturado</option>
                               </select>
                            </div>
@@ -1377,7 +1417,7 @@ export default function PainelReservas() {
                                     />
                                  </div>
                                  <div>
-                                    <label className="block text-[10px] font-medium text-gray-400 mb-1">Valor Total (R$)</label>
+                                    <label className="block text-[10px] font-medium text-gray-400 mb-1">Valor Pago Online (R$)</label>
                                     <input
                                        type="number"
                                        step="0.01"
@@ -1385,6 +1425,28 @@ export default function PainelReservas() {
                                        onChange={e => setSyncGWEditForm(p => ({ ...p, amountBRL: e.target.value }))}
                                        placeholder="0.00"
                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
+                                    />
+                                 </div>
+                                 <div>
+                                    <label className="block text-[10px] font-medium text-amber-300 mb-1">A Pagar no Balcão (€ ou R$)</label>
+                                    <input
+                                       type="number"
+                                       step="0.01"
+                                       value={syncGWEditForm.amountCounter}
+                                       onChange={e => setSyncGWEditForm(p => ({ ...p, amountCounter: e.target.value }))}
+                                       placeholder="0.00"
+                                       className="w-full bg-gray-800 border border-amber-700/50 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
+                                    />
+                                 </div>
+                                 <div>
+                                    <label className="block text-[10px] font-medium text-purple-300 mb-1">Taxa Devolução One-Way (€ ou R$)</label>
+                                    <input
+                                       type="number"
+                                       step="0.01"
+                                       value={syncGWEditForm.taxaDevolucao}
+                                       onChange={e => setSyncGWEditForm(p => ({ ...p, taxaDevolucao: e.target.value }))}
+                                       placeholder="0.00"
+                                       className="w-full bg-gray-800 border border-purple-700/50 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-cyan-500"
                                     />
                                  </div>
                                  <div>
@@ -1402,7 +1464,7 @@ export default function PainelReservas() {
                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-500"
                                     >
                                        <option value="BALCAO">🏪 Pagar no Balcão (NP)</option>
-                                       <option value="PIX">🔑 PIX</option>
+                                       <option value="PIX">🔑 PIX (Online)</option>
                                        <option value="CREDIT">💳 Pago Online (Cartão)</option>
                                        <option value="VOUCHER">🎟️ Voucher / Faturado</option>
                                     </select>
@@ -1646,9 +1708,32 @@ export default function PainelReservas() {
                               </td>
                               <td className="px-4 py-4">
                                  <div className="font-bold text-green-400">
-                                    {metrics.amountBRL > 0 ? `R$ ${metrics.amountBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : <span className="text-gray-600 text-xs">—</span>}
+                                    {metrics.isPrepaid ? (
+                                       <>
+                                          R$ {(metrics.onlinePaidBRL || metrics.amountBRL).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                          {metrics.counterDueBRL && metrics.counterDueBRL > 0.05 ? (
+                                             <div className="text-[10px] text-amber-400 font-semibold mt-0.5">
+                                                + R$ {metrics.counterDueBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no balcão
+                                             </div>
+                                          ) : null}
+                                       </>
+                                    ) : (
+                                       <>
+                                          R$ {metrics.amountBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                          <div className="text-[10px] text-amber-400 font-semibold mt-0.5">
+                                             (no balcão)
+                                          </div>
+                                       </>
+                                    )}
                                  </div>
-                                 <div className="text-[10px] text-gray-600">{metrics.days ? `${metrics.days} dias` : ''}</div>
+                                 <div className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1">
+                                    {metrics.days ? <span>{metrics.days} dias</span> : null}
+                                    {metrics.isOneWay && (
+                                       <span className="text-amber-400 font-semibold" title="Devolução em outra agência">
+                                          · 🔄 One-Way
+                                       </span>
+                                    )}
+                                 </div>
                               </td>
 
                               {/* STATUS OPERACIONAL */}
@@ -1858,23 +1943,58 @@ export default function PainelReservas() {
                                            <div className="border-t border-gray-700/50 my-2"></div>
                                            <p className="text-gray-300"><strong>Retirada:</strong> <StationCode code={parsed?.booking?.pickupStation} /> — {parsed?.booking?.pickupDate ? `${parsed.booking.pickupDate.slice(6,8)}/${parsed.booking.pickupDate.slice(4,6)}/${parsed.booking.pickupDate.slice(0,4)}` : "—"} {parsed?.booking?.pickupTime ? `${parsed.booking.pickupTime.slice(0,2)}:${parsed.booking.pickupTime.slice(2)}` : ""}</p>
                                            <p className="text-gray-300"><strong>Devolução:</strong> <StationCode code={parsed?.booking?.returnStation || parsed?.booking?.pickupStation} /> — {parsed?.booking?.returnDate ? `${parsed.booking.returnDate.slice(6,8)}/${parsed.booking.returnDate.slice(4,6)}/${parsed.booking.returnDate.slice(0,4)}` : "—"} {parsed?.booking?.returnTime ? `${parsed.booking.returnTime.slice(0,2)}:${parsed.booking.returnTime.slice(2)}` : ""}</p>
+                                           {metrics.isOneWay && (
+                                              <div className="my-1.5 p-2 bg-purple-950/40 border border-purple-500/30 rounded text-xs">
+                                                 <div className="flex items-center gap-1.5 text-purple-300 font-semibold">
+                                                    <span>🔄</span>
+                                                    <span>Devolução em outra agência (One-Way)</span>
+                                                 </div>
+                                                 {metrics.oneWayFeeEUR > 0 && (
+                                                    <p className="text-purple-200/80 text-[11px] mt-0.5 ml-5">
+                                                       Taxa de devolução: <strong>€ {metrics.oneWayFeeEUR.toFixed(2)}</strong> {metrics.oneWayFeeBRL > 0 ? `(~R$ ${metrics.oneWayFeeBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})` : ''}
+                                                    </p>
+                                                 )}
+                                              </div>
+                                           )}
                                            <p className="text-gray-300"><strong>Dias:</strong> {metrics.days || parsed?.booking?.duration || parsed?.booking?.days || "—"}</p>
                                            <p className="text-gray-300"><strong>País:</strong> {parsed?.booking?.stationCountry || parsed?.booking?.country || (parsed?.booking?.pickupStation?.startsWith('BR') ? 'BR' : '—')}</p>
                                         </div>
                                         <div className="bg-gray-900 rounded-lg p-4 border border-gray-700/50 flex-1 min-w-[200px]">
                                            <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Valores e Pagamento</p>
-                                           {metrics.isPrepaid && metrics.counterDueEUR && metrics.counterDueEUR > 0.05 ? (
-                                              <>
-                                                 <p className="text-gray-300"><strong>Pago Online:</strong> R$ {metrics.amountBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-gray-400 text-xs">(€ {metrics.amountEUR.toFixed(2)})</span></p>
-                                                 <p className="text-amber-400"><strong>No Balcão:</strong> € {metrics.counterDueEUR.toFixed(2)} <span className="text-amber-400/70 text-xs">(~R$ {metrics.counterDueBRL?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</span></p>
-                                                 <p className="text-gray-300"><strong>Total Contrato XRS:</strong> € {metrics.contractTotalEUR?.toFixed(2)} <span className="text-gray-400 text-xs">(R$ {metrics.contractTotalBRL?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</span></p>
-                                              </>
-                                           ) : (
-                                              <>
-                                                 <p className="text-gray-300"><strong>Total EUR:</strong> {metrics.amountEUR > 0 ? `€ ${metrics.amountEUR.toFixed(2)}` : "—"}</p>
-                                                 <p className="text-gray-300"><strong>Total BRL:</strong> {metrics.amountBRL > 0 ? `R$ ${metrics.amountBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "—"}</p>
-                                              </>
+                                           <p className="text-gray-200">
+                                              <strong>💳 Pago Online (Cielo/PIX):</strong>{' '}
+                                              <span className="font-semibold text-emerald-400">
+                                                 R$ {metrics.onlinePaidBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                              </span>
+                                              {metrics.onlinePaidEUR > 0 ? <span className="text-gray-400 text-xs"> (€ {metrics.onlinePaidEUR.toFixed(2)})</span> : null}
+                                           </p>
+                                           <p className="text-gray-200 mt-1">
+                                              <strong>🏪 A Pagar na Retirada:</strong>{' '}
+                                              {metrics.counterDueEUR > 0.05 || metrics.counterDueBRL > 0.05 ? (
+                                                 <span className="font-semibold text-amber-400">
+                                                    € {metrics.counterDueEUR.toFixed(2)} <span className="text-amber-400/80 text-xs">(~R$ {metrics.counterDueBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</span>
+                                                 </span>
+                                              ) : (
+                                                 <span className="text-emerald-400 text-xs font-semibold">R$ 0,00 (Quitado online)</span>
+                                              )}
+                                           </p>
+                                           {metrics.isOneWay && (
+                                              <p className="text-purple-300 text-xs mt-1">
+                                                 <strong>↳ Taxa de Devolução:</strong>{' '}
+                                                 {metrics.oneWayFeeEUR > 0 ? (
+                                                    <span className="font-semibold">€ {metrics.oneWayFeeEUR.toFixed(2)} (~R$ {metrics.oneWayFeeBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</span>
+                                                 ) : (
+                                                    <span className="text-gray-400">Inclusa na tarifa</span>
+                                                 )}
+                                              </p>
                                            )}
+                                           <p className="text-gray-300 mt-1 text-xs">
+                                              <strong>Total da Locação:</strong>{' '}
+                                              <span className="font-bold text-white">
+                                                 R$ {metrics.totalGeralBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                              </span>
+                                              {metrics.totalGeralEUR > 0 ? <span className="text-gray-400"> (€ {metrics.totalGeralEUR.toFixed(2)})</span> : null}
+                                           </p>
                                            <p className="text-gray-300"><strong>Câmbio:</strong> {(() => {
                                               const xrsRate = parseFloat(parsed?.booking?.car?.exchangeRate || parsed?.booking?.exchangeRate || '0');
                                               if (xrsRate > 0) {
