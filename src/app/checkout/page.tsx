@@ -1349,9 +1349,9 @@ export default function CheckoutPage() {
                   <span className="text-gray-500 font-bold">Devolução</span>
                   <span className="font-black text-gray-900 text-right">
                     {displayReturnStationName}
-                    {!isSameStation && displayReturnStationAddress ? (
+                    {displayReturnStationAddress ? (
                       <span className="text-[10px] text-gray-500 font-normal block">📍 {displayReturnStationAddress}</span>
-                    ) : !isSameStation && (returnStation || pickupStation) && displayReturnStationName !== (returnStation || pickupStation) ? (
+                    ) : (returnStation || pickupStation) && displayReturnStationName !== (returnStation || pickupStation) ? (
                       <span className="text-[10px] text-gray-400 font-normal block">({returnStation || pickupStation})</span>
                     ) : null}
                     <span className="font-normal text-gray-500 block">{formatDate(returnDate)}</span>
@@ -1998,11 +1998,11 @@ export default function CheckoutPage() {
                 <div className="p-3">
                   <div className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Devolução</div>
                   <div className="text-sm font-bold text-gray-900 leading-snug">{displayReturnStationName}</div>
-                  {!isSameStation && displayReturnStationAddress ? (
+                  {displayReturnStationAddress ? (
                     <div className="text-[11px] text-gray-500 font-normal mt-0.5 leading-tight">
                       📍 {displayReturnStationAddress}
                     </div>
-                  ) : !isSameStation && (returnStation || pickupStation) && displayReturnStationName !== (returnStation || pickupStation) ? (
+                  ) : (returnStation || pickupStation) && displayReturnStationName !== (returnStation || pickupStation) ? (
                     <div className="text-[11px] text-gray-400 font-medium">({returnStation || pickupStation})</div>
                   ) : null}
                   <div className="text-xs text-gray-500 mt-1">{formatDate(returnDate)} · {(booking.returnTime || '1000').slice(0,2)}:{(booking.returnTime || '1000').slice(2)}</div>
@@ -2155,13 +2155,13 @@ export default function CheckoutPage() {
 
                       {/* Itens inclusos no online */}
                       {!isBalcaoOnly ? (
-                        <div className="mt-3 pt-2.5 border-t border-emerald-100 space-y-1 text-xs text-gray-700">
-                          <div className="flex items-center gap-2">
-                            <span className="text-emerald-700 font-bold">-</span>
+                        <div className="mt-3 pt-2.5 border-t border-emerald-100 space-y-1.5 text-xs text-gray-700">
+                          <div className="flex items-start gap-1.5 min-w-0">
+                            <span className="text-gray-400 font-bold">-</span>
                             <span>Diárias ({days} {days === 1 ? 'diária' : 'diárias'})</span>
                           </div>
-                          <div className="flex items-start gap-2">
-                            <span className="text-emerald-700 font-bold mt-0.5">-</span>
+                          <div className="flex items-start gap-1.5 min-w-0">
+                            <span className="text-gray-400 font-bold mt-0.5">-</span>
                             <div>
                               <span className="text-gray-900 font-medium">{protectionTitle}</span>{' '}
                               <span className={isZeroExcess ? "text-emerald-700 font-bold" : "text-gray-500"}>({franchiseText})</span>
@@ -2177,7 +2177,7 @@ export default function CheckoutPage() {
                           )}
                         </div>
                       ) : (
-                        <div className="mt-2 text-xs text-gray-500 flex items-center gap-2">
+                        <div className="mt-2 text-xs text-gray-500 flex items-center gap-1.5">
                           <span className="text-gray-400 font-bold">-</span>
                           <span>Reserva confirmada sem cobrança antecipada</span>
                         </div>
@@ -2185,7 +2185,7 @@ export default function CheckoutPage() {
                     </div>
 
                     {/* ── 2. PAGAR NA RETIRADA ── */}
-                    <div className="bg-amber-50/80 border-2 border-amber-300 rounded-xl p-4 shadow-2xs">
+                    <div className="bg-white border-2 border-amber-300/80 rounded-xl p-4 shadow-2xs">
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
                           <span className="text-base">🏪</span>
@@ -2194,11 +2194,11 @@ export default function CheckoutPage() {
                           </span>
                         </div>
                         <div className="text-right shrink-0">
-                          <span className="text-base sm:text-lg font-black text-amber-950 whitespace-nowrap block">
+                          <span className="text-base sm:text-lg font-black text-gray-900 whitespace-nowrap block">
                             {hasLocal ? fmtLocal(balcaoLocal) : fmtBRL(balcaoAmountBRL)}
                           </span>
                           {hasLocal && (
-                            <span className="text-xs font-semibold text-amber-800 whitespace-nowrap block mt-0.5">
+                            <span className="text-xs font-semibold text-gray-500 whitespace-nowrap block mt-0.5">
                               (Aprox. {fmtBRL(balcaoAmountBRL)})
                             </span>
                           )}
@@ -2206,11 +2206,14 @@ export default function CheckoutPage() {
                       </div>
 
                       {/* Itens detalhados da retirada */}
-                      <div className="mt-3 pt-2.5 border-t border-amber-200/80 space-y-1.5 text-xs text-amber-950">
+                      <div className="mt-3 pt-2.5 border-t border-gray-100 space-y-1.5 text-xs text-gray-700">
                         {isBalcaoOnly && (
-                          <div className="flex justify-between items-center">
-                            <span>* Aluguel do veículo ({days} {days === 1 ? 'diária' : 'diárias'}) + taxas</span>
-                            <span className="font-semibold text-amber-950">
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="flex items-start gap-1.5 min-w-0">
+                              <span className="text-gray-400 font-bold">-</span>
+                              <span>Aluguel do veículo ({days} {days === 1 ? 'diária' : 'diárias'}) + taxas</span>
+                            </div>
+                            <span className="font-semibold text-gray-900 shrink-0">
                               {hasLocal ? fmtLocal(vehicleTotalBRL / exchangeRate) : fmtBRL(vehicleTotalBRL)}
                             </span>
                           </div>
@@ -2222,10 +2225,14 @@ export default function CheckoutPage() {
                           const eqTotal = (eqT > 0 ? eqT : eqD * days) * (eq.qty || 1);
                           const q = eq.qty || 1;
                           const name = eq.name || eq.code;
+                          const qtySuffix = q > 1 ? ` (${q} unidades)` : '';
                           return (
-                            <div key={`ret-eq-${eq.code}`} className="flex justify-between items-center">
-                              <span>* {name}: {q} {q === 1 ? 'unidade.' : 'unidades.'}</span>
-                              <span className="font-semibold text-amber-950">
+                            <div key={`ret-eq-${eq.code}`} className="flex justify-between items-start gap-2">
+                              <div className="flex items-start gap-1.5 min-w-0">
+                                <span className="text-gray-400 font-bold">-</span>
+                                <span>{name}{qtySuffix}</span>
+                              </div>
+                              <span className="font-semibold text-gray-900 shrink-0">
                                 {hasLocal ? fmtLocal(eqTotal / exchangeRate) : fmtBRL(eqTotal)}
                               </span>
                             </div>
@@ -2234,18 +2241,39 @@ export default function CheckoutPage() {
 
                         {extrasDetails.map((extra: any, idx: number) => {
                           const insNamesBalcao: Record<string, string> = {
-                            PREMIUM: "Cobertura Premium", PREMPRE: "Premium Pré-pago", PREMUP: "Premium Plus",
-                            SPCDW: "Super CDW", SPTHW: "Super THW", STHW: "THW+",
-                            SCDW: "CDW+", MEDIUM: "Cobertura Média", RSA: "Assistência na Estrada",
-                            APP: "Proteção Aparência", WWI: "Proteção para-brisas", PAI: "Acidentes pessoais",
+                            TPL: "Proteção a Terceiros (TPL)",
+                            LDW: "Proteção contra Danos e Roubo (LDW)",
+                            CDW: "Proteção contra Danos por Colisão (CDW)",
+                            THW: "Proteção contra Roubo (THW)",
+                            SCDW: "Super Proteção contra Danos (SCDW)",
+                            SPCDW: "Super Proteção contra Danos e Acidentes (SPCDW)",
+                            STHW: "Super Proteção contra Roubo (STHW)",
+                            SPTHW: "Proteção Total contra Roubo (SPTHW)",
+                            MEDIUM: "Cobertura Média",
+                            PREMIUM: "Cobertura Premium",
+                            PREMPRE: "Proteção Plus (Pré-pago)",
+                            PREMUP: "Proteção Premium Plus",
+                            PREMPLUS: "Proteção Premium Plus",
+                            RSA: "Assistência na Estrada 24h",
+                            APP: "Proteção de Aparência",
+                            WWI: "Proteção de Para-brisas e Pneus (WWI)",
+                            PAI: "Proteção para Acidentes Pessoais (PAI)",
+                            PEP: "Proteção de Bens Pessoais (PEP)",
+                            SLI: "Proteção Suplementar a Terceiros (SLI)",
+                            SLDW: "Super Proteção LDW",
+                            SPAI: "Super Proteção para Acidentes Pessoais",
+                            INTERIOR: "Cobertura de Danos ao Interior",
                           };
                           const totalExtra = (extra.isTotal ? extra.pricePerDay : extra.pricePerDay * days) * extra.qty;
-                          const q = extra.qty || 1;
-                          const name = insNamesBalcao[extra.id] || extra.id;
+                          const code = (extra.id || extra.code || '').toUpperCase();
+                          const name = insNamesBalcao[code] || extra.name || extra.id;
                           return (
-                            <div key={`ret-e-${idx}`} className="flex justify-between items-center">
-                              <span>* {name}: {q} {q === 1 ? 'unidade.' : 'unidades.'}</span>
-                              <span className="font-semibold text-amber-950">
+                            <div key={`ret-e-${idx}`} className="flex justify-between items-start gap-2">
+                              <div className="flex items-start gap-1.5 min-w-0">
+                                <span className="text-gray-400 font-bold">-</span>
+                                <span>{name}</span>
+                              </div>
+                              <span className="font-semibold text-gray-900 shrink-0">
                                 {hasLocal ? fmtLocal(totalExtra / exchangeRate) : fmtBRL(totalExtra)}
                               </span>
                             </div>
@@ -2253,37 +2281,41 @@ export default function CheckoutPage() {
                         })}
 
                         {airportSurchargeBRL > 0 && (
-                          <div className="flex justify-between items-center">
-                            <span>* Taxa de aeroporto</span>
-                            <span className="font-semibold text-amber-950">
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="flex items-start gap-1.5 min-w-0">
+                              <span className="text-gray-400 font-bold">-</span>
+                              <span>Taxa de aeroporto</span>
+                            </div>
+                            <span className="font-semibold text-gray-900 shrink-0">
                               {hasLocal ? fmtLocal(airportSurchargeBRL / exchangeRate) : fmtBRL(airportSurchargeBRL)}
                             </span>
                           </div>
                         )}
 
                         {balcaoAmountBRL === 0 && (
-                          <div className="text-amber-800 text-[11px] italic">
-                            * Nenhum valor adicional a pagar na retirada (apenas a caução temporária no cartão de crédito)
+                          <div className="text-gray-500 text-[11px] italic flex items-center gap-1.5">
+                            <span className="text-gray-400 font-bold">-</span>
+                            <span>Nenhum valor adicional a pagar na retirada (apenas a caução temporária no cartão de crédito)</span>
                           </div>
                         )}
                       </div>
                     </div>
 
                     {/* ── 3. VALOR TOTAL ── */}
-                    <div className="bg-gray-950 text-white rounded-xl p-4 shadow-sm relative overflow-hidden">
+                    <div className="bg-amber-50/90 border-2 border-amber-300 rounded-xl p-4 shadow-xs relative overflow-hidden">
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
                           <span className="text-base">🟢</span>
-                          <span className="text-xs font-black uppercase tracking-wider text-green-400 whitespace-nowrap">
+                          <span className="text-xs font-black uppercase tracking-wider text-amber-950 whitespace-nowrap">
                             VALOR TOTAL:
                           </span>
                         </div>
                         <div className="text-right shrink-0">
-                          <span className="text-lg sm:text-xl font-black text-white whitespace-nowrap block">
+                          <span className="text-lg sm:text-xl font-black text-amber-950 whitespace-nowrap block">
                             {fmtBRL(totalGeralBRL)}
                           </span>
                           {hasLocal && (
-                            <span className="text-xs font-semibold text-gray-300 whitespace-nowrap block mt-0.5">
+                            <span className="text-xs font-semibold text-amber-800 whitespace-nowrap block mt-0.5">
                               (Aprox. {fmtLocal(totalGeralLocal)})
                             </span>
                           )}
@@ -2291,8 +2323,8 @@ export default function CheckoutPage() {
                       </div>
 
                       {/* Diretriz Luiz: frase informativa de retirada em moeda local */}
-                      <div className="mt-3 pt-2.5 border-t border-gray-800 text-xs text-gray-300 leading-snug">
-                        O pagamento da retirada será realizado em <strong className="text-white font-bold">{currencyNameStr}</strong>, no balcão da Europcar.
+                      <div className="mt-3 pt-2.5 border-t border-amber-200/80 text-xs text-amber-950 leading-snug">
+                        O pagamento da retirada será realizado em <strong className="font-bold">{currencyNameStr}</strong>, no balcão da Europcar.
                       </div>
                     </div>
                   </div>
