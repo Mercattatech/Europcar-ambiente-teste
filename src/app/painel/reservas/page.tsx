@@ -278,6 +278,8 @@ export default function PainelReservas() {
                carCategory: d.carCategory || '',
                carName: d.carCategory || '',
                amountBRL: quoteTotal,
+               amountCounter: '',
+               taxaDevolucao: '',
                paymentMethod: 'BALCAO',
                operationalStatus: d.xrsStatusCode || 'CF',
                status: 'CONFIRMED_NON_PREPAID',

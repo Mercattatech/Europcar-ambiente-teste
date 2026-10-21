@@ -1137,11 +1137,13 @@ function VehiclesContent() {
             return apiDescr || code; // fallback to API description
           };
 
+          let parsedInsurances: any[] = [];
+
           if (quote?.insuranceList?.insurance) {
             const rawIns  = quote.insuranceList.insurance;
             const insArr  = Array.isArray(rawIns) ? rawIns : [rawIns];
 
-            const parsedInsurances: any[] = insArr.map((ins: any) => {
+            parsedInsurances = insArr.map((ins: any) => {
               const a = ins.$ || ins;
               const code = (a.code || '').toUpperCase();
               const descr = translateDescr(code, a.descr || '');
@@ -1168,194 +1170,175 @@ function VehiclesContent() {
               isAirportSurcharge(i.code, i.descr || '')
             );
             if (airportIdx !== -1) parsedInsurances.splice(airportIdx, 1);
+          } else if (selectedCar?.optionalInsurances?.length || selectedCar?.includedInsurances?.length) {
+            // Fallback: se getQuote não retornou insuranceList, recupera do getMultipleRates
+            const fallbackList = [
+              ...(selectedCar.includedInsurances || []).map((ins: any) => ({ ...ins, type: ins.type || 'I' })),
+              ...(selectedCar.optionalInsurances || []).map((ins: any) => ({ ...ins, type: 'O' })),
+            ];
+            parsedInsurances = fallbackList.map((ins: any) => {
+              const a = ins.$ || ins;
+              const code = (a.code || '').toUpperCase();
+              const descr = translateDescr(code, a.descr || '');
+              return {
+                code,
+                descr,
+                type:                          a.type                          || 'O',
+                includedInTotal:               a.includedInTotal               || (a.type === 'I' ? 'Y' : ''),
+                price:                         parseFloat(a.price              || '0'),
+                priceInBookingCurrency:        parseFloat(a.priceInBookingCurrency || '0'),
+                rentalPriceAI:                 parseFloat(a.rentalPriceAI      || '0'),
+                rentalPriceInBookingCurrencyAI:parseFloat(a.rentalPriceInBookingCurrencyAI || '0'),
+                excessWithPOM:                 parseFloat(a.excessWithPOM      || '0'),
+                bkExcessWithPOM:               parseFloat(a.bkExcessWithPOM    || '0'),
+                prepaid:                       a.prepaid                       || '',
+                paidBy:                        undefined as string | undefined,
+              };
+            }).filter((ins: any) => ins.code);
+          }
 
-            // Codes already captured from insuranceList — avoid duplicates from chargeList
-            const alreadyCaptured = new Set(parsedInsurances.map((i: any) => i.code));
-            // Equipment codes that should not appear in "incluído" — uma lista fixa (por
-            // catálogo) nunca cobre tudo, porque cada estação retorna seu próprio conjunto
-            // de códigos (ex: LIST01 tem BBS/CBS/PCB/WIF/TOL/EMS, nenhum coberto por um
-            // catálogo estático). A cotação por equipamento (linhas acima) já sabe
-            // exatamente quais códigos pertencem à estação — usa essa lista dinâmica como
-            // fonte principal, e a lista fixa só como reforço para códigos "clássicos"
-            // que às vezes vêm via chargeList mesmo sem estarem no getEquipmentList.
-            const equipmentCodes = new Set([
-              ...codesForQuote.map((e: any) => (e.code || '').toUpperCase()),
-              'ADD','ADR',                 // condutor adicional
-              'CSB','CSI','CST','BST',     // cadeiras/assentos infantis
-              'NVS','NAV',                 // GPS
-              'JAC','YOU',                 // sobretaxa motorista jovem
-              'TRH',                       // engate reboque
-              'CBF','LRC',                 // taxa transfronteiriça
-              'DVD',                       // diesel garantido
-              'SKR','SKB','SKV','SNO','CHN', // esqui / correntes de neve
-              'WFI','LUG','HEL','MMS','JAB', // wifi, bagagem, capacete, espelhos, antiabandono
-              'RSA',                       // roadside assistance (já capturado via insuranceList)
-            ]);
-            // Rental structure charge types to skip (Basic Rental, Free Miles, etc.)
-            const skipChrgTy = new Set(['00001','00048']);
+          // Codes already captured from insuranceList — avoid duplicates from chargeList
+          const alreadyCaptured = new Set(parsedInsurances.map((i: any) => i.code));
+          // Equipment codes that should not appear in "incluído" — uma lista fixa (por
+          // catálogo) nunca cobre tudo, porque cada estação retorna seu próprio conjunto
+          // de códigos (ex: LIST01 tem BBS/CBS/PCB/WIF/TOL/EMS, nenhum coberto por um
+          // catálogo estático). A cotação por equipamento (linhas acima) já sabe
+          // exatamente quais códigos pertencem à estação — usa essa lista dinâmica como
+          // fonte principal, e a lista fixa só como reforço para códigos "clássicos"
+          // que às vezes vêm via chargeList mesmo sem estarem no getEquipmentList.
+          const equipmentCodes = new Set([
+            ...codesForQuote.map((e: any) => (e.code || '').toUpperCase()),
+            'ADD','ADR',                 // condutor adicional
+            'CSB','CSI','CST','BST',     // cadeiras/assentos infantis
+            'NVS','NAV',                 // GPS
+            'JAC','YOU',                 // sobretaxa motorista jovem
+            'TRH',                       // engate reboque
+            'CBF','LRC',                 // taxa transfronteiriça
+            'DVD',                       // diesel garantido
+            'SKR','SKB','SKV','SNO','CHN', // esqui / correntes de neve
+            'WFI','LUG','HEL','MMS','JAB', // wifi, bagagem, capacete, espelhos, antiabandono
+            'RSA',                       // roadside assistance (já capturado via insuranceList)
+          ]);
+          // Rental structure charge types to skip (Basic Rental, Free Miles, etc.)
+          const skipChrgTy = new Set(['00001','00048']);
 
-            // ── chargeList — API returns <chargeLine> elements (NOT <charge>) ──
-            // IMPORTANT: Individual chargeLine items carry PRE-VAT prices.
-            // The VAT (chrgTy="00028") is a separate line. areTaxesIncluded="Y" on
-            // the quote means the TOTAL includes VAT, not the individual lines.
-            // Confirmed by: sum(pre-VAT lines) + VAT line = totalRateEstimate.
-            // We must apply VAT multiplier to get the correct display value.
-            const rawChargeLine = quote?.chargeList?.chargeLine;
-            if (rawChargeLine) {
-              const chargeArr = Array.isArray(rawChargeLine) ? rawChargeLine : [rawChargeLine];
+          // ── chargeList — API returns <chargeLine> elements (NOT <charge>) ──
+          // IMPORTANT: Individual chargeLine items carry PRE-VAT prices.
+          // The VAT (chrgTy="00028") is a separate line. areTaxesIncluded="Y" on
+          // the quote means the TOTAL includes VAT, not the individual lines.
+          // Confirmed by: sum(pre-VAT lines) + VAT line = totalRateEstimate.
+          // We must apply VAT multiplier to get the correct display value.
+          const rawChargeLine = quote?.chargeList?.chargeLine;
+          if (rawChargeLine) {
+            const chargeArr = Array.isArray(rawChargeLine) ? rawChargeLine : [rawChargeLine];
 
-              // ── Pass 1: extract VAT % from the 00028 line ──────────────────────────
-              // Airport surcharge (and others) are stored PRE-VAT; we need to apply
-              // the VAT multiplier to display the correct amount to the customer.
-              let vatMultiplier = 1;
-              chargeArr.forEach((c: any) => {
-                const a = c.$ || c;
-                if ((a.chrgTy || '') === '00028') {
-                  const pct = parseFloat(a.chrgPct || '0');
-                  if (pct > 0 && pct <= 100) vatMultiplier = 1 + pct / 100;
-                }
-              });
+            // ── Pass 1: extract VAT % from the 00028 line ──────────────────────────
+            // Airport surcharge (and others) are stored PRE-VAT; we need to apply
+            // the VAT multiplier to display the correct amount to the customer.
+            let vatMultiplier = 1;
+            chargeArr.forEach((c: any) => {
+              const a = c.$ || c;
+              if ((a.chrgTy || '') === '00028') {
+                const pct = parseFloat(a.chrgPct || '0');
+                if (pct > 0 && pct <= 100) vatMultiplier = 1 + pct / 100;
+              }
+            });
 
-              let vatAddedFromChargeLine = false;
-              chargeArr.forEach((c: any) => {
-                const a = c.$ || c;
-                const auxK       = (a.auxK     || '').toUpperCase();
-                const chrgTy     = (a.chrgTy   || '');
-                const chrgTyDesc = (a.chrgTyDesc || '').trim();
-                const chrgPct    = parseFloat(a.chrgPct || '0');
-                const price      = parseFloat(a.price || '0');
-                const priceBK    = parseFloat(a.priceInBookingCurrency || '0');
+            let vatAddedFromChargeLine = false;
+            chargeArr.forEach((c: any) => {
+              const a = c.$ || c;
+              const auxK       = (a.auxK     || '').toUpperCase();
+              const chrgTy     = (a.chrgTy   || '');
+              const chrgTyDesc = (a.chrgTyDesc || '').trim();
+              const chrgPct    = parseFloat(a.chrgPct || '0');
+              const price      = parseFloat(a.price || '0');
+              const priceBK    = parseFloat(a.priceInBookingCurrency || '0');
 
-                // ── paidBy: quem paga esta cobrança (fonte XRS) ──────────────
-                const payerNode = c.payer?.$ || c.payer || {};
-                const paidBy: 'driver' | 'business' | 'unknown' =
-                  'dvrName' in payerNode ? 'driver'
-                  : 'ba' in payerNode ? 'business'
-                  : 'unknown';
+              // ── paidBy: quem paga esta cobrança (fonte XRS) ──────────────
+              const payerNode = c.payer?.$ || c.payer || {};
+              const paidBy: 'driver' | 'business' | 'unknown' =
+                'dvrName' in payerNode ? 'driver'
+                : 'ba' in payerNode ? 'business'
+                : 'unknown';
 
-                // Skip pure rental/mileage infrastructure lines
-                if (skipChrgTy.has(chrgTy)) return;
-                // Skip equipment items (already shown in extras section)
-                if (equipmentCodes.has(auxK)) return;
+              // Skip pure rental/mileage infrastructure lines
+              if (skipChrgTy.has(chrgTy)) return;
+              // Skip equipment items (already shown in extras section)
+              if (equipmentCodes.has(auxK)) return;
 
-                // ── Airport surcharge (chrgTy 00024) ─────────────────────────────────────
-                // The correct \"at counter\" value depends on prepaidMode:
-                //   PP (ETO): always use the dedicated NP call (npAirportEntry).
-                //             If that call failed → skip entirely (no fallback with wrong value).
-                //   NP (POA): this call IS already NP → use its value directly.
-                // Confirmed by Europcar: airport surcharge amount varies between POA (NP)
-                // and BA (PP) modes. The NP value matches what the B2B portal shows.
-                if (chrgTy === '00024') {
-                  // Remove any duplicate airport entry that slipped in from insuranceList
-                  const dupIdx = parsedInsurances.findIndex((i: any) =>
-                    isAirportSurcharge(i.code, i.descr || '')
-                  );
-                  if (dupIdx !== -1) parsedInsurances.splice(dupIdx, 1);
+              // ── Airport surcharge (chrgTy 00024) ─────────────────────────────────────
+              // The correct \"at counter\" value depends on prepaidMode:
+              //   PP (ETO): always use the dedicated NP call (npAirportEntry).
+              //             If that call failed → skip entirely (no fallback with wrong value).
+              //   NP (POA): this call IS already NP → use its value directly.
+              // Confirmed by Europcar: airport surcharge amount varies between POA (NP)
+              // and BA (PP) modes. The NP value matches what the B2B portal shows.
+              if (chrgTy === '00024') {
+                // Remove any duplicate airport entry that slipped in from insuranceList
+                const dupIdx = parsedInsurances.findIndex((i: any) =>
+                  isAirportSurcharge(i.code, i.descr || '')
+                );
+                if (dupIdx !== -1) parsedInsurances.splice(dupIdx, 1);
 
-                  if (prepaidMode === 'PP') {
-                    // ETO customer: must use NP value — no fallback, no guessing.
-                    if (!npAirportEntry) {
-                      console.warn('[Step3] Airport surcharge skipped: NP call unavailable for PP customer.');
-                      return; // skip — do not show incorrect PP amount
-                    }
-                    const npVatMult = npAirportEntry.vatPct > 0 ? 1 + npAirportEntry.vatPct / 100 : 1;
-                    parsedInsurances.push({
-                      code:                          auxK && auxK !== '8' && auxK !== '' ? auxK : 'AIRPORTFEE',
-                      descr:                         AIRPORT_LABEL,
-                      type:                          'M',
-                      includedInTotal:               'Y',
-                      price:                         npAirportEntry.price    * npVatMult,
-                      priceInBookingCurrency:        npAirportEntry.priceBRL * npVatMult,
-                      rentalPriceAI:                 0,
-                      rentalPriceInBookingCurrencyAI: 0,
-                      excessWithPOM:                 0,
-                      bkExcessWithPOM:               0,
-                      prepaid:                       '',
-                      paidBy: 'counter' as any,  // Airport surcharge = SEMPRE balcão
-                    });
-                  } else {
-                    // POA customer: this call is already NP — value is authoritative.
-                    // chrgTy 00024 = SEMPRE pago no balcão, independente do paidBy do XRS.
-                    parsedInsurances.push({
-                      code:                          auxK && auxK !== '8' && auxK !== '' ? auxK : 'AIRPORTFEE',
-                      descr:                         AIRPORT_LABEL,
-                      type:                          'M',
-                      includedInTotal:               'Y',
-                      price:                         price   * vatMultiplier,
-                      priceInBookingCurrency:        priceBK * vatMultiplier,
-                      rentalPriceAI:                 0,
-                      rentalPriceInBookingCurrencyAI: 0,
-                      excessWithPOM:                 0,
-                      bkExcessWithPOM:               0,
-                      prepaid:                       '',
-                      paidBy: 'counter' as any,  // Airport surcharge = SEMPRE balcão
-                    });
+                if (prepaidMode === 'PP') {
+                  // ETO customer: must use NP value — no fallback, no guessing.
+                  if (!npAirportEntry) {
+                    console.warn('[Step3] Airport surcharge skipped: NP call unavailable for PP customer.');
+                    return; // skip — do not show incorrect PP amount
                   }
-                  return;
-                }
-
-
-                // Skip insurance items already captured from insuranceList
-                if (alreadyCaptured.has(auxK)) return;
-
-                // ── Young/Senior Driver Surcharge (chrgTy 00070 or codes YOU/SNR) ──
-                // When the driver age is below youngDriverAge, the XRS automatically
-                // includes this surcharge. We display it as a visible line item.
-                if (chrgTy === '00070' || auxK === 'YOU' || auxK === 'SNR') {
-                  const isYoung = chrgTy === '00070' || auxK === 'YOU';
-                  const surchargeLabel = isYoung ? 'Taxa de Jovem Condutor' : 'Taxa de Condutor Sênior';
+                  const npVatMult = npAirportEntry.vatPct > 0 ? 1 + npAirportEntry.vatPct / 100 : 1;
                   parsedInsurances.push({
-                    code: auxK || chrgTy,
-                    descr: surchargeLabel,
-                    type: 'M',
-                    includedInTotal: 'Y',
-                    price:   price   * vatMultiplier,
-                    priceInBookingCurrency: priceBK * vatMultiplier,
-                    rentalPriceAI: 0,
+                    code:                          auxK && auxK !== '8' && auxK !== '' ? auxK : 'AIRPORTFEE',
+                    descr:                         AIRPORT_LABEL,
+                    type:                          'M',
+                    includedInTotal:               'Y',
+                    price:                         npAirportEntry.price    * npVatMult,
+                    priceInBookingCurrency:        npAirportEntry.priceBRL * npVatMult,
+                    rentalPriceAI:                 0,
                     rentalPriceInBookingCurrencyAI: 0,
-                    excessWithPOM: 0,
-                    bkExcessWithPOM: 0,
-                    prepaid: '',
-                    paidBy,
+                    excessWithPOM:                 0,
+                    bkExcessWithPOM:               0,
+                    prepaid:                       '',
+                    paidBy: 'counter' as any,  // Airport surcharge = SEMPRE balcão
                   });
-                  console.log(`[Step3] 🧑 ${surchargeLabel}: EUR ${price.toFixed(2)} / BRL ${priceBK.toFixed(2)} (paidBy=${paidBy})`);
-                  return;
+                } else {
+                  // POA customer: this call is already NP — value is authoritative.
+                  // chrgTy 00024 = SEMPRE pago no balcão, independente do paidBy do XRS.
+                  parsedInsurances.push({
+                    code:                          auxK && auxK !== '8' && auxK !== '' ? auxK : 'AIRPORTFEE',
+                    descr:                         AIRPORT_LABEL,
+                    type:                          'M',
+                    includedInTotal:               'Y',
+                    price:                         price   * vatMultiplier,
+                    priceInBookingCurrency:        priceBK * vatMultiplier,
+                    rentalPriceAI:                 0,
+                    rentalPriceInBookingCurrencyAI: 0,
+                    excessWithPOM:                 0,
+                    bkExcessWithPOM:               0,
+                    prepaid:                       '',
+                    paidBy: 'counter' as any,  // Airport surcharge = SEMPRE balcão
+                  });
                 }
+                return;
+              }
 
-                // VAT / Tax line
-                if (chrgTy === '00028' || chrgTyDesc.toUpperCase() === 'VAT') {
-                  if (!vatAddedFromChargeLine) {
-                    vatAddedFromChargeLine = true;
-                    const pct = chrgPct > 0 && chrgPct <= 100 ? ` ${chrgPct}%` : '';
-                    parsedInsurances.push({
-                      code: 'VAT',
-                      descr: `IVA${pct}`,
-                      type: 'M',
-                      includedInTotal: 'Y',
-                      price,
-                      priceInBookingCurrency: priceBK,
-                      rentalPriceAI: 0,
-                      rentalPriceInBookingCurrencyAI: 0,
-                      excessWithPOM: 0,
-                      bkExcessWithPOM: 0,
-                      prepaid: '',
-                      paidBy,
-                    });
-                  }
-                  return;
-                }
 
-                // Use auxK as code if meaningful, else use chrgTy
-                const code = auxK && auxK !== '8' && auxK !== '' ? auxK : chrgTy;
-                const descr = translateDescr(code, chrgTyDesc);
+              // Skip insurance items already captured from insuranceList
+              if (alreadyCaptured.has(auxK)) return;
 
+              // ── Young/Senior Driver Surcharge (chrgTy 00070 or codes YOU/SNR) ──
+              // When the driver age is below youngDriverAge, the XRS automatically
+              // includes this surcharge. We display it as a visible line item.
+              if (chrgTy === '00070' || auxK === 'YOU' || auxK === 'SNR') {
+                const isYoung = chrgTy === '00070' || auxK === 'YOU';
+                const surchargeLabel = isYoung ? 'Taxa de Jovem Condutor' : 'Taxa de Condutor Sênior';
                 parsedInsurances.push({
-                  code,
-                  descr,
+                  code: auxK || chrgTy,
+                  descr: surchargeLabel,
                   type: 'M',
                   includedInTotal: 'Y',
-                  price,
-                  priceInBookingCurrency: priceBK,
+                  price:   price   * vatMultiplier,
+                  priceInBookingCurrency: priceBK * vatMultiplier,
                   rentalPriceAI: 0,
                   rentalPriceInBookingCurrencyAI: 0,
                   excessWithPOM: 0,
@@ -1363,51 +1346,95 @@ function VehiclesContent() {
                   prepaid: '',
                   paidBy,
                 });
+                console.log(`[Step3] 🧑 ${surchargeLabel}: EUR ${price.toFixed(2)} / BRL ${priceBK.toFixed(2)} (paidBy=${paidBy})`);
+                return;
+              }
+
+              // VAT / Tax line
+              if (chrgTy === '00028' || chrgTyDesc.toUpperCase() === 'VAT') {
+                if (!vatAddedFromChargeLine) {
+                  vatAddedFromChargeLine = true;
+                  const pct = chrgPct > 0 && chrgPct <= 100 ? ` ${chrgPct}%` : '';
+                  parsedInsurances.push({
+                    code: 'VAT',
+                    descr: `IVA${pct}`,
+                    type: 'M',
+                    includedInTotal: 'Y',
+                    price,
+                    priceInBookingCurrency: priceBK,
+                    rentalPriceAI: 0,
+                    rentalPriceInBookingCurrencyAI: 0,
+                    excessWithPOM: 0,
+                    bkExcessWithPOM: 0,
+                    prepaid: '',
+                    paidBy,
+                  });
+                }
+                return;
+              }
+
+              // Use auxK as code if meaningful, else use chrgTy
+              const code = auxK && auxK !== '8' && auxK !== '' ? auxK : chrgTy;
+              const descr = translateDescr(code, chrgTyDesc);
+
+              parsedInsurances.push({
+                code,
+                descr,
+                type: 'M',
+                includedInTotal: 'Y',
+                price,
+                priceInBookingCurrency: priceBK,
+                rentalPriceAI: 0,
+                rentalPriceInBookingCurrencyAI: 0,
+                excessWithPOM: 0,
+                bkExcessWithPOM: 0,
+                prepaid: '',
+                paidBy,
               });
-            }
+            });
+          }
 
-            // ── taxList fallback (if API returns a separate taxList) ──
-            if (quote?.taxList?.tax) {
-              const rawTax = quote.taxList.tax;
-              const taxArr = Array.isArray(rawTax) ? rawTax : [rawTax];
-              taxArr.forEach((t: any) => {
-                const a = t.$ || t;
-                const percent = parseFloat(a.percent || a.amount || '0');
-                const isVAT = (a.type || '').toUpperCase() === 'VAT';
-                if (parsedInsurances.some((i: any) => i.code === 'VAT') && isVAT) return; // already added
-                const taxName = isVAT
-                  ? `IVA${percent > 0 && percent <= 100 ? ' ' + percent + '%' : ''}`
-                  : `Taxa/Imposto${percent > 0 && percent <= 100 ? ' ' + percent + '%' : ''}`;
-                parsedInsurances.push({
-                  code:                          (a.type || 'TAX').toUpperCase(),
-                  descr:                         taxName.trim(),
-                  type:                          'M',
-                  includedInTotal:               'Y',
-                  price:                         parseFloat(a.price || '0'),
-                  priceInBookingCurrency:        parseFloat(a.priceInBookingCurrency || '0'),
-                  rentalPriceAI:                 parseFloat(a.rentalPriceAI || '0'),
-                  rentalPriceInBookingCurrencyAI:parseFloat(a.rentalPriceInBookingCurrencyAI || '0'),
-                  excessWithPOM:                 0,
-                  bkExcessWithPOM:               0,
-                  prepaid:                       a.prepaid || '',
-                });
+          // ── taxList fallback (if API returns a separate taxList) ──
+          if (quote?.taxList?.tax) {
+            const rawTax = quote.taxList.tax;
+            const taxArr = Array.isArray(rawTax) ? rawTax : [rawTax];
+            taxArr.forEach((t: any) => {
+              const a = t.$ || t;
+              const percent = parseFloat(a.percent || a.amount || '0');
+              const isVAT = (a.type || '').toUpperCase() === 'VAT';
+              if (parsedInsurances.some((i: any) => i.code === 'VAT') && isVAT) return; // already added
+              const taxName = isVAT
+                ? `IVA${percent > 0 && percent <= 100 ? ' ' + percent + '%' : ''}`
+                : `Taxa/Imposto${percent > 0 && percent <= 100 ? ' ' + percent + '%' : ''}`;
+              parsedInsurances.push({
+                code:                          (a.type || 'TAX').toUpperCase(),
+                descr:                         taxName.trim(),
+                type:                          'M',
+                includedInTotal:               'Y',
+                price:                         parseFloat(a.price || '0'),
+                priceInBookingCurrency:        parseFloat(a.priceInBookingCurrency || '0'),
+                rentalPriceAI:                 parseFloat(a.rentalPriceAI || '0'),
+                rentalPriceInBookingCurrencyAI:parseFloat(a.rentalPriceInBookingCurrencyAI || '0'),
+                excessWithPOM:                 0,
+                bkExcessWithPOM:               0,
+                prepaid:                       a.prepaid || '',
               });
-            }
+            });
+          }
 
-            setQuoteInsurances(parsedInsurances);
+          setQuoteInsurances(parsedInsurances);
 
-            // ── payerList — split entre motorista e conta corporativa ────────────
-            // Usa parsePayerList para extrair driverDueBRL (cobrado online) e
-            // businessDueBRL (faturado separado). Armazenado em payerSplit e
-            // incluído no payload que vai ao checkout via sessionStorage.
-            const split = parsePayerList(reservation);
-            if (split) {
-              setPayerSplit(split);
-              console.log(`[Step3] payerSplit: driver=${split.driverDueBRL} BRL, business=${split.businessDueBRL} BRL`);
-            } else {
-              setPayerSplit(null);
-              console.log('[Step3] payerList não disponível — checkout usará cálculo por nome de cobrança como fallback');
-            }
+          // ── payerList — split entre motorista e conta corporativa ────────────
+          // Usa parsePayerList para extrair driverDueBRL (cobrado online) e
+          // businessDueBRL (faturado separado). Armazenado em payerSplit e
+          // incluído no payload que vai ao checkout via sessionStorage.
+          const split = parsePayerList(reservation);
+          if (split) {
+            setPayerSplit(split);
+            console.log(`[Step3] payerSplit: driver=${split.driverDueBRL} BRL, business=${split.businessDueBRL} BRL`);
+          } else {
+            setPayerSplit(null);
+            console.log('[Step3] payerList não disponível — checkout usará cálculo por nome de cobrança como fallback');
           }
 
           // ── Mileage data ────────────────────────────────────────────────
@@ -2723,9 +2750,12 @@ function VehiclesContent() {
                   })()}
 
                   {/* 🛡️ Proteções da API getQuote — Real data for selected vehicle */}
-                  {/* For ETO (Pagar Agora) on international stations, hide the package cards —
-                      only the Zero Excess banner above is shown. */}
-                  {!(selectedTariffType === 'ETO' && stationCountry !== 'BR' && !pickupStation.toUpperCase().startsWith('BR')) && quoteInsurances.length > 0 ? (() => {
+                  {loadingEquipment ? (
+                    <div className="flex items-center gap-2 text-gray-500 text-sm py-4">
+                      <div className="w-4 h-4 border-2 border-[#008d36] border-t-transparent rounded-full animate-spin" />
+                      <p>{t('extras.loadingProtections')}</p>
+                    </div>
+                  ) : quoteInsurances.filter((ins: any) => ins.type !== 'M' && ins.code !== 'SL').length > 0 ? (() => {
                     // Insurance name and description maps (Portuguese)
                     const insNamesPT: Record<string, string> = {
                       WWI: 'Proteção de para-brisas, vidros, faróis e pneus',
@@ -2923,7 +2953,12 @@ function VehiclesContent() {
                       </>
                     );
                   })() : (
-                    <p className="text-gray-400 text-sm py-4">{t('extras.loadingProtections')}</p>
+                    <div className="border border-gray-200 rounded-xl p-4 mb-8 bg-gray-50 flex items-center gap-3">
+                      <span className="text-xl">🛡️</span>
+                      <p className="text-sm text-gray-600">
+                        As proteções básicas obrigatórias (danos e roubo com franquia) já estão incluídas na tarifa do veículo.
+                      </p>
+                    </div>
                   )}
 
                   {/* 🚗 Quilometragem Incluída */}
