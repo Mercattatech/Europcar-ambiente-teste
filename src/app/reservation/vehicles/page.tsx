@@ -2952,14 +2952,82 @@ function VehiclesContent() {
                         </div>
                       </>
                     );
-                  })() : (
-                    <div className="border border-gray-200 rounded-xl p-4 mb-8 bg-gray-50 flex items-center gap-3">
-                      <span className="text-xl">🛡️</span>
-                      <p className="text-sm text-gray-600">
-                        As proteções básicas obrigatórias (danos e roubo com franquia) já estão incluídas na tarifa do veículo.
-                      </p>
-                    </div>
-                  )}
+                  })() : (() => {
+                    const basicWithExcess = (quoteInsurances || []).find(
+                      (ins: any) => (ins.type === 'I' || ins.type === 'M') && (ins.bkExcessWithPOM > 0 || ins.excessWithPOM > 0)
+                    );
+                    const excessBRL = basicWithExcess?.bkExcessWithPOM || 0;
+                    const excessOrig = basicWithExcess?.excessWithPOM || 0;
+                    const currency = selectedCar?.currency || 'EUR';
+
+                    return (
+                      <div className="border border-green-200 bg-gradient-to-r from-green-50/70 to-emerald-50/40 rounded-2xl p-5 md:p-6 mb-8 shadow-xs">
+                        <div className="flex items-start gap-3.5 mb-4">
+                          <div className="w-10 h-10 rounded-xl bg-[#008d36] text-white flex items-center justify-center text-xl shrink-0 shadow-sm">
+                            🛡️
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="font-extrabold text-gray-900 text-base md:text-lg">
+                                Proteção Básica Inclusa
+                              </h3>
+                              <span className="text-[11px] bg-green-100 text-[#008d36] font-bold px-2.5 py-0.5 rounded-full border border-green-200">
+                                Já inclusa no valor
+                              </span>
+                            </div>
+                            <p className="text-xs md:text-sm text-gray-600 mt-0.5">
+                              Sua tarifa já contempla as coberturas obrigatórias da Europcar para você viajar com segurança e tranquilidade.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Coberturas detalhadas da proteção básica */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-3 border-t border-green-100">
+                          <div className="bg-white/80 rounded-xl p-3.5 border border-green-100/80 shadow-2xs">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="text-base">🚗</span>
+                              <h4 className="font-bold text-gray-900 text-xs md:text-sm">Danos e Colisão (CDW/LDW)</h4>
+                            </div>
+                            <p className="text-[11px] md:text-xs text-gray-600 leading-relaxed">
+                              Limita sua responsabilidade financeira em caso de avarias ou danos por colisão acidental ao veículo alugado.
+                            </p>
+                          </div>
+
+                          <div className="bg-white/80 rounded-xl p-3.5 border border-green-100/80 shadow-2xs">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="text-base">🔒</span>
+                              <h4 className="font-bold text-gray-900 text-xs md:text-sm">Roubo e Furto (THW/TP)</h4>
+                            </div>
+                            <p className="text-[11px] md:text-xs text-gray-600 leading-relaxed">
+                              Cobertura contra roubo ou furto total do veículo durante todo o período da locação.
+                            </p>
+                          </div>
+
+                          <div className="bg-white/80 rounded-xl p-3.5 border border-green-100/80 shadow-2xs">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="text-base">📄</span>
+                              <h4 className="font-bold text-gray-900 text-xs md:text-sm">Responsabilidade Civil (TPL)</h4>
+                            </div>
+                            <p className="text-[11px] md:text-xs text-gray-600 leading-relaxed">
+                              Proteção contra terceiros para danos materiais e corporais, conforme as leis do país de destino.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Informação sobre franquia */}
+                        <div className="mt-3.5 pt-3 border-t border-green-100/70 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-green-700 font-bold">ℹ️</span>
+                            {excessBRL > 0 ? (
+                              <span>Franquia padrão desta categoria: <strong className="text-gray-800">R$ {fmtPrice(excessBRL)}</strong> {excessOrig > 0 && `(${currency} ${fmtPrice(excessOrig)})`} (aplicada somente em caso de sinistro ou avaria).</span>
+                            ) : (
+                              <span>Proteção sujeita à coparticipação (franquia) padrão da locadora, acionada somente em caso de sinistro.</span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* 🚗 Quilometragem Incluída */}
                   {quoteMileage && (
