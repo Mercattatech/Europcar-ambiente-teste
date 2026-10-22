@@ -9,6 +9,7 @@
  */
 import { sendEmail } from '@/lib/emailService';
 import prisma from '@/lib/prisma';
+import { getStationInfo } from '@/lib/europcar/stationInfo';
 
 interface BookingConfirmationData {
   toEmail: string;
@@ -17,6 +18,12 @@ interface BookingConfirmationData {
   carName: string;
   pickupStation: string;
   returnStation: string;
+  pickupStationName?: string;
+  returnStationName?: string;
+  pickupStationAddress?: string;
+  returnStationAddress?: string;
+  pickupStationPhone?: string;
+  returnStationPhone?: string;
   pickupDate: string;
   returnDate: string;
   paymentMethod: string;
@@ -52,11 +59,36 @@ async function getFromEmail(): Promise<string> {
 export async function sendBookingConfirmation(data: BookingConfirmationData): Promise<boolean> {
   const fromEmail = await getFromEmail();
 
-  const {
+  let {
     toEmail, customerName, resNumber, carName,
     pickupStation, returnStation, pickupDate, returnDate,
+    pickupStationName, returnStationName,
+    pickupStationAddress, returnStationAddress,
+    pickupStationPhone, returnStationPhone,
     paymentMethod, totalBRL, isOnRequest,
   } = data;
+
+  // Resolve endereços das estações se não vierem preenchidos
+  try {
+    const [pInfo, rInfo] = await Promise.all([
+      (!pickupStationAddress && pickupStation) ? getStationInfo(pickupStation, 3000) : null,
+      (!returnStationAddress && returnStation && returnStation !== pickupStation) ? getStationInfo(returnStation, 3000) : null,
+    ]);
+    if (pInfo) {
+      if (!pickupStationName || pickupStationName === pickupStation) pickupStationName = pInfo.name;
+      if (!pickupStationAddress) pickupStationAddress = pInfo.fullAddress;
+      if (!pickupStationPhone) pickupStationPhone = pInfo.phone;
+    }
+    if (rInfo) {
+      if (!returnStationName || returnStationName === returnStation) returnStationName = rInfo.name;
+      if (!returnStationAddress) returnStationAddress = rInfo.fullAddress;
+      if (!returnStationPhone) returnStationPhone = rInfo.phone;
+    } else if (!returnStationAddress && (!returnStation || returnStation === pickupStation)) {
+      returnStationName = returnStationName || pickupStationName;
+      returnStationAddress = pickupStationAddress;
+      returnStationPhone = returnStationPhone || pickupStationPhone;
+    }
+  } catch { /* mantém os dados fornecidos */ }
 
   const statusColor = isOnRequest ? '#f59e0b' : '#008d36';
   const statusLabel = isOnRequest ? 'Aguardando Confirmação' : 'Confirmada ✓';
@@ -106,12 +138,20 @@ export async function sendBookingConfirmation(data: BookingConfirmationData): Pr
             <td style="padding:12px 0;color:#111827;font-size:13px;font-weight:bold;">${carName}</td>
           </tr>
           <tr style="border-bottom:1px solid #f3f4f6;">
-            <td style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;">Retirada</td>
-            <td style="padding:12px 0;color:#111827;font-size:13px;">${pickupStation} · ${formatXRSDate(pickupDate)}</td>
+            <td style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;vertical-align:top;">Retirada</td>
+            <td style="padding:12px 0;color:#111827;font-size:13px;">
+              <strong>${pickupStationName || pickupStation}</strong>${pickupStation && pickupStation !== pickupStationName ? ` <span style="color:#6b7280;font-weight:normal;">(${pickupStation})</span>` : ''} · ${formatXRSDate(pickupDate)}
+              ${pickupStationAddress ? `<div style="margin-top:4px;color:#4b5563;font-size:12px;line-height:1.4;">📍 ${pickupStationAddress}</div>` : ''}
+              ${pickupStationPhone ? `<div style="margin-top:2px;color:#6b7280;font-size:11px;">Tel: ${pickupStationPhone}</div>` : ''}
+            </td>
           </tr>
           <tr style="border-bottom:1px solid #f3f4f6;">
-            <td style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;">Devolução</td>
-            <td style="padding:12px 0;color:#111827;font-size:13px;">${returnStation} · ${formatXRSDate(returnDate)}</td>
+            <td style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;vertical-align:top;">Devolução</td>
+            <td style="padding:12px 0;color:#111827;font-size:13px;">
+              <strong>${returnStationName || returnStation}</strong>${returnStation && returnStation !== returnStationName ? ` <span style="color:#6b7280;font-weight:normal;">(${returnStation})</span>` : ''} · ${formatXRSDate(returnDate)}
+              ${returnStationAddress ? `<div style="margin-top:4px;color:#4b5563;font-size:12px;line-height:1.4;">📍 ${returnStationAddress}</div>` : ''}
+              ${returnStationPhone ? `<div style="margin-top:2px;color:#6b7280;font-size:11px;">Tel: ${returnStationPhone}</div>` : ''}
+            </td>
           </tr>
           <tr style="border-bottom:1px solid #f3f4f6;">
             <td style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;">Pagamento</td>

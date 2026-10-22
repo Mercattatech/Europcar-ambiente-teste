@@ -73,6 +73,22 @@ export async function POST(request: Request) {
                 }
                 const valorTotal = localCur === 'BRL' ? valorLocal : `${valorLocal} (≈ ${valorBRL})`;
                 const fmtPag: Record<string,string> = { BALCAO:'Pagamento no Balcão', PIX:'PIX', CREDIT:'Cartão de Crédito', VOUCHER:'Voucher ETO (Faturado)' };
+                const pickupStationCode = booking.pickupStation || '';
+                const pickupStationName = booking.pickupStationName || pickupStationCode;
+                const pickupStationAddress = booking.pickupStationAddress || booking.pickupAddress || booking.stationAddress || '';
+                const pickupStationPhone = booking.pickupStationPhone || '';
+
+                const returnStationCode = booking.returnStation || booking.pickupStation || '';
+                const returnStationName = booking.returnStationName || (returnStationCode === pickupStationCode ? pickupStationName : returnStationCode);
+                const returnStationAddress = booking.returnStationAddress || booking.returnAddress || (returnStationCode === pickupStationCode ? pickupStationAddress : '');
+                const returnStationPhone = booking.returnStationPhone || (returnStationCode === pickupStationCode ? pickupStationPhone : '');
+
+                const formatLine = (name: string, code: string, addr: string) => {
+                  if (!code) return '';
+                  const head = name && name !== code ? `${name} (${code})` : code;
+                  return addr ? `${head} — ${addr}` : head;
+                };
+
                 const cancelResult = await sendTransactionalEmail(cd.email, 'CANCELAMENTO', {
                    NOME: cd.nome || '',
                    SOBRENOME: cd.sobrenome || '',
@@ -83,10 +99,18 @@ export async function POST(request: Request) {
                    CATEGORIA_CARRO: car.carCategoryCode || car.acrissCode || '',
                    DATA_RETIRADA: fmtD(booking.pickupDate || ''),
                    HORARIO_RETIRADA: fmtT(booking.pickupTime || ''),
-                   LOCAL_RETIRADA: booking.pickupStation || '',
+                   CODIGO_LOJA_RETIRADA: pickupStationCode,
+                   NOME_LOJA_RETIRADA: pickupStationName,
+                   ENDERECO_LOJA_RETIRADA: pickupStationAddress,
+                   TELEFONE_LOJA_RETIRADA: pickupStationPhone,
+                   LOCAL_RETIRADA: formatLine(pickupStationName, pickupStationCode, pickupStationAddress),
                    DATA_DEVOLUCAO: fmtD(booking.returnDate || ''),
                    HORARIO_DEVOLUCAO: fmtT(booking.returnTime || ''),
-                   LOCAL_DEVOLUCAO: booking.returnStation || booking.pickupStation || '',
+                   CODIGO_LOJA_DEVOLUCAO: returnStationCode,
+                   NOME_LOJA_DEVOLUCAO: returnStationName,
+                   ENDERECO_LOJA_DEVOLUCAO: returnStationAddress,
+                   TELEFONE_LOJA_DEVOLUCAO: returnStationPhone,
+                   LOCAL_DEVOLUCAO: formatLine(returnStationName, returnStationCode, returnStationAddress),
                    VALOR_LOCAL: valorLocal,
                    VALOR_BRL: valorBRL,
                    VALOR_TOTAL: valorTotal,
@@ -98,7 +122,10 @@ export async function POST(request: Request) {
                   await sendCancellationEmail({
                     toEmail: cd.email, customerName: `${cd.nome||''} ${cd.sobrenome||''}`.trim(),
                     resNumber, carName: car.carCategoryName || car.carCategorySample || '',
-                    pickupStation: booking.pickupStation || '', returnStation: booking.returnStation || booking.pickupStation || '',
+                    pickupStation: pickupStationCode, returnStation: returnStationCode,
+                    pickupStationName, returnStationName,
+                    pickupStationAddress, returnStationAddress,
+                    pickupStationPhone, returnStationPhone,
                     pickupDate: booking.pickupDate || '', returnDate: booking.returnDate || '',
                     paymentMethod: cd.paymentMethod || '', totalBRL: amtBRL,
                   });
@@ -151,6 +178,22 @@ export async function POST(request: Request) {
               }
               const valorTotal = localCur === 'BRL' ? valorLocal : `${valorLocal} (≈ ${valorBRL})`;
               const fmtPag: Record<string,string> = { BALCAO:'Pagamento no Balcão', PIX:'PIX', CREDIT:'Cartão de Crédito', VOUCHER:'Voucher ETO (Faturado)' };
+              const pickupStationCode = booking.pickupStation || '';
+              const pickupStationName = booking.pickupStationName || pickupStationCode;
+              const pickupStationAddress = booking.pickupStationAddress || booking.pickupAddress || booking.stationAddress || '';
+              const pickupStationPhone = booking.pickupStationPhone || '';
+
+              const returnStationCode = booking.returnStation || booking.pickupStation || '';
+              const returnStationName = booking.returnStationName || (returnStationCode === pickupStationCode ? pickupStationName : returnStationCode);
+              const returnStationAddress = booking.returnStationAddress || booking.returnAddress || (returnStationCode === pickupStationCode ? pickupStationAddress : '');
+              const returnStationPhone = booking.returnStationPhone || (returnStationCode === pickupStationCode ? pickupStationPhone : '');
+
+              const formatLine = (name: string, code: string, addr: string) => {
+                if (!code) return '';
+                const head = name && name !== code ? `${name} (${code})` : code;
+                return addr ? `${head} — ${addr}` : head;
+              };
+
               const cancelResult2 = await sendTransactionalEmail(cd.email, 'CANCELAMENTO', {
                  NOME: cd.nome || '',
                  SOBRENOME: cd.sobrenome || '',
@@ -161,10 +204,18 @@ export async function POST(request: Request) {
                  CATEGORIA_CARRO: car.carCategoryCode || car.acrissCode || '',
                  DATA_RETIRADA: fmtD(booking.pickupDate || ''),
                  HORARIO_RETIRADA: fmtT(booking.pickupTime || ''),
-                 LOCAL_RETIRADA: booking.pickupStation || '',
+                 CODIGO_LOJA_RETIRADA: pickupStationCode,
+                 NOME_LOJA_RETIRADA: pickupStationName,
+                 ENDERECO_LOJA_RETIRADA: pickupStationAddress,
+                 TELEFONE_LOJA_RETIRADA: pickupStationPhone,
+                 LOCAL_RETIRADA: formatLine(pickupStationName, pickupStationCode, pickupStationAddress),
                  DATA_DEVOLUCAO: fmtD(booking.returnDate || ''),
                  HORARIO_DEVOLUCAO: fmtT(booking.returnTime || ''),
-                 LOCAL_DEVOLUCAO: booking.returnStation || booking.pickupStation || '',
+                 CODIGO_LOJA_DEVOLUCAO: returnStationCode,
+                 NOME_LOJA_DEVOLUCAO: returnStationName,
+                 ENDERECO_LOJA_DEVOLUCAO: returnStationAddress,
+                 TELEFONE_LOJA_DEVOLUCAO: returnStationPhone,
+                 LOCAL_DEVOLUCAO: formatLine(returnStationName, returnStationCode, returnStationAddress),
                  VALOR_LOCAL: valorLocal,
                  VALOR_BRL: valorBRL,
                  VALOR_TOTAL: valorTotal,
@@ -176,7 +227,10 @@ export async function POST(request: Request) {
                 await sendCancellationEmail({
                   toEmail: cd.email, customerName: `${cd.nome||''} ${cd.sobrenome||''}`.trim(),
                   resNumber, carName: car.carCategoryName || car.carCategorySample || '',
-                  pickupStation: booking.pickupStation || '', returnStation: booking.returnStation || booking.pickupStation || '',
+                  pickupStation: pickupStationCode, returnStation: returnStationCode,
+                  pickupStationName, returnStationName,
+                  pickupStationAddress, returnStationAddress,
+                  pickupStationPhone, returnStationPhone,
                   pickupDate: booking.pickupDate || '', returnDate: booking.returnDate || '',
                   paymentMethod: cd.paymentMethod || '', totalBRL: amtBRL,
                 });

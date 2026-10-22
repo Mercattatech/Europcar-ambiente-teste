@@ -82,7 +82,7 @@ export default function SearchBookingPage() {
             ) : session?.user ? (
                <div className="flex items-center gap-4">
                   <span className="text-[#008d36]">Olá, {session.user.name || session.user.email?.split('@')[0]}</span>
-                  <button onClick={() => signOut()} className="text-xs text-gray-500 hover:text-red-500 font-normal">Sair</button>
+                  <button onClick={() => signOut({ callbackUrl: "/" })} className="text-xs text-gray-500 hover:text-red-500 font-normal">Sair</button>
                </div>
             ) : (
                <button onClick={() => setShowLoginModal(true)} className="flex items-center gap-2 hover:text-[#008d36]">

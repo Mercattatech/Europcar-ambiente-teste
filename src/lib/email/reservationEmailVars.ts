@@ -308,7 +308,23 @@ export function buildReservationEmailVars(params: {
     console.warn('[reservationEmailVars] Falha ao montar detalhamento:', err?.message);
   }
 
-  const vars: Record<string, string> = {
+    const pickupStationCode = booking.pickupStation || '';
+    const pickupStationName = booking.pickupStationName || pickupStationCode;
+    const pickupStationAddress = booking.pickupStationAddress || booking.pickupAddress || booking.stationAddress || '';
+    const pickupStationPhone = booking.pickupStationPhone || '';
+
+    const returnStationCode = booking.returnStation || booking.pickupStation || '';
+    const returnStationName = booking.returnStationName || (returnStationCode === pickupStationCode ? pickupStationName : returnStationCode);
+    const returnStationAddress = booking.returnStationAddress || booking.returnAddress || (returnStationCode === pickupStationCode ? pickupStationAddress : '');
+    const returnStationPhone = booking.returnStationPhone || (returnStationCode === pickupStationCode ? pickupStationPhone : '');
+
+    const formatLine = (name: string, code: string, addr: string) => {
+      if (!code) return '';
+      const head = name && name !== code ? `${name} (${code})` : code;
+      return addr ? `${head} — ${addr}` : head;
+    };
+
+    const vars: Record<string, string> = {
     NOME: cd.nome || cd.firstName || '',
     SOBRENOME: cd.sobrenome || cd.lastName || '',
     EMAIL: cd.email || '',
@@ -326,10 +342,18 @@ export function buildReservationEmailVars(params: {
     CATEGORIA_CARRO: car.acrissCode || car.carCategoryCode || booking.carCategory || '',
     DATA_RETIRADA: fmtDate(booking.pickupDate),
     HORARIO_RETIRADA: fmtTime(booking.pickupDate) || fmtTime(booking.pickupTime),
-    LOCAL_RETIRADA: booking.pickupStation || '',
+    CODIGO_LOJA_RETIRADA: pickupStationCode,
+    NOME_LOJA_RETIRADA: pickupStationName,
+    ENDERECO_LOJA_RETIRADA: pickupStationAddress,
+    TELEFONE_LOJA_RETIRADA: pickupStationPhone,
+    LOCAL_RETIRADA: formatLine(pickupStationName, pickupStationCode, pickupStationAddress),
     DATA_DEVOLUCAO: fmtDate(booking.returnDate),
     HORARIO_DEVOLUCAO: fmtTime(booking.returnDate) || fmtTime(booking.returnTime),
-    LOCAL_DEVOLUCAO: booking.returnStation || booking.pickupStation || '',
+    CODIGO_LOJA_DEVOLUCAO: returnStationCode,
+    NOME_LOJA_DEVOLUCAO: returnStationName,
+    ENDERECO_LOJA_DEVOLUCAO: returnStationAddress,
+    TELEFONE_LOJA_DEVOLUCAO: returnStationPhone,
+    LOCAL_DEVOLUCAO: formatLine(returnStationName, returnStationCode, returnStationAddress),
     LISTA_PROTECOES: lists.LISTA_PROTECOES,
     LISTA_EXTRAS: lists.LISTA_EXTRAS,
     ...detail,

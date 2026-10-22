@@ -1735,7 +1735,7 @@ function VehiclesContent() {
             {session?.user ? (
               <div className="flex items-center gap-4">
                 <span className="text-[#008d36]">{t('nav.hello')}, {session.user.name || session.user.email?.split("@")[0]}</span>
-                <button onClick={() => signOut()} className="text-xs text-gray-500 hover:text-red-500 font-normal">{t('nav.logout')}</button>
+                <button onClick={() => signOut({ callbackUrl: "/" })} className="text-xs text-gray-500 hover:text-red-500 font-normal">{t('nav.logout')}</button>
               </div>
             ) : status !== "loading" && (
               <button onClick={() => setShowLoginModal(true)} className="hover:text-[#008d36]">{t('nav.login')}</button>

@@ -29,10 +29,25 @@ const TTL_FAIL = 5 * 60 * 1000;
 const cache = new Map<string, { at: number; data: StationInfo | null }>();
 const inflight = new Map<string, Promise<StationInfo | null>>();
 
-/** Códigos de estação XRS: 5–8 caracteres alfanuméricos com ao menos um dígito (LISX02, POAO03). */
+/** Códigos de estação XRS: 3–10 caracteres alfanuméricos. */
 export function isStationCode(v?: string | null): boolean {
-  const s = String(v || '').trim().toUpperCase();
-  return /^[A-Z0-9]{5,8}$/.test(s) && /\d/.test(s);
+  if (!v) return false;
+  const s = String(v).trim().toUpperCase();
+  return /^[A-Z0-9]{3,10}$/.test(s);
+}
+
+/** Extrai código da estação mesmo se estiver com parênteses, hífen ou texto livre. */
+export function extractStationCode(v?: string | null): string | null {
+  if (!v) return null;
+  const s = String(v).trim().toUpperCase();
+  if (/^[A-Z0-9]{3,10}$/.test(s)) return s;
+  const mParen = s.match(/\(([A-Z0-9]{3,10})\)/);
+  if (mParen) return mParen[1];
+  const mWord = s.match(/\b([A-Z]{2,4}\d{1,4}[A-Z0-9]*|[A-Z]{3,4}[A-Z0-9]{1,4}\d[A-Z0-9]*)\b/);
+  if (mWord) return mWord[1];
+  const mFirst = s.match(/^([A-Z0-9]{3,10})\b/);
+  if (mFirst) return mFirst[1];
+  return null;
 }
 
 const clean = (v: any) => String(v ?? '').replace(/\s+/g, ' ').trim();
@@ -87,7 +102,7 @@ async function fetchStation(code: string): Promise<StationInfo | null> {
 
 /** Busca (com cache) as informações da loja. `timeoutMs` limita a espera de quem chama. */
 export async function getStationInfo(rawCode?: string | null, timeoutMs = 5000): Promise<StationInfo | null> {
-  const code = String(rawCode || '').trim().toUpperCase();
+  const code = extractStationCode(rawCode) || String(rawCode || '').trim().toUpperCase();
   if (!isStationCode(code)) return null;
 
   const hit = cache.get(code);
@@ -114,34 +129,72 @@ export async function getStationInfo(rawCode?: string | null, timeoutMs = 5000):
 const escHtml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+export interface StationFallbacks {
+  pickupName?: string | null;
+  returnName?: string | null;
+  pickupAddress?: string | null;
+  returnAddress?: string | null;
+  pickupPhone?: string | null;
+  returnPhone?: string | null;
+}
+
 /** "CORROIOS SEIXAL (LISX02) — Estação Ferroviária Corroios, 2855-097 Corroios, Portugal" */
-export function formatStationLine(code: string, info: StationInfo | null): string {
-  if (!info) return code;
-  const head = info.name && info.name !== code ? `${info.name} (${code})` : code;
-  return info.fullAddress ? `${head} — ${info.fullAddress}` : head;
+export function formatStationLine(
+  code: string,
+  info: StationInfo | null,
+  fallbackAddress?: string | null,
+  fallbackName?: string | null
+): string {
+  const name = info?.name && info.name !== code ? info.name : (fallbackName && fallbackName !== code ? fallbackName : code);
+  const head = name !== code ? `${name} (${code})` : code;
+  const address = info?.fullAddress || fallbackAddress || '';
+  return address ? `${head} — ${address}` : head;
 }
 
 /**
  * Variáveis de loja dos e-mails (retirada e devolução). Valores já escapados para HTML.
- * LOCAL_RETIRADA / LOCAL_DEVOLUCAO passam a trazer nome + código + endereço em texto simples,
- * então até os templates antigos (que só usam {{LOCAL_RETIRADA}}) mostram a loja completa.
+ * Garante sempre CODIGO, NOME, ENDERECO e TELEFONE de cada loja.
+ * LOCAL_RETIRADA / LOCAL_DEVOLUCAO trazem nome + código + endereço completo.
  */
-export async function buildStationEmailVars(pickupCode?: string | null, returnCode?: string | null): Promise<Record<string, string>> {
-  const pCode = String(pickupCode || '').trim().toUpperCase();
-  const rCode = String(returnCode || pickupCode || '').trim().toUpperCase();
-  const [p, r] = await Promise.all([getStationInfo(pCode), rCode === pCode ? null : getStationInfo(rCode)]);
-  const rInfo = rCode === pCode ? p : r;
+export async function buildStationEmailVars(
+  pickupCode?: string | null,
+  returnCode?: string | null,
+  fallbacks?: StationFallbacks
+): Promise<Record<string, string>> {
+  const pCode = extractStationCode(pickupCode) || String(pickupCode || '').trim().toUpperCase();
+  const rCode = extractStationCode(returnCode || pickupCode) || String(returnCode || pickupCode || '').trim().toUpperCase();
+  const isSame = !rCode || rCode === pCode;
 
-  const block = (suffix: string, code: string, info: StationInfo | null): Record<string, string> => ({
+  const [p, r] = await Promise.all([
+    pCode ? getStationInfo(pCode) : null,
+    isSame ? null : (rCode ? getStationInfo(rCode) : null),
+  ]);
+  const rInfo = isSame ? p : r;
+
+  const pAddress = p?.fullAddress || fallbacks?.pickupAddress || '';
+  const rAddress = rInfo?.fullAddress || fallbacks?.returnAddress || (isSame ? pAddress : '');
+  const pName = p?.name || fallbacks?.pickupName || pCode;
+  const rName = rInfo?.name || fallbacks?.returnName || (isSame ? pName : rCode);
+  const pPhone = p?.phone || fallbacks?.pickupPhone || '';
+  const rPhone = rInfo?.phone || fallbacks?.returnPhone || (isSame ? pPhone : '');
+
+  const block = (
+    suffix: string,
+    code: string,
+    info: StationInfo | null,
+    finalName: string,
+    finalAddress: string,
+    finalPhone: string
+  ): Record<string, string> => ({
     [`CODIGO_LOJA_${suffix}`]: escHtml(code),
-    [`NOME_LOJA_${suffix}`]: escHtml(info?.name || code),
-    [`ENDERECO_LOJA_${suffix}`]: escHtml(info?.fullAddress || ''),
-    [`TELEFONE_LOJA_${suffix}`]: escHtml(info?.phone || ''),
-    [`LOCAL_${suffix}`]: escHtml(formatStationLine(code, info)),
+    [`NOME_LOJA_${suffix}`]: escHtml(finalName),
+    [`ENDERECO_LOJA_${suffix}`]: escHtml(finalAddress),
+    [`TELEFONE_LOJA_${suffix}`]: escHtml(finalPhone),
+    [`LOCAL_${suffix}`]: escHtml(formatStationLine(code, info, finalAddress, finalName)),
   });
 
   return {
-    ...(pCode ? block('RETIRADA', pCode, p) : {}),
-    ...(rCode ? block('DEVOLUCAO', rCode, rInfo) : {}),
+    ...(pCode ? block('RETIRADA', pCode, p, pName, pAddress, pPhone) : {}),
+    ...(rCode ? block('DEVOLUCAO', rCode, rInfo, rName, rAddress, rPhone) : {}),
   };
 }

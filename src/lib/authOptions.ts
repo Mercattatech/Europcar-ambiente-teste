@@ -81,7 +81,8 @@ export const authOptions: NextAuthOptions = {
     }
   },
   pages: {
-    signIn: "/login",
+    signIn: "/",
+    signOut: "/",
   },
   secret: (() => {
     // Durante "next build", o Next.js importa as rotas para coletar metadados

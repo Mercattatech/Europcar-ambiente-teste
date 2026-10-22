@@ -282,11 +282,32 @@ export async function POST(req: Request) {
                 car.currency || 'BRL'
               );
               const fmtDate = (d: string) => (d && d.length >= 8 ? `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : d || '');
+              const fmtTime = (t?: string) => {
+                if (!t) return '';
+                const s = t.replace(/\D/g, '');
+                return s.length >= 4 ? `${s.slice(0, 2)}:${s.slice(2, 4)}` : t;
+              };
 
               // Listas de proteções/franquias e acessórios contratados (antes não eram enviadas
               // neste fluxo e o template exibia o texto cru {{LISTA_PROTECOES}}).
               const { buildExtrasListVars } = await import('@/lib/email/reservationEmailVars');
               const extraLists = buildExtrasListVars({ ...parsedCustomerData, booking: bookingData });
+
+              const pickupStationCode = bookingData.pickupStation || xrs.pickupStation || '';
+              const pickupStationName = bookingData.pickupStationName || pickupStationCode;
+              const pickupStationAddress = bookingData.pickupStationAddress || bookingData.pickupAddress || bookingData.stationAddress || '';
+              const pickupStationPhone = bookingData.pickupStationPhone || '';
+
+              const returnStationCode = bookingData.returnStation || bookingData.pickupStation || xrs.pickupStation || '';
+              const returnStationName = bookingData.returnStationName || (returnStationCode === pickupStationCode ? pickupStationName : returnStationCode);
+              const returnStationAddress = bookingData.returnStationAddress || bookingData.returnAddress || (returnStationCode === pickupStationCode ? pickupStationAddress : '');
+              const returnStationPhone = bookingData.returnStationPhone || (returnStationCode === pickupStationCode ? pickupStationPhone : '');
+
+              const formatLine = (name: string, code: string, addr: string) => {
+                if (!code) return '';
+                const head = name && name !== code ? `${name} (${code})` : code;
+                return addr ? `${head} — ${addr}` : head;
+              };
 
               const emailVars: Record<string, string> = {
                 NOME: customerName,
@@ -297,9 +318,19 @@ export async function POST(req: Request) {
                 NUMERO_RESERVA: res.resNumber || '',
                 CARRO: car.carCategoryName || car.name || xrs.carCategory || '',
                 DATA_RETIRADA: fmtDate(bookingData.pickupDate || xrs.pickupDate || ''),
-                LOCAL_RETIRADA: bookingData.pickupStation || xrs.pickupStation || '',
+                HORARIO_RETIRADA: fmtTime(bookingData.pickupTime || xrs.pickupTime || ''),
+                CODIGO_LOJA_RETIRADA: pickupStationCode,
+                NOME_LOJA_RETIRADA: pickupStationName,
+                ENDERECO_LOJA_RETIRADA: pickupStationAddress,
+                TELEFONE_LOJA_RETIRADA: pickupStationPhone,
+                LOCAL_RETIRADA: formatLine(pickupStationName, pickupStationCode, pickupStationAddress),
                 DATA_DEVOLUCAO: fmtDate(bookingData.returnDate || xrs.returnDate || ''),
-                LOCAL_DEVOLUCAO: bookingData.returnStation || bookingData.pickupStation || xrs.pickupStation || '',
+                HORARIO_DEVOLUCAO: fmtTime(bookingData.returnTime || xrs.returnTime || ''),
+                CODIGO_LOJA_DEVOLUCAO: returnStationCode,
+                NOME_LOJA_DEVOLUCAO: returnStationName,
+                ENDERECO_LOJA_DEVOLUCAO: returnStationAddress,
+                TELEFONE_LOJA_DEVOLUCAO: returnStationPhone,
+                LOCAL_DEVOLUCAO: formatLine(returnStationName, returnStationCode, returnStationAddress),
                 LISTA_PROTECOES: extraLists.LISTA_PROTECOES,
                 LISTA_EXTRAS: extraLists.LISTA_EXTRAS,
                 VALOR_TOTAL: cv.VALOR_TOTAL,
@@ -324,8 +355,14 @@ export async function POST(req: Request) {
                   customerName: `${customerName} ${customerLastName}`.trim(),
                   resNumber: res.resNumber || '',
                   carName: car.carCategoryName || car.name || xrs.carCategory || '',
-                  pickupStation: bookingData.pickupStation || xrs.pickupStation || '',
-                  returnStation: bookingData.returnStation || bookingData.pickupStation || xrs.pickupStation || '',
+                  pickupStation: pickupStationCode,
+                  returnStation: returnStationCode,
+                  pickupStationName,
+                  returnStationName,
+                  pickupStationAddress,
+                  returnStationAddress,
+                  pickupStationPhone,
+                  returnStationPhone,
                   pickupDate: bookingData.pickupDate || xrs.pickupDate || '',
                   returnDate: bookingData.returnDate || xrs.returnDate || '',
                   paymentMethod: isPrepaid ? 'CREDIT' : 'BALCAO',
@@ -357,11 +394,24 @@ export async function POST(req: Request) {
 
           if (customerEmail) {
             try {
+              const cancelPickupCode = bookingData?.pickupStation || xrs.pickupStation || '';
+              const cancelPickupName = bookingData?.pickupStationName || cancelPickupCode;
+              const cancelPickupAddress = bookingData?.pickupStationAddress || bookingData?.pickupAddress || bookingData?.stationAddress || '';
+              const cancelReturnCode = bookingData?.returnStation || bookingData?.pickupStation || xrs.pickupStation || '';
+              const cancelReturnName = bookingData?.returnStationName || (cancelReturnCode === cancelPickupCode ? cancelPickupName : cancelReturnCode);
+              const cancelReturnAddress = bookingData?.returnStationAddress || bookingData?.returnAddress || (cancelReturnCode === cancelPickupCode ? cancelPickupAddress : '');
+
               let sent = await sendTransactionalEmail(customerEmail, 'RESERVA_REJEITADA', {
                 NOME: customerName,
                 NUMERO_RESERVA: res.resNumber || '',
                 STATUS: 'Recusada',
                 MENSAGEM: 'Sua solicitação de reserva On Request não pôde ser confirmada pela Europcar para a categoria solicitada. Nenhuma cobrança foi realizada.',
+                CODIGO_LOJA_RETIRADA: cancelPickupCode,
+                NOME_LOJA_RETIRADA: cancelPickupName,
+                ENDERECO_LOJA_RETIRADA: cancelPickupAddress,
+                CODIGO_LOJA_DEVOLUCAO: cancelReturnCode,
+                NOME_LOJA_DEVOLUCAO: cancelReturnName,
+                ENDERECO_LOJA_DEVOLUCAO: cancelReturnAddress,
               });
               if (!sent.success) {
                 sent = await sendTransactionalEmail(customerEmail, 'CANCELAMENTO', {
@@ -369,6 +419,12 @@ export async function POST(req: Request) {
                   NUMERO_RESERVA: res.resNumber || '',
                   STATUS: 'Recusada',
                   MENSAGEM: 'Sua solicitação de reserva On Request não pôde ser confirmada pela Europcar.',
+                  CODIGO_LOJA_RETIRADA: cancelPickupCode,
+                  NOME_LOJA_RETIRADA: cancelPickupName,
+                  ENDERECO_LOJA_RETIRADA: cancelPickupAddress,
+                  CODIGO_LOJA_DEVOLUCAO: cancelReturnCode,
+                  NOME_LOJA_DEVOLUCAO: cancelReturnName,
+                  ENDERECO_LOJA_DEVOLUCAO: cancelReturnAddress,
                 });
               }
               if (!sent.success) {
@@ -378,8 +434,12 @@ export async function POST(req: Request) {
                   customerName: `${customerName} ${customerLastName}`.trim(),
                   resNumber: res.resNumber || '',
                   carName: bookingData?.car?.carCategoryName || bookingData?.car?.name || xrs.carCategory || '',
-                  pickupStation: bookingData?.pickupStation || xrs.pickupStation || '',
-                  returnStation: bookingData?.returnStation || bookingData?.pickupStation || xrs.pickupStation || '',
+                  pickupStation: cancelPickupCode,
+                  pickupStationName: cancelPickupName,
+                  pickupStationAddress: cancelPickupAddress,
+                  returnStation: cancelReturnCode,
+                  returnStationName: cancelReturnName,
+                  returnStationAddress: cancelReturnAddress,
                   pickupDate: bookingData?.pickupDate || xrs.pickupDate || '',
                   returnDate: bookingData?.returnDate || xrs.returnDate || '',
                   paymentMethod: isPrepaid ? 'CREDIT' : 'BALCAO',
@@ -409,11 +469,24 @@ export async function POST(req: Request) {
           // Enviar email de cancelamento
           if (customerEmail) {
             try {
+              const cancelPickupCode = bookingData?.pickupStation || xrs.pickupStation || '';
+              const cancelPickupName = bookingData?.pickupStationName || cancelPickupCode;
+              const cancelPickupAddress = bookingData?.pickupStationAddress || bookingData?.pickupAddress || bookingData?.stationAddress || '';
+              const cancelReturnCode = bookingData?.returnStation || bookingData?.pickupStation || xrs.pickupStation || '';
+              const cancelReturnName = bookingData?.returnStationName || (cancelReturnCode === cancelPickupCode ? cancelPickupName : cancelReturnCode);
+              const cancelReturnAddress = bookingData?.returnStationAddress || bookingData?.returnAddress || (cancelReturnCode === cancelPickupCode ? cancelPickupAddress : '');
+
               let sent = await sendTransactionalEmail(customerEmail, 'CANCELAMENTO', {
                 NOME: customerName,
                 NUMERO_RESERVA: res.resNumber || '',
                 STATUS: 'Cancelada',
                 MENSAGEM: 'Sua reserva foi cancelada pela operação Europcar. Caso tenha sido cobrado online, o estorno será processado automaticamente.',
+                CODIGO_LOJA_RETIRADA: cancelPickupCode,
+                NOME_LOJA_RETIRADA: cancelPickupName,
+                ENDERECO_LOJA_RETIRADA: cancelPickupAddress,
+                CODIGO_LOJA_DEVOLUCAO: cancelReturnCode,
+                NOME_LOJA_DEVOLUCAO: cancelReturnName,
+                ENDERECO_LOJA_DEVOLUCAO: cancelReturnAddress,
               });
               if (!sent.success) {
                 const { sendCancellationEmail } = await import('@/lib/email/sendCancellationEmail');
@@ -422,8 +495,12 @@ export async function POST(req: Request) {
                   customerName: `${customerName} ${customerLastName}`.trim(),
                   resNumber: res.resNumber || '',
                   carName: bookingData?.car?.carCategoryName || bookingData?.car?.name || xrs.carCategory || '',
-                  pickupStation: bookingData?.pickupStation || xrs.pickupStation || '',
-                  returnStation: bookingData?.returnStation || bookingData?.pickupStation || xrs.pickupStation || '',
+                  pickupStation: cancelPickupCode,
+                  pickupStationName: cancelPickupName,
+                  pickupStationAddress: cancelPickupAddress,
+                  returnStation: cancelReturnCode,
+                  returnStationName: cancelReturnName,
+                  returnStationAddress: cancelReturnAddress,
                   pickupDate: bookingData?.pickupDate || xrs.pickupDate || '',
                   returnDate: bookingData?.returnDate || xrs.returnDate || '',
                   paymentMethod: isPrepaid ? 'CREDIT' : 'BALCAO',

@@ -12,9 +12,20 @@ const carImageOverrides: Record<string,string> = {};
 export default function HomePage() {
   const { data: session, status } = useSession();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [carImages, setCarImages] = useState<Record<string,string>>({});
   const { t } = useLanguage();
+
+  const handleSignOut = async () => {
+    setMobileMenuOpen(false);
+    try {
+      await signOut({ redirect: false });
+    } catch (err) {
+      console.error("Erro ao sair:", err);
+    }
+    setShowLogoutModal(true);
+  };
 
   useEffect(() => {
     fetch("/api/admin/fleet-images")
@@ -28,6 +39,27 @@ export default function HomePage() {
       {/* Login Modal */}
       {showLoginModal && (
         <LoginModal onClose={() => setShowLoginModal(false)} />
+      )}
+
+      {/* Logout Success Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-[#008d36]">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Sessão encerrada</h3>
+            <p className="text-sm text-gray-300 mb-6">Você encerrou sua sessão com sucesso.</p>
+            <button
+              onClick={() => setShowLogoutModal(false)}
+              className="w-full bg-[#008d36] hover:bg-[#007530] text-white font-bold py-2.5 px-4 rounded-xl transition-colors shadow-md shadow-[#008d36]/20"
+            >
+              OK
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Mobile Menu Overlay */}
@@ -51,7 +83,7 @@ export default function HomePage() {
                   <p className="text-[#008d36] font-bold">Olá, {session.user.name || session.user.email?.split('@')[0]}</p>
                   <div className="flex gap-4 mt-2">
                     <a href="/reservas" className="text-sm text-gray-300 hover:text-white">Meu Perfil</a>
-                    <button onClick={() => signOut()} className="text-sm text-gray-400 hover:text-red-400">Sair</button>
+                    <button onClick={handleSignOut} className="text-sm text-gray-400 hover:text-red-400">Sair</button>
                   </div>
                 </div>
               ) : (
@@ -124,7 +156,7 @@ export default function HomePage() {
                <div className="flex items-center gap-4">
                   <span className="text-[#008d36]">{t('nav.hello')}, {session.user.name || session.user.email?.split('@')[0]}</span>
                   <a href="/reservas" className="text-xs text-white hover:text-[#008d36] font-normal">{t('nav.myBookings')}</a>
-                  <button onClick={() => signOut()} className="text-xs text-gray-300 hover:text-red-500 font-normal">{t('nav.logout')}</button>
+                  <button onClick={handleSignOut} className="text-xs text-gray-300 hover:text-red-500 font-normal">{t('nav.logout')}</button>
                </div>
             ) : (
                <button onClick={() => setShowLoginModal(true)} className="flex items-center gap-2 cursor-pointer hover:text-gray-300">
