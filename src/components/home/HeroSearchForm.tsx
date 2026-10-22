@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
+import StationDetailPanel from "./StationDetailPanel";
 
 const TIMES = Array.from({ length: 24 * 4 }).map((_, i) => {
   const h = Math.floor(i / 4)
@@ -268,6 +269,8 @@ export default function HeroSearchForm() {
       setStationDetail(detailCacheRef.current[code]);
       return;
     }
+    let active = true;
+    setStationDetail(null);
     setLoadingDetail(true);
     const timer = setTimeout(() => {
       fetch(`/api/europcar/getStation?code=${code}`)
@@ -275,13 +278,13 @@ export default function HeroSearchForm() {
         .then(d => {
           if (d.station) {
             detailCacheRef.current[code] = d.station;
-            setStationDetail(d.station);
+            if (active) setStationDetail(d.station);
           }
         })
         .catch(() => {})
-        .finally(() => setLoadingDetail(false));
+        .finally(() => { if (active) setLoadingDetail(false); });
     }, 200); // small debounce to avoid firing on fast mouse movements
-    return () => clearTimeout(timer);
+    return () => { active = false; clearTimeout(timer); };
   }, [hoveredStation]);
 
   // Fetch return station detail when hovering (One-Way)
@@ -292,6 +295,8 @@ export default function HeroSearchForm() {
       setReturnStationDetail(returnDetailCacheRef.current[code]);
       return;
     }
+    let active = true;
+    setReturnStationDetail(null);
     setLoadingReturnDetail(true);
     const timer = setTimeout(() => {
       fetch(`/api/europcar/getStation?code=${code}`)
@@ -299,13 +304,13 @@ export default function HeroSearchForm() {
         .then(d => {
           if (d.station) {
             returnDetailCacheRef.current[code] = d.station;
-            setReturnStationDetail(d.station);
+            if (active) setReturnStationDetail(d.station);
           }
         })
         .catch(() => {})
-        .finally(() => setLoadingReturnDetail(false));
+        .finally(() => { if (active) setLoadingReturnDetail(false); });
     }, 200);
-    return () => clearTimeout(timer);
+    return () => { active = false; clearTimeout(timer); };
   }, [hoveredReturnStation]);
 
   // Handle outside click popovers
@@ -520,175 +525,24 @@ export default function HeroSearchForm() {
                         ))}
                       </div>
                     </div>
-                    {/* Right: Station detail panel */}
-                    {hoveredStation && (
-                      <div className="hidden md:flex flex-col flex-1 overflow-y-auto">
-                        {/* Top: Info + Map side by side */}
-                        <div className="flex flex-1 min-h-0">
-                          {/* Station info */}
-                          <div className="w-[260px] shrink-0 p-5 flex flex-col overflow-y-auto border-r border-gray-100">
-                            {/* Station name */}
-                            <h3 className="font-black text-sm uppercase text-gray-900 leading-tight">{stationDetail?.name || hoveredStation.name}</h3>
-                            {/* Address lines */}
-                            <div className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
-                              {(stationDetail?.address || hoveredStation.address) && <div>{stationDetail?.address || hoveredStation.address}</div>}
-                              {stationDetail?.postalCode && <div>{stationDetail.postalCode} {stationDetail?.city || ''}</div>}
-                              {hoveredStation.country && <div className="uppercase font-medium text-gray-400">{hoveredStation.country}</div>}
-                            </div>
-
-                            {/* Features from XRS API */}
-                            {loadingDetail ? (
-                              <div className="mt-4 flex flex-col gap-2">
-                                <div className="h-3.5 bg-gray-100 rounded animate-pulse w-3/4"></div>
-                                <div className="h-3.5 bg-gray-100 rounded animate-pulse w-1/2"></div>
-                              </div>
-                            ) : (
-                              <div className="mt-4 flex flex-col gap-2">
-                                {Boolean(stationDetail?.has247Return ?? stationDetail?.features?.has247Return) && (
-                                  <div className="flex items-center gap-2">
-                                    <svg className="w-4 h-4 text-[#008d36] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-                                    <span className="text-xs font-bold text-gray-700">Devolução 24/7</span>
-                                  </div>
-                                )}
-                                {Boolean(stationDetail?.hasOutOfHours ?? stationDetail?.features?.hasOutOfHours) && (
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-gray-500 text-sm shrink-0">🕐</span>
-                                    <span className="text-xs font-bold text-gray-700">{t('station.outOfHours')}</span>
-                                  </div>
-                                )}
-                                {Boolean(stationDetail?.hasElectricVehicles ?? stationDetail?.features?.hasElectricVehicles) && (
-                                  <div className="flex items-center gap-2">
-                                    <svg className="w-4 h-4 text-[#008d36] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z" /></svg>
-                                    <span className="text-xs font-bold text-gray-700">{t('station.electricVehicles')}</span>
-                                  </div>
-                                )}
-                                {Boolean(stationDetail?.features?.hasMeetAndGreet) && (
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-gray-500 text-sm shrink-0">🤝</span>
-                                    <span className="text-xs font-bold text-gray-700">{t('station.meetAndGreet')}</span>
-                                  </div>
-                                )}
-                                {Boolean(stationDetail?.features?.hasShuttle) && (
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-gray-500 text-sm shrink-0">🚐</span>
-                                    <span className="text-xs font-bold text-gray-700">{t('station.transferShuttle')}</span>
-                                  </div>
-                                )}
-                                {Boolean(stationDetail?.hasLunchBreak ?? stationDetail?.features?.hasLunchBreak) && (
-                                  <div className="flex items-center gap-1.5 text-xs text-amber-700 font-bold">
-                                    <svg className="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <span>{t('station.lunchBreak')}</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Operating Hours from XRS API */}
-                            <div className="mt-3 flex-1">
-                              <div className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                                <svg className="w-3.5 h-3.5 text-[#008d36]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                {t('station.operatingHours')}
-                              </div>
-                              {loadingDetail ? (
-                                <div className="flex gap-1.5 items-center text-[11px] text-gray-400">
-                                  <div className="w-3 h-3 border-2 border-[#008d36] border-t-transparent rounded-full animate-spin"></div>
-                                  Consultando horários...
-                                </div>
-                              ) : stationDetail?.hours?.length ? (
-                                <div className="flex flex-col gap-0">
-                                  {stationDetail.hours.map((h: any, i: number) => {
-                                    const isClosed = h.isClosed || (!h.open && (!h.intervals || !h.intervals.length));
-                                    const hasMultipleIntervals = Boolean(h.intervals && h.intervals.length > 1);
-                                    return (
-                                      <div key={i} className="flex justify-between items-start text-[11px] py-0.5 border-b border-gray-50 last:border-0">
-                                        <span className="font-bold text-gray-700 w-12 shrink-0 uppercase">{h.day}:</span>
-                                        {isClosed ? (
-                                          <span className="text-red-500 font-bold">Fechado</span>
-                                        ) : hasMultipleIntervals ? (
-                                          <div className="flex flex-col items-end gap-0.5">
-                                            {h.intervals.map((inv: any, idx: number) => (
-                                              <span key={idx} className="text-gray-700 font-medium whitespace-nowrap">
-                                                {inv.open} - {inv.close}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        ) : (
-                                          <span className="text-gray-700 font-medium">
-                                            {h.intervals?.[0] ? `${h.intervals[0].open} - ${h.intervals[0].close}` : `${h.open} - ${h.close}`}
-                                          </span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : hoveredStation.hours?.length ? (
-                                <div className="flex flex-col gap-0">
-                                  {hoveredStation.hours.map((h: any, i: number) => {
-                                    const hasMultipleIntervals = Boolean(h.intervals && h.intervals.length > 1);
-                                    return (
-                                      <div key={i} className="flex justify-between items-start text-[11px] py-0.5 border-b border-gray-50 last:border-0">
-                                        <span className="font-bold text-gray-700 w-12 shrink-0 uppercase">{h.day}:</span>
-                                        {h.isClosed ? (
-                                          <span className="text-red-500 font-bold">Fechado</span>
-                                        ) : hasMultipleIntervals ? (
-                                          <div className="flex flex-col items-end gap-0.5">
-                                            {h.intervals.map((inv: any, idx: number) => (
-                                              <span key={idx} className="text-gray-700 font-medium whitespace-nowrap">
-                                                {inv.open} - {inv.close}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        ) : (
-                                          <span className="text-gray-700 font-medium">{h.hours || (h.open ? `${h.open} - ${h.close}` : 'Consulte')}</span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <p className="text-[11px] text-gray-400 italic">Consulte a loja.</p>
-                              )}
-                            </div>
-
-                            {/* Select button */}
-                            <button type="button" onClick={() => handleSelectPickupStation(hoveredStation)} className="mt-3 w-full bg-[#008d36] hover:bg-[#007530] text-white font-bold text-xs py-2.5 rounded transition-colors shrink-0">Selecionar esta loja</button>
-                          </div>
-
-                          {/* Google Maps */}
-                          <div className="flex-1 bg-gray-100 min-h-0">
-                            {(stationDetail?.latitude || stationDetail?.longitude) ? (
-                              <iframe
-                                className="w-full h-full border-0"
-                                loading="lazy"
-                                referrerPolicy="no-referrer-when-downgrade"
-                                src={`https://www.google.com/maps?q=${stationDetail.latitude},${stationDetail.longitude}&z=14&output=embed`}
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                                <div className="text-center">
-                                  <svg className="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                  Carregando mapa...
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    {/* Right: Station detail panel (compartilhado com devolução) */}
+                    <StationDetailPanel
+                      hovered={hoveredStation}
+                      detail={stationDetail}
+                      loading={loadingDetail}
+                      onSelect={handleSelectPickupStation}
+                      t={t}
+                    />
                   </div>
                 )}
             </div>
 
-            {/* Return Station Field - only when One-Way */}
+            {/* Return Station Field - only when One-Way (mesmo padrão visual da retirada) */}
             {!sameReturnLocation && (
               <div className="relative mt-3" ref={returnStationRef}>
-                <label className="text-sm font-bold text-[#e67e00] block mb-2">{t('hero.returnLocation')}</label>
+                <label className="text-sm font-bold text-gray-900 block mb-2">{t('hero.returnLocation')}</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-3.5 text-[#e67e00]">
+                  <span className="absolute left-3 top-3.5 text-[#008d36]">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -697,7 +551,7 @@ export default function HeroSearchForm() {
                   <input
                     type="text"
                     placeholder="Cidade, endereço ou ponto de interesse"
-                    className="w-full pl-11 p-4 bg-white border border-[#e67e00] rounded-lg focus:ring-1 focus:ring-[#e67e00] focus:border-[#e67e00] outline-none text-base font-medium transition-all text-gray-900 placeholder-gray-400"
+                    className="w-full pl-11 p-4 bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#008d36] focus:border-[#008d36] outline-none text-base font-medium transition-all text-gray-900 placeholder-gray-400"
                     value={returnStationQuery}
                     onChange={(e) => {
                       setReturnStationQuery(e.target.value);
@@ -707,121 +561,34 @@ export default function HeroSearchForm() {
 
                   {/* Dropdown Autocomplete - Return Station */}
                   {showReturnStationsList && returnStations.length > 0 && (
-                    <div className="absolute top-full left-0 w-[calc(100vw-2rem)] sm:w-full md:w-[760px] mt-2 bg-white flex flex-col md:flex-row shadow-2xl rounded-lg z-50 max-h-[85vh] md:max-h-[500px] overflow-hidden border border-gray-200">
-                      <div className="w-full md:w-[380px] flex flex-col border-b md:border-b-0 md:border-r border-gray-200 max-h-[250px] md:max-h-none overflow-y-auto">
-                        <div className="bg-orange-50 font-bold text-[10px] text-orange-600 px-4 py-2 border-b border-gray-200 tracking-wider">LOCAL DE DEVOLUÇÃO</div>
+                    <div className="absolute top-full left-0 w-[calc(100vw-2rem)] sm:w-full md:w-[840px] mt-1 bg-white flex flex-col md:flex-row shadow-2xl rounded-lg z-50 overflow-hidden border border-gray-200 max-h-[85vh] md:max-h-[500px]">
+                      <div className="w-full md:w-[340px] flex flex-col border-b md:border-b-0 md:border-r border-gray-200 shrink-0 max-h-[280px] md:max-h-none overflow-y-auto">
+                        <div className="bg-gray-50 font-bold text-[11px] text-gray-500 px-5 py-2.5 border-b border-gray-200 tracking-widest uppercase">Local de devolução</div>
                         <div className="flex-1 overflow-y-auto">
                           {returnStations.map((station) => (
-                            <div key={station.code} className={`px-4 py-3 cursor-pointer text-sm border-b border-gray-100 flex items-center gap-3 transition-colors ${hoveredReturnStation?.code === station.code ? 'bg-orange-50' : 'hover:bg-gray-50 text-gray-700'}`} onMouseEnter={() => setHoveredReturnStation(station)} onClick={() => handleSelectReturnStation(station)}>
-                              {station.type === 'airport' ? (<svg className="w-5 h-5 text-gray-400 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>) : (<svg className="w-5 h-5 text-gray-400 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 12h-2v-2h2v2zm0-4h-2v-2h2v2z" /></svg>)}
-                              <div className="flex flex-col min-w-0">
-                                <span className="font-extrabold text-xs uppercase text-gray-900 leading-snug truncate">{station.name}</span>
-                                {station.country && (<span className="text-[10px] text-gray-400 font-medium">{station.country}</span>)}
-                              </div>
+                            <div
+                              key={station.code}
+                              className={`px-5 py-3.5 cursor-pointer text-sm border-b border-gray-100 flex items-center gap-3 transition-colors ${hoveredReturnStation?.code === station.code ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                              onMouseEnter={() => setHoveredReturnStation(station)}
+                              onClick={() => handleSelectReturnStation(station)}
+                            >
+                              {station.type === 'airport' ? (
+                                <svg className="w-5 h-5 text-gray-400 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" /></svg>
+                              ) : (
+                                <svg className="w-5 h-5 text-gray-400 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 12h-2v-2h2v2zm0-4h-2v-2h2v2z" /></svg>
+                              )}
+                              <span className="flex-1 font-medium text-gray-800 text-[13px] truncate">{station.name}</span>
                             </div>
                           ))}
                         </div>
                       </div>
-                      {hoveredReturnStation && (
-                        <div className="hidden md:flex flex-col w-[380px] bg-[#fffaf5] overflow-y-auto relative p-6">
-                          <h3 className="font-extrabold text-sm uppercase text-black max-w-[80%] leading-tight">{returnStationDetail?.name || hoveredReturnStation.name}</h3>
-                          {hoveredReturnStation.country && (<span className="text-[10px] bg-[#e67e00]/10 text-[#e67e00] font-bold px-2 py-0.5 rounded-full mt-1 w-fit">{hoveredReturnStation.country}</span>)}
-                          {(returnStationDetail?.address || hoveredReturnStation.address) && (<p className="text-[11px] font-medium text-gray-500 mt-1 whitespace-pre-wrap leading-tight">{returnStationDetail?.address || hoveredReturnStation.address}{returnStationDetail?.postalCode ? `, ${returnStationDetail.postalCode}` : ''}{returnStationDetail?.city ? ` — ${returnStationDetail.city}` : ''}</p>)}
-                          {(returnStationDetail?.phone || returnStationDetail?.email) && (
-                            <div className="mt-3 flex flex-col gap-1">
-                              {returnStationDetail.phone && (<div className="flex items-center gap-1.5 text-[11px] text-gray-600"><svg className="w-3.5 h-3.5 text-[#e67e00] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg><span className="font-bold">{returnStationDetail.phone}</span></div>)}
-                              {returnStationDetail.email && (<div className="flex items-center gap-1.5 text-[11px] text-gray-600"><svg className="w-3.5 h-3.5 text-[#e67e00] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg><span>{returnStationDetail.email}</span></div>)}
-                            </div>
-                          )}
-
-                          {/* Dynamic Return Station Features from XRS */}
-                          {Boolean(returnStationDetail?.has247Return ?? returnStationDetail?.features?.has247Return) && (
-                            <div className="mt-3 flex items-center gap-1.5 text-xs text-[#008d36] font-bold">
-                              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-                              <span>Devolução 24/7</span>
-                            </div>
-                          )}
-                          {Boolean(returnStationDetail?.hasOutOfHours ?? returnStationDetail?.features?.hasOutOfHours) && (
-                            <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-700 font-bold">
-                              <span className="text-sm shrink-0">🕐</span>
-                              <span>Devolução fora do horário de funcionamento</span>
-                            </div>
-                          )}
-                          {Boolean(returnStationDetail?.hasLunchBreak ?? returnStationDetail?.features?.hasLunchBreak) && (
-                            <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-700 font-bold">
-                              <svg className="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <span>{t('station.lunchBreak')}</span>
-                            </div>
-                          )}
-
-                          <div className="mt-4">
-                            <div className="flex items-center gap-1.5 mb-2"><svg className="w-3.5 h-3.5 text-[#e67e00]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span className="text-[10px] font-black text-gray-700 uppercase tracking-wider">{t('station.operatingHours')}</span></div>
-                            {loadingReturnDetail ? (
-                              <div className="flex gap-1.5 items-center text-[11px] text-gray-400">
-                                <div className="w-3 h-3 border-2 border-[#e67e00] border-t-transparent rounded-full animate-spin"></div>
-                                Consultando horários...
-                              </div>
-                            ) : returnStationDetail?.hours?.length ? (
-                              <div className="flex flex-col gap-0.5">
-                                {returnStationDetail.hours.map((h: any, i: number) => {
-                                  const isClosed = h.isClosed || (!h.open && (!h.intervals || !h.intervals.length));
-                                  const hasMultipleIntervals = Boolean(h.intervals && h.intervals.length > 1);
-                                  return (
-                                    <div key={i} className="flex text-xs w-full justify-between items-start py-0.5 border-b border-gray-100 last:border-0">
-                                      <span className="font-bold text-gray-800 w-10 shrink-0 uppercase">{h.day}</span>
-                                      {isClosed ? (
-                                        <span className="text-red-500 font-bold">Fechado</span>
-                                      ) : hasMultipleIntervals ? (
-                                        <div className="flex flex-col items-end gap-0.5">
-                                          {h.intervals.map((inv: any, idx: number) => (
-                                            <span key={idx} className="text-gray-600 font-medium whitespace-nowrap">
-                                              {inv.open} – {inv.close}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      ) : (
-                                        <span className="text-gray-600 font-medium">
-                                          {h.intervals?.[0] ? `${h.intervals[0].open} – ${h.intervals[0].close}` : `${h.open} – ${h.close}`}
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : hoveredReturnStation.hours?.length ? (
-                              <div className="flex flex-col gap-0.5">
-                                {hoveredReturnStation.hours.map((h: any, i: number) => {
-                                  const isClosed = h.isClosed || (!h.open && (!h.intervals || !h.intervals.length));
-                                  const hasMultipleIntervals = Boolean(h.intervals && h.intervals.length > 1);
-                                  return (
-                                    <div key={i} className="flex text-xs w-full justify-between items-start py-0.5 border-b border-gray-100 last:border-0">
-                                      <span className="font-bold text-gray-800 w-10 shrink-0 uppercase">{h.day}</span>
-                                      {isClosed ? (
-                                        <span className="text-red-500 font-bold">Fechado</span>
-                                      ) : hasMultipleIntervals ? (
-                                        <div className="flex flex-col items-end gap-0.5">
-                                          {h.intervals.map((inv: any, idx: number) => (
-                                            <span key={idx} className="text-gray-600 font-medium whitespace-nowrap">
-                                              {inv.open} – {inv.close}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      ) : (
-                                        <span className="text-gray-600 font-medium">{h.hours || (h.open ? `${h.open} – ${h.close}` : 'Consulte')}</span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <p className="text-[11px] text-gray-400 italic">Consulte a loja para informações de horário.</p>
-                            )}
-                          </div>
-                          <button type="button" onClick={() => handleSelectReturnStation(hoveredReturnStation)} className="mt-4 w-full bg-[#e67e00] hover:bg-[#cc6f00] text-white font-bold text-sm py-2.5 rounded transition-colors shrink-0">Selecionar esta loja</button>
-                        </div>
-                      )}
+                      <StationDetailPanel
+                        hovered={hoveredReturnStation}
+                        detail={returnStationDetail}
+                        loading={loadingReturnDetail}
+                        onSelect={handleSelectReturnStation}
+                        t={t}
+                      />
                     </div>
                   )}
                 </div>

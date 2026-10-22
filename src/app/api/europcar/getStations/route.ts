@@ -197,7 +197,11 @@ const SYNONYMS: Record<string, string[]> = {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const q = (searchParams.get('q') ?? '').trim().toLowerCase();
+  // Remove acentos/diacríticos para busca tolerante ("sao paulo" == "São Paulo")
+  const normalize = (s: string): string =>
+    String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+  const q = normalize((searchParams.get('q') ?? '').trim());
   const countryParam = searchParams.get('country')?.toUpperCase();
 
   if (!q || q.length < 2) {
@@ -253,9 +257,9 @@ export async function GET(request: Request) {
 
   // Helper to match term at the beginning of any word
   const matchWordStart = (text: string, term: string): boolean => {
-    const escaped = term.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const escaped = normalize(term).replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     const regex = new RegExp(`(^|[^\\p{L}\\p{N}]+)${escaped}`, 'ui');
-    return regex.test(text);
+    return regex.test(normalize(text));
   };
 
   // Apply text filter
@@ -275,10 +279,10 @@ export async function GET(request: Request) {
 
   // Sort: exact city match first, then station name match, then others
   filtered.sort((a, b) => {
-    const cityA = (a.cityName ?? a.city ?? '').toLowerCase();
-    const cityB = (b.cityName ?? b.city ?? '').toLowerCase();
-    const nameA = (a.stationName ?? a.name ?? '').toLowerCase();
-    const nameB = (b.stationName ?? b.name ?? '').toLowerCase();
+    const cityA = normalize(a.cityName ?? a.city ?? '');
+    const cityB = normalize(b.cityName ?? b.city ?? '');
+    const nameA = normalize(a.stationName ?? a.name ?? '');
+    const nameB = normalize(b.stationName ?? b.name ?? '');
 
     // Exact city match gets priority
     const aCityExact = searchTerms.some(term => cityA === term) ? 0 : searchTerms.some(term => cityA.startsWith(term)) ? 1 : 2;
@@ -323,6 +327,8 @@ export async function GET(request: Request) {
       countryCode: s.countryCode ?? '',
       type: isAirport ? 'airport' : 'city',
       address: fullAddress || s.address1 || s.address || '',
+      latitude: s.latitude ?? '',
+      longitude: s.longitude ?? '',
       features: s.features ?? [],
       hours: s.hours ?? [],
     };
