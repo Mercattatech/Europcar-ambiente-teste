@@ -586,3 +586,84 @@ export async function readBooking(resNumber: string): Promise<ReadBookingResult>
     };
   }
 }
+
+/**
+ * Consulta a Europcar XRS via search.searchbyid e retorna os XMLs brutos
+ * (requisição enviada e resposta recebida), gravando no LogXRS.
+ */
+export async function getReservationRawXml(resNumber: string): Promise<{
+  xmlRequest: string;
+  xmlResponse: string;
+  httpStatus: number;
+  durationMs: number;
+  hasError: boolean;
+  error?: string;
+}> {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<message>
+  <serviceRequest serviceCode="search.searchbyid">
+    <serviceParameters>
+      <reservation resNumber="${escapeXml(resNumber)}" />
+    </serviceParameters>
+  </serviceRequest>
+</message>`;
+
+  const creds = await getXRSCredentials();
+  const callerCode = creds.callerCode;
+  const password = creds.password;
+  const url = process.env.XRS_ENDPOINT_URL || creds.endpointUrl;
+
+  const payload = new URLSearchParams();
+  payload.append('callerCode', callerCode);
+  payload.append('password', password);
+  payload.append('XML-Request', xml);
+
+  const startTime = Date.now();
+  let rawResponse = '';
+  let httpStatus = 0;
+  let hasError = false;
+
+  try {
+    const response = await axios.post(url, payload.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      timeout: 20000,
+    });
+    httpStatus = response.status;
+    rawResponse = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+    const durationMs = Date.now() - startTime;
+
+    hasError = rawResponse.includes('returnCode="KO"') || rawResponse.includes('<error>');
+
+    saveLog({
+      action: 'search.searchbyid',
+      sourceFile: 'reservas/xml/route.ts',
+      endpoint: url,
+      xmlRequest: maskSensitiveXml(xml),
+      xmlResponse: maskSensitiveXml(rawResponse),
+      httpStatus,
+      durationMs,
+      hasError,
+    }).catch(() => {});
+
+    return {
+      xmlRequest: xml,
+      xmlResponse: rawResponse,
+      httpStatus,
+      durationMs,
+      hasError,
+    };
+  } catch (error: any) {
+    const durationMs = Date.now() - startTime;
+    httpStatus = error.response?.status || 0;
+    rawResponse = error.response?.data || error.message || 'Erro de comunicação com Europcar XRS';
+    return {
+      xmlRequest: xml,
+      xmlResponse: typeof rawResponse === 'string' ? rawResponse : JSON.stringify(rawResponse),
+      httpStatus,
+      durationMs,
+      hasError: true,
+      error: error.message,
+    };
+  }
+}
+

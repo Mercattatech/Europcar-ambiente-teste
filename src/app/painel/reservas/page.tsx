@@ -115,6 +115,20 @@ export default function PainelReservas() {
    const [syncResult, setSyncResult] = useState<any | null>(null);
    const [syncingSingle, setSyncingSingle] = useState<string | null>(null);
 
+   // ── Modal de XML da Reserva ──
+   const [xmlModalOpen, setXmlModalOpen] = useState(false);
+   const [xmlModalReservation, setXmlModalReservation] = useState<any | null>(null);
+   const [xmlLoading, setXmlLoading] = useState(false);
+   const [xmlData, setXmlData] = useState<{
+      liveXml?: any;
+      liveError?: string | null;
+      logs?: any[];
+   } | null>(null);
+   const [xmlViewType, setXmlViewType] = useState<'response' | 'request'>('response');
+   const [selectedLogIndex, setSelectedLogIndex] = useState<number>(-1);
+   const [xmlCopied, setXmlCopied] = useState(false);
+   const [formatXml, setFormatXml] = useState(true);
+
    // ── Nova Reserva Manual ──
    const [manualModalOpen, setManualModalOpen] = useState(false);
    const [manualSaving, setManualSaving] = useState(false);
@@ -331,6 +345,132 @@ export default function PainelReservas() {
       setToast({ message, type });
       setTimeout(() => setToast(null), 3000);
    };
+
+   // ── Formatador de XML com indentação limpa ──
+   const formatXmlString = (xml: string): string => {
+      if (!xml) return '';
+      try {
+         let formatted = '';
+         let indent = 0;
+         const tab = '  ';
+         const cleaned = xml.replace(/>\s*</g, '><').trim();
+         const tokens = cleaned.split(/(<[^>]+>)/g).filter(Boolean);
+
+         for (let i = 0; i < tokens.length; i++) {
+            const token = tokens[i].trim();
+            if (!token) continue;
+
+            if (token.startsWith('</')) {
+               indent = Math.max(0, indent - 1);
+               formatted += tab.repeat(indent) + token + '\n';
+            } else if (token.startsWith('<') && (token.endsWith('/>') || token.startsWith('<?') || token.startsWith('<!'))) {
+               formatted += tab.repeat(indent) + token + '\n';
+            } else if (token.startsWith('<')) {
+               if (i + 2 < tokens.length && !tokens[i + 1].startsWith('<') && tokens[i + 2].startsWith('</')) {
+                  formatted += tab.repeat(indent) + token + tokens[i + 1] + tokens[i + 2] + '\n';
+                  i += 2;
+               } else {
+                  formatted += tab.repeat(indent) + token + '\n';
+                  indent++;
+               }
+            } else {
+               formatted += tab.repeat(indent) + token + '\n';
+            }
+         }
+         return formatted.trim();
+      } catch {
+         return xml;
+      }
+   };
+
+   const handleOpenXmlModal = async (res: any) => {
+      const resNum = res.resNumber && res.resNumber !== res.merchantOrderId ? res.resNumber : (res.resNumber || res.merchantOrderId);
+      setXmlModalReservation(res);
+      setXmlModalOpen(true);
+      setXmlLoading(true);
+      setXmlData(null);
+      setXmlViewType('response');
+      setSelectedLogIndex(-1);
+      setXmlCopied(false);
+
+      try {
+         const response = await fetch('/api/admin/reservas/xml', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+               resNumber: resNum,
+               merchantOrderId: res.merchantOrderId,
+            }),
+         });
+         const data = await response.json();
+         if (!response.ok || data.error) {
+            showToast(`Erro ao carregar XML: ${data.error || 'Falha na resposta'}`, 'error');
+         } else {
+            setXmlData(data);
+            if (!data.liveXml?.xmlResponse && data.logs?.length > 0) {
+               setSelectedLogIndex(0);
+            }
+         }
+      } catch (err: any) {
+         showToast(`Erro ao buscar XML: ${err.message}`, 'error');
+      } finally {
+         setXmlLoading(false);
+      }
+   };
+
+   const handleRefreshLiveXml = async () => {
+      if (!xmlModalReservation) return;
+      const resNum = xmlModalReservation.resNumber && xmlModalReservation.resNumber !== xmlModalReservation.merchantOrderId
+         ? xmlModalReservation.resNumber
+         : (xmlModalReservation.resNumber || xmlModalReservation.merchantOrderId);
+      setXmlLoading(true);
+      try {
+         const response = await fetch('/api/admin/reservas/xml', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+               resNumber: resNum,
+               merchantOrderId: xmlModalReservation.merchantOrderId,
+               fetchLive: true,
+            }),
+         });
+         const data = await response.json();
+         if (!response.ok || data.error) {
+            showToast(`Erro ao atualizar XML: ${data.error || 'Falha na resposta'}`, 'error');
+         } else {
+            setXmlData(data);
+            setSelectedLogIndex(-1);
+            showToast('XML atualizado diretamente do GreenWay!', 'success');
+         }
+      } catch (err: any) {
+         showToast(`Erro: ${err.message}`, 'error');
+      } finally {
+         setXmlLoading(false);
+      }
+   };
+
+   const handleCopyXml = (text: string) => {
+      if (!text) return;
+      navigator.clipboard.writeText(text);
+      setXmlCopied(true);
+      showToast('XML copiado para a área de transferência!', 'success');
+      setTimeout(() => setXmlCopied(false), 2000);
+   };
+
+   const handleDownloadXml = (text: string, filename: string) => {
+      if (!text) return;
+      const blob = new Blob([text], { type: 'application/xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`Arquivo ${filename} baixado!`, 'success');
+   };
+
 
    const handleSyncSingleGreenway = async (resNumber: string) => {
       setSyncingSingle(resNumber);
@@ -863,6 +1003,218 @@ export default function PainelReservas() {
                </div>
             </div>
          )}
+
+         {/* ── Modal: Visualizar e Baixar XML da Reserva (XRS / GreenWay) ── */}
+         {xmlModalOpen && (() => {
+            const rawCurrentXml = (() => {
+               if (selectedLogIndex === -1) {
+                  return xmlViewType === 'response'
+                     ? (xmlData?.liveXml?.xmlResponse || '')
+                     : (xmlData?.liveXml?.xmlRequest || '');
+               }
+               const log = xmlData?.logs?.[selectedLogIndex];
+               return xmlViewType === 'response' ? (log?.xmlResponse || '') : (log?.xmlRequest || '');
+            })();
+            const displayedXml = formatXml ? formatXmlString(rawCurrentXml) : rawCurrentXml;
+            const resNum = xmlModalReservation?.resNumber && xmlModalReservation?.resNumber !== xmlModalReservation?.merchantOrderId
+               ? xmlModalReservation.resNumber
+               : (xmlModalReservation?.resNumber || xmlModalReservation?.merchantOrderId || 'reserva');
+            const suffix = selectedLogIndex === -1 ? 'greenway_live' : (xmlData?.logs?.[selectedLogIndex]?.action || 'log');
+            const currentDownloadFilename = `reserva_${resNum}_${suffix}_${xmlViewType}.xml`;
+
+            return (
+               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setXmlModalOpen(false)}>
+                  <div className="bg-gray-900 border border-emerald-500/40 rounded-2xl max-w-5xl w-full p-6 shadow-2xl flex flex-col max-h-[92vh]" onClick={e => e.stopPropagation()}>
+                     {/* Cabeçalho */}
+                     <div className="flex items-center justify-between pb-4 border-b border-gray-800">
+                        <div className="flex items-center gap-3">
+                           <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                              </svg>
+                           </div>
+                           <div>
+                              <div className="flex items-center gap-2">
+                                 <h2 className="text-lg font-black text-white">XML da Reserva</h2>
+                                 <span className="font-mono text-sm px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                                    {resNum}
+                                 </span>
+                              </div>
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                 Cliente: <span className="text-gray-200 font-semibold">{xmlModalReservation?.customerData?.nome || xmlModalReservation?.parsed?.nome || '—'} {xmlModalReservation?.customerData?.sobrenome || xmlModalReservation?.parsed?.sobrenome || ''}</span> • 
+                                 Merchant Order: <span className="font-mono text-gray-300">{xmlModalReservation?.merchantOrderId}</span>
+                              </p>
+                           </div>
+                        </div>
+                        <button
+                           onClick={() => setXmlModalOpen(false)}
+                           className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition-colors"
+                           title="Fechar"
+                        >
+                           ✕
+                        </button>
+                     </div>
+
+                     {/* Controles e Seletores */}
+                     <div className="py-4 border-b border-gray-800/80 flex flex-wrap items-center justify-between gap-3">
+                        {/* Seletor de Origem: Live XRS vs Logs históricos */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                           <span className="text-xs font-bold text-gray-400">Origem:</span>
+                           <button
+                              onClick={() => setSelectedLogIndex(-1)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                 selectedLogIndex === -1
+                                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30'
+                                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                              }`}
+                           >
+                              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                              GreenWay XRS (Ao Vivo)
+                           </button>
+
+                           {xmlData?.logs && xmlData.logs.length > 0 && (
+                              <select
+                                 value={selectedLogIndex}
+                                 onChange={(e) => setSelectedLogIndex(Number(e.target.value))}
+                                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border outline-none cursor-pointer ${
+                                    selectedLogIndex >= 0
+                                       ? 'bg-blue-600/30 text-blue-300 border-blue-500'
+                                       : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-600'
+                                 }`}
+                              >
+                                 <option value={-1}>Ou ver log histórico do banco ({xmlData.logs.length} encontrados)...</option>
+                                 {xmlData.logs.map((log: any, idx: number) => (
+                                    <option key={log.id} value={idx}>
+                                       Log #{idx + 1}: {log.action} ({new Date(log.createdAt).toLocaleString('pt-BR')}) {log.hasError ? '⚠️ Erro' : '✓ OK'}
+                                    </option>
+                                 ))}
+                              </select>
+                           )}
+
+                           <button
+                              onClick={handleRefreshLiveXml}
+                              disabled={xmlLoading}
+                              className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors disabled:opacity-50"
+                              title="Atualizar consulta no GreenWay"
+                           >
+                              <svg className={`w-4 h-4 ${xmlLoading ? 'animate-spin text-emerald-400' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                           </button>
+                        </div>
+
+                        {/* Alternar entre Resposta (Response) e Requisição (Request) */}
+                        <div className="flex items-center gap-2">
+                           <div className="bg-gray-800 p-1 rounded-xl flex items-center border border-gray-700">
+                              <button
+                                 onClick={() => setXmlViewType('response')}
+                                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                    xmlViewType === 'response'
+                                       ? 'bg-emerald-500 text-gray-950 font-black'
+                                       : 'text-gray-400 hover:text-white'
+                                 }`}
+                              >
+                                 Resposta (Response XML)
+                              </button>
+                              <button
+                                 onClick={() => setXmlViewType('request')}
+                                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                    xmlViewType === 'request'
+                                       ? 'bg-emerald-500 text-gray-950 font-black'
+                                       : 'text-gray-400 hover:text-white'
+                                 }`}
+                              >
+                                 Requisição (Request XML)
+                              </button>
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* Barra de Ações Rápidas (Copiar / Baixar / Toggle Formatação) */}
+                     <div className="py-2.5 flex items-center justify-between text-xs text-gray-400 flex-wrap gap-2">
+                        <div className="flex items-center gap-3">
+                           <label className="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white select-none">
+                              <input
+                                 type="checkbox"
+                                 checked={formatXml}
+                                 onChange={(e) => setFormatXml(e.target.checked)}
+                                 className="rounded bg-gray-800 border-gray-700 text-emerald-500 focus:ring-0"
+                              />
+                              <span>Formatar XML (Identação e quebra de linhas)</span>
+                           </label>
+                           {selectedLogIndex === -1 && xmlData?.liveXml?.durationMs && (
+                              <span className="text-[11px] text-gray-400">
+                                 Latência: <strong className="text-gray-200">{xmlData.liveXml.durationMs}ms</strong>
+                              </span>
+                           )}
+                           {selectedLogIndex >= 0 && xmlData?.logs?.[selectedLogIndex] && (
+                              <span className="text-[11px] text-gray-400">
+                                 Ação: <strong className="text-gray-200">{xmlData.logs[selectedLogIndex].action}</strong> • 
+                                 Endpoint: <span className="font-mono text-[10px] text-gray-300">{xmlData.logs[selectedLogIndex].endpoint}</span>
+                              </span>
+                           )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                           <button
+                              onClick={() => handleCopyXml(displayedXml)}
+                              disabled={!displayedXml}
+                              className="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold transition-colors flex items-center gap-1.5 disabled:opacity-40 cursor-pointer"
+                           >
+                              {xmlCopied ? (
+                                 <>
+                                    <span className="text-emerald-400">✓</span>
+                                    <span className="text-emerald-400">Copiado!</span>
+                                 </>
+                              ) : (
+                                 <>
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    Copiar XML
+                                 </>
+                              )}
+                           </button>
+
+                           <button
+                              onClick={() => handleDownloadXml(displayedXml, currentDownloadFilename)}
+                              disabled={!displayedXml}
+                              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-md flex items-center gap-1.5 disabled:opacity-40 cursor-pointer"
+                           >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                              Baixar XML (.xml)
+                           </button>
+                        </div>
+                     </div>
+
+                     {/* Área de Visualização do Conteúdo XML */}
+                     <div className="flex-1 overflow-hidden min-h-[300px] max-h-[550px] relative mt-2 bg-gray-950 rounded-xl border border-gray-800 flex flex-col">
+                        {xmlLoading ? (
+                           <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
+                              <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                              <p className="text-xs text-gray-400">Consultando GreenWay (Europcar XRS)...</p>
+                           </div>
+                        ) : !displayedXml ? (
+                           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                              <p className="text-gray-400 text-sm">Nenhum XML encontrado para esta seleção.</p>
+                              {xmlData?.liveError && (
+                                 <p className="text-xs text-red-400 mt-2 bg-red-950/40 p-2 rounded border border-red-900/40">
+                                    {xmlData.liveError}
+                                 </p>
+                              )}
+                           </div>
+                        ) : (
+                           <div className="flex-1 overflow-auto p-4 font-mono text-xs text-emerald-400 selection:bg-emerald-900 selection:text-white leading-relaxed">
+                              <pre className="whitespace-pre">{displayedXml}</pre>
+                           </div>
+                        )}
+                     </div>
+                  </div>
+               </div>
+            );
+         })()}
 
          {/* ── Admin Modify Modal ── */}
          {modifyModal && (
@@ -1899,8 +2251,27 @@ export default function PainelReservas() {
                                           </div>
                                        )}
                                     </div>
-                                    <button onClick={() => setExpandedRow(isExpanded ? null : res.id)} className="p-1.5 rounded-lg bg-gray-800 hover:bg-blue-900/50 text-gray-400 hover:text-blue-400 transition-colors" title="Detalhes do Cliente">
-                                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                    {/* Botão Ver Detalhes (Expandir / Recolher Linha) */}
+                                    <button
+                                       onClick={() => setExpandedRow(isExpanded ? null : res.id)}
+                                       className={`p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors cursor-pointer ${isExpanded ? 'text-white bg-gray-700' : ''}`}
+                                       title={isExpanded ? "Ocultar detalhes da reserva" : "Expandir detalhes da reserva"}
+                                    >
+                                       <svg className={`w-4 h-4 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                       </svg>
+                                    </button>
+
+                                    {/* Botão Ver e Baixar XML da Reserva (Ícone de Olho) */}
+                                    <button
+                                       onClick={() => handleOpenXmlModal(res)}
+                                       className="p-1.5 rounded-lg bg-gray-800 hover:bg-emerald-900/50 text-gray-400 hover:text-emerald-400 transition-colors border border-transparent hover:border-emerald-500/30 cursor-pointer"
+                                       title="Ver e baixar XML da reserva (XRS / GreenWay)"
+                                    >
+                                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                       </svg>
                                     </button>
                                     {res.resNumber && (
                                        <button onClick={() => openModifyModal(res)} className="p-1.5 rounded-lg bg-gray-800 hover:bg-blue-900/50 text-gray-400 hover:text-blue-400 transition-colors" title="Modificar reserva no XRS">
@@ -1916,6 +2287,20 @@ export default function PainelReservas() {
                               {isExpanded && (
                                <tr className="bg-gray-800/40 border-b border-gray-800">
                                   <td colSpan={8} className="px-5 py-4">
+                                     <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-700/50">
+                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Detalhamento da Reserva</span>
+                                        <button
+                                           onClick={() => handleOpenXmlModal(res)}
+                                           className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                                           title="Ver e baixar XML da reserva"
+                                        >
+                                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                           </svg>
+                                           Ver / Baixar XML da Reserva (XRS)
+                                        </button>
+                                     </div>
                                      <div className="flex flex-wrap gap-4 text-sm">
                                         <div className="bg-gray-900 rounded-lg p-4 border border-gray-700/50 flex-1 min-w-[200px]">
                                            <p className="text-[10px] text-gray-500 font-bold uppercase mb-2">Dados do Cliente</p>

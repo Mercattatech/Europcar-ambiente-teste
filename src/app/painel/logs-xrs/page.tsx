@@ -36,16 +36,19 @@ export default function PainelLogsXRS() {
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const [view, setView] = useState<"request" | "response">("response");
   const [filterAction, setFilterAction] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [onlyErrors, setOnlyErrors] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
-  const fetchLogs = useCallback(async () => {
+  const fetchLogs = useCallback(async (customSearch?: string) => {
+    const s = typeof customSearch === "string" ? customSearch : searchTerm;
     const params = new URLSearchParams();
     if (filterAction) params.set("action", filterAction);
     if (onlyErrors) params.set("onlyErrors", "true");
+    if (s.trim()) params.set("search", s.trim());
     params.set("limit", "200");
 
     try {
@@ -54,9 +57,14 @@ export default function PainelLogsXRS() {
       setLogs(Array.isArray(data) ? data : []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, [filterAction, onlyErrors]);
+  }, [filterAction, onlyErrors, searchTerm]);
 
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchLogs();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [fetchLogs]);
 
   useEffect(() => {
     if (!autoRefresh) return;
@@ -112,12 +120,26 @@ export default function PainelLogsXRS() {
               <h1 className="text-base font-black text-white">XRS Debugger</h1>
               <p className="text-[11px] text-gray-500">{logs.length} requisições capturadas</p>
             </div>
-            <button onClick={fetchLogs} className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white" title="Atualizar">
+            <button onClick={() => fetchLogs()} className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white cursor-pointer" title="Atualizar">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
             </button>
           </div>
 
           {/* Filters */}
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Buscar nº reserva, XML..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-8 pr-7 py-2 text-xs text-white placeholder-gray-500 outline-none focus:border-green-600"
+            />
+            <svg className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            {searchTerm && (
+              <button onClick={() => { setSearchTerm(""); fetchLogs(""); }} className="absolute right-2 top-2 text-gray-400 hover:text-white text-xs font-bold px-1">✕</button>
+            )}
+          </div>
+
           <select value={filterAction} onChange={e => setFilterAction(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-green-600">
             <option value="">Todas as ações</option>
             {actions.map(a => <option key={a} value={a}>{a}</option>)}

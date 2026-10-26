@@ -22,14 +22,24 @@ export async function GET(request: Request) {
    const { searchParams } = new URL(request.url);
    const action = searchParams.get('action');
    const onlyErrors = searchParams.get('onlyErrors') === 'true';
+   const search = searchParams.get('search')?.trim();
    const limit = parseInt(searchParams.get('limit') || '100');
 
    try {
+      const where: any = {};
+      if (action) where.action = action;
+      if (onlyErrors) where.hasError = true;
+      if (search) {
+         where.OR = [
+            { xmlRequest: { contains: search } },
+            { xmlResponse: { contains: search } },
+            { sourceFile: { contains: search } },
+            { action: { contains: search } },
+         ];
+      }
+
       const logs = await prisma.logXRS.findMany({
-         where: {
-            ...(action ? { action } : {}),
-            ...(onlyErrors ? { hasError: true } : {}),
-         } as any,
+         where,
          orderBy: { createdAt: 'desc' },
          take: limit,
       });
