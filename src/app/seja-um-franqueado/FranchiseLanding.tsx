@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import "./franchise.css";
+import FranchiseApplication, { APPLICATION_STORAGE_KEY, type ApplicationContact } from "./FranchiseApplication";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
@@ -123,6 +124,25 @@ export default function FranchiseLanding() {
 
   const set = (k: keyof SimInput) => (v: number) => setSim((s) => ({ ...s, [k]: v }));
 
+  // Popup de aplicação: decidido só no cliente (localStorage) para não piscar no SSR.
+  // ?aplicacao=1 força a exibição (útil para testes).
+  const [showApp, setShowApp] = useState(false);
+  const [prefill, setPrefill] = useState<ApplicationContact | null>(null);
+  useEffect(() => {
+    let done = false;
+    try { done = !!localStorage.getItem(APPLICATION_STORAGE_KEY); } catch { /* ignora */ }
+    const force = new URLSearchParams(window.location.search).get("aplicacao") === "1";
+    setShowApp(force || !done);
+  }, []);
+
+  function onApplicationDone(contact: ApplicationContact) {
+    setPrefill(contact);
+    setShowApp(false);
+    window.setTimeout(() => {
+      document.getElementById("simulador")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  }
+
   /**
    * Envia os dados do formulário ao webhook (via /api/franquia/lead).
    * channel "site"     → botão "Enviar interesse"
@@ -212,6 +232,7 @@ export default function FranchiseLanding() {
 
   return (
     <div className="fr">
+      {showApp && <FranchiseApplication onDone={onApplicationDone} />}
       <header className="fr-top">
         <a className="fr-brand" href="#inicio" aria-label="Europcar Brasil — Franquias">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -335,11 +356,11 @@ export default function FranchiseLanding() {
             <h2>Receba uma análise da sua cidade e uma conversa com a expansão Europcar.</h2>
             <p className="fr-muted">Preencha os dados para avaliarmos perfil, capital, cidade de interesse e aderência ao modelo.</p>
           </div>
-          <form className="fr-form" onSubmit={onSubmit}>
-            <label><span>Nome completo</span><input name="name" required autoComplete="name" /></label>
-            <label><span>E-mail</span><input name="email" type="email" required autoComplete="email" /></label>
-            <label><span>Telefone / WhatsApp</span><input name="phone" type="tel" required autoComplete="tel" placeholder="(11) 99999-8888" /></label>
-            <label><span>Cidade de interesse</span><input name="city" required /></label>
+          <form className="fr-form" onSubmit={onSubmit} key={prefill ? "prefilled" : "empty"}>
+            <label><span>Nome completo</span><input name="name" required autoComplete="name" defaultValue={prefill?.name} /></label>
+            <label><span>E-mail</span><input name="email" type="email" required autoComplete="email" defaultValue={prefill?.email} /></label>
+            <label><span>Telefone / WhatsApp</span><input name="phone" type="tel" required autoComplete="tel" placeholder="(11) 99999-8888" defaultValue={prefill?.phone} /></label>
+            <label><span>Cidade de interesse</span><input name="city" required defaultValue={prefill?.city} /></label>
             <label><span>Capital para investimento</span>
               <select name="capital" required defaultValue="">
                 <option value="">Selecione</option>

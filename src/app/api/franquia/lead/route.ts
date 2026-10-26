@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { scoreApplication } from '@/lib/franquia/applicationQuestions';
 
 export const dynamic = 'force-dynamic';
 
@@ -6,9 +7,10 @@ export const dynamic = 'force-dynamic';
  * POST /api/franquia/lead
  *
  * Recebe os dados da landing "Seja um franqueado" e envia ao webhook do n8n (Mercatta Growth).
- * É a MESMA rota e o MESMO payload para os dois canais:
+ * É a MESMA rota e o MESMO payload para os canais:
  *   - channel = "site"      → botão "Enviar interesse"
  *   - channel = "whatsapp"  → botão "Enviar pelo WhatsApp"
+ *   - channel = "aplicacao" → popup de aplicação (8 perguntas) que libera o simulador
  * O n8n identifica a origem pelo campo `channel` (e pelas tags/`source`).
  */
 
@@ -58,14 +60,30 @@ export async function POST(req: Request) {
   // Honeypot: robôs preenchem; fingimos sucesso e descartamos
   if (clean(body?.website)) return NextResponse.json({ ok: true });
 
-  const channel = clean(body?.channel, 20) === 'whatsapp' ? 'whatsapp' : 'site';
+  const rawChannel = clean(body?.channel, 20);
+  const channel = rawChannel === 'whatsapp' ? 'whatsapp' : rawChannel === 'aplicacao' ? 'aplicacao' : 'site';
   const name = clean(body?.name, 120);
   const email = clean(body?.email, 160).toLowerCase();
   const phone = normalizePhone(clean(body?.phone, 40));
-  const city = clean(body?.city, 120);
-  const capital = clean(body?.capital, 60);
-  const rental = clean(body?.rental, 80);
+  let city = clean(body?.city, 120);
+  let capital = clean(body?.capital, 60);
+  let rental = clean(body?.rental, 80);
   const message = clean(body?.message, 1000);
+
+  // Aplicação (popup): respostas validadas e pontuadas no servidor
+  const application =
+    channel === 'aplicacao' && body?.application && typeof body.application === 'object'
+      ? scoreApplication(body.application)
+      : null;
+  if (channel === 'aplicacao') {
+    if (!application || application.missing.length) {
+      return NextResponse.json({ error: 'Responda todas as perguntas da aplicação.' }, { status: 400 });
+    }
+    const ans = (id: string) => application.answers.find((a) => a.id === id)?.resposta || '';
+    city = ans('cidade') || city;
+    capital = ans('capital');
+    rental = ans('perfil');
+  }
 
   if (!name || !email || !phone || !city) {
     return NextResponse.json({ error: 'Preencha nome, e-mail, telefone e cidade.' }, { status: 400 });
@@ -88,11 +106,17 @@ export async function POST(req: Request) {
   if (capital) tags.push(`capital: ${capital}`);
   if (rental) tags.push(`locadora: ${rental}`);
   if (HOT_CAPITAL.includes(capital)) tags.push('hot');
+  if (application) tags.push(`aplicacao: ${application.grade}`);
 
-  // Payload IDÊNTICO para site e WhatsApp (só muda `channel`)
+  const defaultSource =
+    channel === 'whatsapp' ? 'site_europcar_franquia_whatsapp'
+    : channel === 'aplicacao' ? 'site_europcar_franquia_aplicacao'
+    : 'site_europcar_franquia';
+
+  // Payload igual para todos os canais (muda `channel`; aplicação acrescenta respostas e score)
   const payload = {
     action: 'create_lead',
-    event: 'franquia_lead',
+    event: channel === 'aplicacao' ? 'franquia_aplicacao' : 'franquia_lead',
     channel,
     name,
     email,
@@ -103,7 +127,19 @@ export async function POST(req: Request) {
     possui_locadora: rental,
     message,
     simulation,
-    source: clean(body?.utm?.source, 60) || (channel === 'whatsapp' ? 'site_europcar_franquia_whatsapp' : 'site_europcar_franquia'),
+    ...(application && {
+      aplicacao: {
+        respostas: Object.fromEntries(application.answers.map((a) => [a.id, a.resposta])),
+        detalhes: application.answers,
+        score: application.score,
+        score_max: application.max,
+        // A = quente, B = morno, C = frio
+        nota: application.grade,
+      },
+      lead_score: application.score,
+      lead_grade: application.grade,
+    }),
+    source: clean(body?.utm?.source, 60) || defaultSource,
     medium: clean(body?.utm?.medium, 60) || 'landing_page',
     campaign: clean(body?.utm?.campaign, 80) || 'expansao_2030',
     tags,

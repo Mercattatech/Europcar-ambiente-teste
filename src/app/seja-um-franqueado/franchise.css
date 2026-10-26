@@ -123,3 +123,47 @@
 .fr .fr-submit-row .fr-btn{flex:1 1 220px}
 .fr .fr-whats{background:#25d366;color:#fff;gap:8px}
 .fr .fr-whats:hover{background:#1ebe5b}
+
+/* ── Popup de aplicação (libera o simulador) ── */
+.fr .fr-app-overlay{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;background:rgba(6,26,16,.72);backdrop-filter:blur(8px);animation:frAppFade .25s ease-out}
+.fr .fr-app{width:min(620px,100%);max-height:calc(100vh - 40px);display:flex;flex-direction:column;background:#fff;border-radius:14px;box-shadow:0 30px 90px rgba(0,0,0,.35);overflow:hidden;animation:frAppPop .3s cubic-bezier(.2,.9,.3,1.2)}
+.fr .fr-app-head{padding:26px 28px 18px;background:linear-gradient(115deg,rgba(0,55,29,.98),rgba(0,132,61,.9)),radial-gradient(circle at 85% 10%,rgba(255,212,0,.35),transparent 40%);color:#fff}
+.fr .fr-app-badge{display:inline-block;margin-bottom:12px;padding:5px 10px;border-radius:999px;background:var(--yellow);color:#163018;font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em}
+.fr .fr-app-head h2{font-size:clamp(1.05rem,2.4vw,1.3rem);line-height:1.35;font-weight:800;margin:0 0 16px}
+.fr .fr-app-progress{height:6px;border-radius:999px;background:rgba(255,255,255,.22);overflow:hidden}
+.fr .fr-app-progress span{display:block;height:100%;background:var(--yellow);border-radius:inherit;transition:width .35s ease}
+.fr .fr-app-count{margin:8px 0 0;font-size:.8rem;font-weight:800;color:rgba(255,255,255,.8)}
+.fr .fr-app-body{padding:24px 28px;overflow-y:auto;animation:frAppSlide .28s ease-out}
+.fr .fr-app-q{border:0;margin:0;padding:0;display:grid;gap:12px}
+.fr .fr-app-q legend,.fr .fr-app-legend{display:block;padding:0;margin:0 0 4px;font-size:1.15rem;font-weight:900;color:#132019;line-height:1.3}
+.fr .fr-app-hint{margin:-4px 0 4px;color:var(--muted);font-size:.9rem}
+.fr .fr-app-options{display:grid;gap:10px}
+.fr .fr-app-opt{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;text-align:left;border:1.5px solid var(--line);border-radius:10px;background:#fbfcfa;color:#132019;font-weight:700;cursor:pointer;transition:border-color .15s,background .15s,transform .15s}
+.fr .fr-app-opt:hover{border-color:var(--green);background:#f1f8f3;transform:translateX(2px)}
+.fr .fr-app-opt:focus-visible{outline:2px solid rgba(0,132,61,.45);outline-offset:2px}
+.fr .fr-app-opt.is-selected{border-color:var(--green);background:#eaf5ed;color:#005b2c}
+.fr .fr-app-radio{flex:0 0 20px;height:20px;border-radius:50%;border:2px solid #b9cfc1;background:#fff;transition:all .15s}
+.fr .fr-app-opt.is-selected .fr-app-radio{border-color:var(--green);background:var(--green);box-shadow:inset 0 0 0 4px #fff}
+.fr .fr-app-label{display:grid;gap:8px}
+.fr .fr-app-label span{color:var(--muted);font-weight:800}
+.fr .fr-app-label .fr-app-legend{color:#132019}
+.fr .fr-app-label input{width:100%;border:1.5px solid var(--line);border-radius:8px;background:#fbfcfa;color:#132019;padding:13px 14px}
+.fr .fr-app-label input:focus{outline:2px solid rgba(0,132,61,.35);border-color:var(--green)}
+.fr .fr-app-next{width:100%;margin-top:6px}
+.fr .fr-app-privacy{margin:0;color:var(--muted);font-size:.82rem;text-align:center}
+.fr .fr-app-err{margin:0;color:#b3261e;font-weight:800;text-align:center}
+.fr .fr-app-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 28px;border-top:1px solid var(--line);background:#fafcfa}
+.fr .fr-app-back{border:0;background:none;color:#005b2c;font-weight:900;cursor:pointer;padding:6px 0}
+.fr .fr-app-exit{color:var(--muted) !important;font-size:.85rem;font-weight:700;text-decoration:underline !important}
+@keyframes frAppFade{from{opacity:0}to{opacity:1}}
+@keyframes frAppPop{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes frAppSlide{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+@media(max-width:680px){
+  .fr .fr-app-overlay{padding:0;align-items:end}
+  .fr .fr-app{max-height:100vh;border-radius:14px 14px 0 0}
+  .fr .fr-app-head,.fr .fr-app-body{padding-left:18px;padding-right:18px}
+  .fr .fr-app-foot{padding:12px 18px}
+}
+@media(prefers-reduced-motion:reduce){
+  .fr .fr-app-overlay,.fr .fr-app,.fr .fr-app-body{animation:none}
+}
