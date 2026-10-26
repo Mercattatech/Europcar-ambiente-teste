@@ -203,7 +203,7 @@ function detectAction(xmlRequest: string): string {
   return 'unknown';
 }
 
-function getXRSErrors(parsedData: any): any {
+export function getXRSErrors(parsedData: any): any {
   if (parsedData?.Errors) return parsedData.Errors;
   if (parsedData?.Response?.Errors) return parsedData.Response.Errors;
   if (parsedData?.Envelope?.Body?.Fault) return parsedData.Envelope.Body.Fault;

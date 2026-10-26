@@ -1,4 +1,4 @@
-import { callXRS, DEFAULT_POA_CID } from '@/lib/europcar/xrsClient';
+import { callXRS, DEFAULT_POA_CID, getDynamicXRSContractConfig, getXRSErrors } from '@/lib/europcar/xrsClient';
 import { buildReservationPaymentAttrs, buildCreateVoucherXml, CID_TO_BA } from '@/lib/europcar/paymentMapping';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { parsePayerList } from '@/lib/europcar/parsePayerList';
@@ -293,8 +293,10 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
   // ETO: meanOfPayment vai direto no bookReservationRQ — createVoucher NÃO é suportado (Antonio/Europcar).
   const isOnlineEXO = isPrepaidOnline && !isETO;
   const isManualEXO = paymentData.method === 'VOUCHER' && voucherData?.type === 'EXO';
+  // POA (pagar no balcão): mesmo IATA do EXO — necessário para a comissão da agência.
+  const isPoaBalcao = paymentData.method === 'BALCAO' && !isETO;
 
-  if (resNumber && (isOnlineEXO || isManualEXO)) {
+  if (resNumber && (isOnlineEXO || isManualEXO || isPoaBalcao)) {
     try {
       const voucherAmount = car.totalRateEstimate || car.total || '0';
       const voucherCurrency = car.bookingCurrencyOfTotalRateEstimate || car.currency || 'EUR';
@@ -303,18 +305,24 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
       if (isManualEXO) {
         vData = voucherData;
       } else {
-        vData = { type: 'EXO', iataNumber: '02170722' };
+        const { exoIata } = await getDynamicXRSContractConfig();
+        vData = { type: 'EXO', iataNumber: exoIata };
       }
 
       const createVoucherXml = buildCreateVoucherXml(resNumber, vData, voucherAmount, voucherCurrency, carCategory, pickupDate, returnDate);
 
-      await callXRS(createVoucherXml, {
+      const voucherRes = await callXRS(createVoucherXml, {
         callerCode: process.env.XRS_CALLER_CODE || 'DEMO',
         password: process.env.XRS_PASSWORD || 'DEMO',
         action: 'createVoucher',
         sourceFile: 'bookXRS.ts'
       });
-      console.log(`[xrsBook] createVoucher (${vData.type}) enviado com sucesso para a reserva ${resNumber}`);
+      const voucherErrors = getXRSErrors(voucherRes);
+      if (voucherErrors) {
+        console.error(`[xrsBook] ⚠️ GW recusou createVoucher (${vData.type}, IATA ${vData.iataNumber || '-'}) para ${resNumber}:`, JSON.stringify(voucherErrors));
+      } else {
+        console.log(`[xrsBook] createVoucher (${vData.type}, IATA ${vData.iataNumber || '-'}) aceito pelo GW para a reserva ${resNumber}`);
+      }
     } catch (voucherErr: any) {
       console.error(`[xrsBook] Erro ao criar voucher para ${resNumber}:`, voucherErr.message);
     }
