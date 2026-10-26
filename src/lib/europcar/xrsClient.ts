@@ -626,7 +626,7 @@ export async function getReservationRawXml(resNumber: string): Promise<{
   try {
     const response = await axios.post(url, payload.toString(), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      timeout: 20000,
+      timeout: 12000,
     });
     httpStatus = response.status;
     rawResponse = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);

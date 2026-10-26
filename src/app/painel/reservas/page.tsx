@@ -119,6 +119,7 @@ export default function PainelReservas() {
    const [xmlModalOpen, setXmlModalOpen] = useState(false);
    const [xmlModalReservation, setXmlModalReservation] = useState<any | null>(null);
    const [xmlLoading, setXmlLoading] = useState(false);
+   const [xmlLogsLoading, setXmlLogsLoading] = useState(false);
    const [xmlData, setXmlData] = useState<{
       liveXml?: any;
       liveError?: string | null;
@@ -383,70 +384,70 @@ export default function PainelReservas() {
       }
    };
 
-   const handleOpenXmlModal = async (res: any) => {
-      const resNum = res.resNumber && res.resNumber !== res.merchantOrderId ? res.resNumber : (res.resNumber || res.merchantOrderId);
-      setXmlModalReservation(res);
-      setXmlModalOpen(true);
-      setXmlLoading(true);
-      setXmlData(null);
-      setXmlViewType('response');
-      setSelectedLogIndex(-1);
-      setXmlCopied(false);
+   const getXmlResNum = (res: any) =>
+      res?.resNumber && res.resNumber !== res.merchantOrderId ? res.resNumber : (res?.resNumber || res?.merchantOrderId);
 
+   const fetchXmlPart = async (res: any, mode: 'logs' | 'live') => {
+      const response = await fetch('/api/admin/reservas/xml', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ resNumber: getXmlResNum(res), merchantOrderId: res.merchantOrderId, mode }),
+      });
+      const data = await response.json();
+      if (!response.ok || data.error) throw new Error(data.error || 'Falha na resposta');
+      return data;
+   };
+
+   const loadLiveXml = async (res: any, notify = false) => {
+      setXmlLoading(true);
       try {
-         const response = await fetch('/api/admin/reservas/xml', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-               resNumber: resNum,
-               merchantOrderId: res.merchantOrderId,
-            }),
-         });
-         const data = await response.json();
-         if (!response.ok || data.error) {
-            showToast(`Erro ao carregar XML: ${data.error || 'Falha na resposta'}`, 'error');
-         } else {
-            setXmlData(data);
-            if (!data.liveXml?.xmlResponse && data.logs?.length > 0) {
-               setSelectedLogIndex(0);
-            }
+         const data = await fetchXmlPart(res, 'live');
+         setXmlData(prev => ({ ...(prev || {}), liveXml: data.liveXml, liveError: data.liveError }));
+         if (notify) {
+            setSelectedLogIndex(-1);
+            showToast('XML atualizado diretamente do GreenWay!', 'success');
          }
       } catch (err: any) {
-         showToast(`Erro ao buscar XML: ${err.message}`, 'error');
+         setXmlData(prev => ({ ...(prev || {}), liveXml: null, liveError: err.message }));
       } finally {
          setXmlLoading(false);
       }
    };
 
-   const handleRefreshLiveXml = async () => {
-      if (!xmlModalReservation) return;
-      const resNum = xmlModalReservation.resNumber && xmlModalReservation.resNumber !== xmlModalReservation.merchantOrderId
-         ? xmlModalReservation.resNumber
-         : (xmlModalReservation.resNumber || xmlModalReservation.merchantOrderId);
-      setXmlLoading(true);
+   const handleOpenXmlModal = async (res: any) => {
+      setXmlModalReservation(res);
+      setXmlModalOpen(true);
+      setXmlData(null);
+      setXmlViewType('response');
+      setSelectedLogIndex(-1);
+      setXmlCopied(false);
+
+      // Consulta ao vivo (GreenWay, lenta) e histórico (banco, rápido) em paralelo.
+      let liveDone = false;
+      const livePromise = loadLiveXml(res).finally(() => { liveDone = true; });
+
+      setXmlLogsLoading(true);
       try {
-         const response = await fetch('/api/admin/reservas/xml', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-               resNumber: resNum,
-               merchantOrderId: xmlModalReservation.merchantOrderId,
-               fetchLive: true,
-            }),
-         });
-         const data = await response.json();
-         if (!response.ok || data.error) {
-            showToast(`Erro ao atualizar XML: ${data.error || 'Falha na resposta'}`, 'error');
-         } else {
-            setXmlData(data);
-            setSelectedLogIndex(-1);
-            showToast('XML atualizado diretamente do GreenWay!', 'success');
+         const data = await fetchXmlPart(res, 'logs');
+         const logs = data.logs || [];
+         setXmlData(prev => ({ ...(prev || {}), logs }));
+         // Se o GreenWay ainda está respondendo, já exibe o histórico mais relevante
+         if (!liveDone && logs.length > 0) {
+            const bookIdx = logs.findIndex((l: any) => l.action === 'bookReservation');
+            setSelectedLogIndex(bookIdx >= 0 ? bookIdx : 0);
          }
       } catch (err: any) {
-         showToast(`Erro: ${err.message}`, 'error');
+         showToast(`Erro ao carregar histórico XML: ${err.message}`, 'error');
       } finally {
-         setXmlLoading(false);
+         setXmlLogsLoading(false);
       }
+      await livePromise;
+   };
+
+   const handleRefreshLiveXml = async () => {
+      if (!xmlModalReservation) return;
+      setSelectedLogIndex(-1);
+      await loadLiveXml(xmlModalReservation, true);
    };
 
    const handleCopyXml = (text: string) => {
@@ -1068,9 +1069,16 @@ export default function PainelReservas() {
                                     : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                               }`}
                            >
-                              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                              GreenWay XRS (Ao Vivo)
+                              <span className={`inline-block w-2 h-2 rounded-full bg-emerald-400 ${xmlLoading ? 'animate-ping' : 'animate-pulse'}`}></span>
+                              GreenWay XRS (Ao Vivo){xmlLoading ? ' — consultando...' : ''}
                            </button>
+
+                           {xmlLogsLoading && (
+                              <span className="text-[11px] text-gray-500 flex items-center gap-1.5">
+                                 <span className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span>
+                                 Carregando histórico...
+                              </span>
+                           )}
 
                            {xmlData?.logs && xmlData.logs.length > 0 && (
                               <select
@@ -1191,10 +1199,21 @@ export default function PainelReservas() {
 
                      {/* Área de Visualização do Conteúdo XML */}
                      <div className="flex-1 overflow-hidden min-h-[300px] max-h-[550px] relative mt-2 bg-gray-950 rounded-xl border border-gray-800 flex flex-col">
-                        {xmlLoading ? (
+                        {(selectedLogIndex === -1 && xmlLoading) ? (
                            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
                               <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
                               <p className="text-xs text-gray-400">Consultando GreenWay (Europcar XRS)...</p>
+                              {xmlData?.logs && xmlData.logs.length > 0 && (
+                                 <button
+                                    onClick={() => {
+                                       const idx = xmlData.logs!.findIndex((l: any) => l.action === 'bookReservation');
+                                       setSelectedLogIndex(idx >= 0 ? idx : 0);
+                                    }}
+                                    className="text-xs text-blue-300 hover:text-blue-200 underline cursor-pointer"
+                                 >
+                                    Ver histórico salvo enquanto aguarda ({xmlData.logs.length})
+                                 </button>
+                              )}
                            </div>
                         ) : !displayedXml ? (
                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
