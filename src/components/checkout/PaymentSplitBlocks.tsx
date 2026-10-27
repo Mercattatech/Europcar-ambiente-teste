@@ -5,6 +5,7 @@
  * Regra em src/lib/europcar/paymentSplit.ts (payer com `ba` = on-line; sem `ba` = balcão).
  * Usado no checkout (resumo e PIX) e na tela de confirmação (/obrigado).
  */
+import { useState, useEffect } from "react";
 import {
   formatBRL,
   formatMoney,
@@ -14,6 +15,11 @@ import {
   type PaymentSplit,
   type SplitLine,
 } from "@/lib/europcar/paymentSplit";
+import {
+  type CheckoutSummaryConfig,
+  DEFAULT_CHECKOUT_SUMMARY_CONFIG,
+  isOnlineItemVisible,
+} from "@/lib/checkout/summaryConfig";
 
 interface Props {
   split: PaymentSplit;
@@ -28,6 +34,8 @@ interface Props {
   compact?: boolean;
   /** Indica se a reserva possui Proteção Premium (Franquia Zero) */
   isZeroExcess?: boolean;
+  /** Configuração personalizada do resumo (editável no /painel/resumo-checkout) */
+  summaryConfig?: CheckoutSummaryConfig;
 }
 
 export default function PaymentSplitBlocks({
@@ -38,7 +46,25 @@ export default function PaymentSplitBlocks({
   installments = 1,
   compact = false,
   isZeroExcess,
+  summaryConfig: externalConfig,
 }: Props) {
+  const [internalConfig, setInternalConfig] = useState<CheckoutSummaryConfig>(DEFAULT_CHECKOUT_SUMMARY_CONFIG);
+
+  useEffect(() => {
+    if (externalConfig) return;
+    let isMounted = true;
+    fetch("/api/checkout/summary-config")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (isMounted && data) setInternalConfig(data);
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [externalConfig]);
+
+  const cfg = externalConfig || internalConfig;
   const zeroExcess = isZeroExcess ?? split.isZeroExcess ?? false;
   const cur = split.localCurrency;
   const labelOf = (l: SplitLine) => (!l.mapped && l.auxK && nameOverrides[l.auxK]) || l.label;
@@ -64,26 +90,42 @@ export default function PaymentSplitBlocks({
   const BlockContent = ({ block, side }: { block: NonNullable<PaymentSplit['online']>; side: 'online' | 'counter' }) => {
     const isOnline = side === 'online';
     const isVat = (l: SplitLine) => l.chrgTy === "00028" || /imposto|vat/i.test(l.label);
-    const visibleLines = block.lines.filter((l) => !isVat(l));
-    const hasLines = visibleLines.length > 0;
+    
+    // Filtro por configuração administrativa (se for balcão, checa cfg.counter.showItemsList)
+    const visibleLines = block.lines.filter((l) => {
+      if (isVat(l)) return false;
+      return isOnline ? isOnlineItemVisible(labelOf(l), zeroExcess, cfg) : cfg.counter.showItemsList;
+    });
 
     let includedList = block.included || [];
-    if (zeroExcess) {
-      includedList = includedList.filter((i) => !isOtherProtection(i));
-      if (isOnline && !includedList.some((i) => i.code === 'ZERO_EXCESS')) {
-        includedList = [
-          {
-            code: 'ZERO_EXCESS',
-            chrgTy: 'ZERO_EXCESS',
-            label: 'Proteção Premium — Franquia Zero',
-            side: 'online',
-            excessLocal: null,
-            excessBRL: null,
-          },
-          ...includedList,
-        ];
+    if (isOnline) {
+      if (zeroExcess) {
+        includedList = includedList.filter((i) => !isOtherProtection(i) && isOnlineItemVisible(i.label, zeroExcess, cfg));
+        if (cfg.online.showZeroExcess && !includedList.some((i) => i.code === 'ZERO_EXCESS')) {
+          includedList = [
+            {
+              code: 'ZERO_EXCESS',
+              chrgTy: 'ZERO_EXCESS',
+              label: 'Proteção Premium — Franquia Zero',
+              side: 'online',
+              excessLocal: null,
+              excessBRL: null,
+            },
+            ...includedList,
+          ];
+        }
+      } else {
+        includedList = includedList.filter((i) => isOnlineItemVisible(i.label, zeroExcess, cfg));
+      }
+    } else {
+      if (!cfg.counter.showItemsList) {
+        includedList = [];
+      } else if (zeroExcess) {
+        includedList = includedList.filter((i) => !isOtherProtection(i));
       }
     }
+
+    const hasLines = visibleLines.length > 0;
     const hasIncluded = includedList.length > 0;
     if (!hasLines && !hasIncluded) return null;
 
@@ -116,34 +158,43 @@ export default function PaymentSplitBlocks({
     );
   };
 
+  const effectiveOnlineTitle = cfg.online.title || onlineTitle || "Pagar on-line";
+  const effectiveCounterTitle = cfg.counter.title || "A pagar no balcão";
+  const effectiveTotalTitle = cfg.total.title || "Valor total";
+
   return (
     <div className="space-y-3.5" data-testid="payment-split-blocks">
-      {!split.online && (
+      {cfg.online.enabled && !split.online && (
         <div className="bg-white border-2 border-emerald-500/30 rounded-xl p-4 shadow-2xs" id="split-online-block">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-1.5 pt-0.5">
               <span className="text-base">💳</span>
-              <span className="text-xs font-black uppercase tracking-wider text-emerald-950">{onlineTitle}</span>
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-950">{effectiveOnlineTitle}</span>
             </div>
-            <span className="text-base sm:text-lg font-black text-gray-900 whitespace-nowrap">{formatBRL(0)}</span>
+            {cfg.online.showSubtotalBRL && (
+              <span className="text-base sm:text-lg font-black text-gray-900 whitespace-nowrap">{formatBRL(0)}</span>
+            )}
           </div>
           <p className={`mt-3 pt-2.5 border-t border-gray-100 ${textSize} text-gray-600`}>
             Nenhum valor a pagar on-line: todas as cobranças desta reserva são pagas no balcão.
           </p>
         </div>
       )}
-      {split.online && (
+
+      {cfg.online.enabled && split.online && (
         <div className="bg-white border-2 border-emerald-500/30 rounded-xl p-4 shadow-2xs" id="split-online-block">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-1.5 pt-0.5">
               <span className="text-base">💳</span>
-              <span className="text-xs font-black uppercase tracking-wider text-emerald-950">{onlineTitle}</span>
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-950">{effectiveOnlineTitle}</span>
             </div>
             <div className="text-right">
-              <span className="text-base sm:text-lg font-black text-gray-900 whitespace-nowrap block">
-                {formatBRL(split.online.subtotalBRL)}
-              </span>
-              {showLocal && (
+              {cfg.online.showSubtotalBRL && (
+                <span className="text-base sm:text-lg font-black text-gray-900 whitespace-nowrap block">
+                  {formatBRL(split.online.subtotalBRL)}
+                </span>
+              )}
+              {cfg.online.showSubtotalLocal && showLocal && (
                 <span className="text-xs font-semibold text-gray-500 whitespace-nowrap block mt-0.5">
                   ({formatMoney(split.online.subtotalLocal, cur)})
                 </span>
@@ -151,7 +202,7 @@ export default function PaymentSplitBlocks({
             </div>
           </div>
           {!hideOnlineDetail && <BlockContent block={split.online} side="online" />}
-          {installments > 1 && (
+          {cfg.online.showInstallmentsNotice && installments > 1 && (
             <div className="mt-2 bg-emerald-50 border border-emerald-200/70 rounded-lg px-2.5 py-1 flex items-center justify-between text-[11px]">
               <span className="text-emerald-800 font-medium">Parcelamento:</span>
               <span className="font-black text-[#008d36]">
@@ -163,18 +214,20 @@ export default function PaymentSplitBlocks({
         </div>
       )}
 
-      {split.counter && (
+      {cfg.counter.enabled && split.counter && (
         <div className="bg-white border-2 border-amber-300/80 rounded-xl p-4 shadow-2xs" id="split-counter-block">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-1.5 pt-0.5">
               <span className="text-base">🏪</span>
-              <span className="text-xs font-black uppercase tracking-wider text-amber-950">A pagar no balcão</span>
+              <span className="text-xs font-black uppercase tracking-wider text-amber-950">{effectiveCounterTitle}</span>
             </div>
             <div className="text-right">
-              <span className="text-base sm:text-lg font-black text-gray-900 whitespace-nowrap block">
-                {formatBRL(split.counter.subtotalBRL)}
-              </span>
-              {showLocal && (
+              {cfg.counter.showSubtotalBRL && (
+                <span className="text-base sm:text-lg font-black text-gray-900 whitespace-nowrap block">
+                  {formatBRL(split.counter.subtotalBRL)}
+                </span>
+              )}
+              {cfg.counter.showSubtotalLocal && showLocal && (
                 <span className="text-xs font-semibold text-gray-500 whitespace-nowrap block mt-0.5">
                   ({formatMoney(split.counter.subtotalLocal, cur)})
                 </span>
@@ -182,28 +235,34 @@ export default function PaymentSplitBlocks({
             </div>
           </div>
           <BlockContent block={split.counter} side="counter" />
-          <p className={`mt-3 pt-2.5 border-t border-amber-200/80 ${textSize} text-amber-950 leading-snug`}>
-            {counterNotice(cur)}
-          </p>
+          {cfg.counter.showNotice && (
+            <p className={`mt-3 pt-2.5 border-t border-amber-200/80 ${textSize} text-amber-950 leading-snug`}>
+              {counterNotice(cur)}
+            </p>
+          )}
         </div>
       )}
 
-      <div className="bg-amber-50/90 border-2 border-amber-300 rounded-xl p-4 shadow-xs" id="split-total-block">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-1.5 pt-0.5">
-            <span className="text-base">🟢</span>
-            <span className="text-xs font-black uppercase tracking-wider text-amber-950">Valor total</span>
-          </div>
-          <div className="text-right">
-            <span className="text-lg sm:text-xl font-black text-amber-950 whitespace-nowrap block">{formatBRL(split.totalBRL)}</span>
-            {showLocal && (
-              <span className="text-xs font-semibold text-amber-800 whitespace-nowrap block mt-0.5">
-                ({formatMoney(split.totalLocal, cur)})
-              </span>
-            )}
+      {cfg.total.enabled && (
+        <div className="bg-amber-50/90 border-2 border-amber-300 rounded-xl p-4 shadow-xs" id="split-total-block">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-1.5 pt-0.5">
+              <span className="text-base">🟢</span>
+              <span className="text-xs font-black uppercase tracking-wider text-amber-950">{effectiveTotalTitle}</span>
+            </div>
+            <div className="text-right">
+              {cfg.total.showBRL && (
+                <span className="text-lg sm:text-xl font-black text-amber-950 whitespace-nowrap block">{formatBRL(split.totalBRL)}</span>
+              )}
+              {cfg.total.showLocal && showLocal && (
+                <span className="text-xs font-semibold text-amber-800 whitespace-nowrap block mt-0.5">
+                  ({formatMoney(split.totalLocal, cur)})
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
