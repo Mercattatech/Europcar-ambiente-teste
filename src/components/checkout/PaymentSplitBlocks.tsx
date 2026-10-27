@@ -9,6 +9,7 @@ import {
   formatBRL,
   formatMoney,
   counterNotice,
+  counterCurrencyNotice,
   includedExcessText,
   type PaymentSplit,
   type SplitLine,
@@ -66,6 +67,20 @@ export default function PaymentSplitBlocks({
 
   return (
     <div className="space-y-3.5" data-testid="payment-split-blocks">
+      {!split.online && (
+        <div className="bg-white border-2 border-emerald-500/30 rounded-xl p-4 shadow-2xs" id="split-online-block">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-1.5 pt-0.5">
+              <span className="text-base">💳</span>
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-950">{onlineTitle}</span>
+            </div>
+            <span className="text-base sm:text-lg font-black text-gray-900 whitespace-nowrap">{formatBRL(0)}</span>
+          </div>
+          <p className={`mt-3 pt-2.5 border-t border-gray-100 ${textSize} text-gray-600`}>
+            Nenhum valor a pagar on-line: todas as cobranças desta reserva são pagas no balcão.
+          </p>
+        </div>
+      )}
       {split.online && (
         <div className="bg-white border-2 border-emerald-500/30 rounded-xl p-4 shadow-2xs" id="split-online-block">
           <div className="flex items-start justify-between gap-2">
@@ -160,6 +175,11 @@ export default function PaymentSplitBlocks({
             )}
           </div>
         </div>
+        {split.counter && (
+          <p className={`mt-3 pt-2.5 border-t border-amber-200/80 ${textSize} text-amber-950 leading-snug`}>
+            {counterCurrencyNotice(cur)}
+          </p>
+        )}
       </div>
     </div>
   );

@@ -243,6 +243,7 @@ export async function sendTransactionalEmail(to: string, trigger: string, dataVa
 
     // E-mails de reserva: completa loja (nome + endereço) e valores online × balcão.
     // Limite de 8s — se o XRS/banco demorar, envia com as variáveis originais.
+    let templateHtml = template.html;
     try {
       const { enrichReservationEmailVars, withReservationVarDefaults, RESERVATION_TRIGGERS } = await import('@/lib/email/enrichReservationEmailVars');
       if (RESERVATION_TRIGGERS.has(trigger)) {
@@ -251,6 +252,10 @@ export async function sendTransactionalEmail(to: string, trigger: string, dataVa
           new Promise<Record<string, string>>((resolve) => setTimeout(() => resolve(dataVars), 8000)),
         ]);
         dataVars = withReservationVarDefaults(enriched);
+        // Resumo de caixa (espelho do checkout): templates do painel ainda sem {{RESUMO_CAIXA}}
+        // têm só a tabela de valores trocada — títulos e textos informativos permanecem.
+        const { upgradeTemplateWithCashSummary } = await import('@/lib/email/cashSummaryHtml');
+        templateHtml = upgradeTemplateWithCashSummary(templateHtml);
       }
     } catch (enrichErr: any) {
       console.warn(`[Email] Enriquecimento de variáveis falhou (${trigger}):`, enrichErr?.message);
@@ -277,7 +282,7 @@ export async function sendTransactionalEmail(to: string, trigger: string, dataVa
       text.replace(/\{\{#([^}]+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_m, rawKey: string, inner: string) =>
         normalizedVars[normalizeVarKey(rawKey)] ? inner : '');
 
-    const parsedHtml    = replaceVars(resolveConditionals(template.html));
+    const parsedHtml    = replaceVars(resolveConditionals(templateHtml));
     const parsedSubject = replaceVars(resolveConditionals(template.subject));
 
     const result = await sendEmail(fromEmail, to, parsedSubject, parsedHtml);

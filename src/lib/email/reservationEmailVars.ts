@@ -20,6 +20,7 @@ import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 import { INSURANCE_NAMES_PT, type XrsSnapshot } from '@/lib/email/xrsReservationSnapshot';
 import { buildReservationDetailVars, calcCounterBRL } from '@/lib/email/reservationDetailVars';
 import { buildPaymentSplitEmailVars, getStoredPaymentSplit } from '@/lib/email/paymentSplitEmailVars';
+import { buildCashSummaryFromSplit, buildCashSummaryFromVars } from '@/lib/email/cashSummaryHtml';
 import { isZeroExcessBooking, ZERO_EXCESS_LABEL } from '@/lib/europcar/protectionSummary';
 
 // Mesmos códigos de proteção usados em bookXRS.ts / reservas/route.ts
@@ -312,10 +313,15 @@ export function buildReservationEmailVars(params: {
   // Regra de pagamento on-line (ba) × balcão — quando a reserva tem o split, ele manda
   // nos blocos on-line/balcão/Incluso e no total.
   let splitVars: Record<string, string> = {};
+  let cashSummaryFromSplit = '';
   try {
     const split = getStoredPaymentSplit(cd);
     if (split) {
       splitVars = buildPaymentSplitEmailVars(split, { quilometragem: detail.QUILOMETRAGEM });
+      cashSummaryFromSplit = buildCashSummaryFromSplit(split, {
+        onlineTitle: paymentMethod === 'PIX' ? 'Pago on-line (PIX)' : 'Pago on-line',
+        quilometragem: detail.QUILOMETRAGEM,
+      });
       totalBRL = split.totalBRL;
     }
   } catch (err: any) {
@@ -374,6 +380,17 @@ export function buildReservationEmailVars(params: {
     ...splitVars,
     ...(params.extraVars || {}),
   };
+
+  // Resumo de caixa ({{RESUMO_CAIXA}}) — espelho do checkout. Montado por último para refletir
+  // os valores finais (inclusive os que a rota sobrescreveu em extraVars).
+  if (!vars.RESUMO_CAIXA) {
+    try {
+      vars.RESUMO_CAIXA = cashSummaryFromSplit || buildCashSummaryFromVars(vars);
+    } catch (err: any) {
+      console.warn('[reservationEmailVars] Falha ao montar o resumo de caixa:', err?.message);
+      vars.RESUMO_CAIXA = '';
+    }
+  }
 
   return { vars, lists, totalBRL };
 }

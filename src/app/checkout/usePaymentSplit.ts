@@ -8,8 +8,11 @@
  * - Os opcionais (insuranceList type="O" e equipamentos) vão na requisição: o lado em que
  *   cada um cai é decidido pelo payer da linha retornada — nunca presumido.
  * - Markup ETO (margem do painel) aplicado SOMENTE ao bloco on-line.
- * - Se a cotação falhar ou não vier nenhuma linha com ba, volta ao cálculo antigo
- *   (status "fallback") e remove qualquer split antigo da reserva.
+ * - A cotação vai com o MESMO meio de pagamento do bookReservation ETO (mirrorEtoPayment),
+ *   para o payer de cada linha ser o mesmo da reserva real no GW.
+ * - Linha sem ba = balcão, SEMPRE (inclusive taxa de aeroporto e taxa de devolução em outra loja).
+ *   Se nenhuma linha tiver ba, tudo vai para o balcão e nada é cobrado on-line.
+ * - Só volta ao cálculo antigo (status "fallback") se a cotação falhar.
  */
 import { useEffect, useRef, useState } from "react";
 import { computePaymentSplit, type PaymentSplit } from "@/lib/europcar/paymentSplit";
@@ -101,6 +104,8 @@ export function useEtoPaymentSplit(booking: any, setBooking: (updater: (prev: an
             xrsLanguage: booking.xrsLanguage,
             equipmentList,
             insuranceList,
+            mirrorEtoPayment: true,
+            stationCountry: booking.stationCountry,
           }),
         });
         const data = await res.json();
@@ -110,10 +115,13 @@ export function useEtoPaymentSplit(booking: any, setBooking: (updater: (prev: an
           return;
         }
         const computed = computePaymentSplit(reservation, { onlineMarkupPercent: markup });
-        if (!computed || !computed.online) {
-          // ETO sem nenhuma linha com ba: não cobramos 0 on-line por engano.
-          fallback(computed ? "nenhuma linha com payer ba" : "cotação sem chargeList");
+        if (!computed) {
+          fallback("cotação sem chargeList");
           return;
+        }
+        if (!computed.online) {
+          // Regra: linha sem ba = balcão. Nenhuma linha com ba → tudo no balcão, nada on-line.
+          console.warn(`[checkout] Cotação ETO sem nenhuma linha com payer ba (mirror=${data?._etoMirror}) — tudo a pagar no balcão.`);
         }
         setSplit(computed);
         setStatus("ready");

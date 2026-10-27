@@ -3,6 +3,8 @@ import { callXRS } from '@/lib/europcar/xrsClient';
 import { isValidXRSDate, isValidXRSTime } from '@/lib/europcar/validate';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { parsePayerList } from '@/lib/europcar/parsePayerList';
+import { CID_TO_BA } from '@/lib/europcar/paymentMapping';
+import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 export const dynamic = 'force-dynamic';
 
 /**
@@ -23,6 +25,11 @@ export const dynamic = 'force-dynamic';
  *   chargesDetail  — always sent as "TRE" (Total, Rental, Equipment)
  *   equipmentList  — [{ code, qty }] optional
  *   insuranceList  — [{ code }] optional
+ *   mirrorEtoPayment — true (checkout ETO): envia o MESMO meio de pagamento do bookReservation ETO
+ *                    (<meanOfPayment typeCode="VCH" voucherType="ETO" businessAccount=…/>, sem prepaidMode),
+ *                    para o XRS devolver em cada chargeLine o mesmo <payer> (ba × condutor) que a
+ *                    reserva real terá. Se o XRS recusar, refaz a cotação no formato antigo e
+ *                    devolve _etoMirror=false.
  */
 export async function POST(request: Request) {
   try {
@@ -42,6 +49,8 @@ export async function POST(request: Request) {
       insuranceList,  // Array of { code } — optional
       driverAge,      // Driver age for young/senior driver validation
       xrsLanguage,    // XRS language code (EN, PT, FR, DE, etc.)
+      mirrorEtoPayment, // true → mesmo meanOfPayment VCH ETO do bookReservation
+      stationCountry,
     } = body;
 
     if (!carCategory) {
@@ -85,16 +94,30 @@ export async function POST(request: Request) {
       }
     }
 
+    // ETO: mesmo meio de pagamento do bookReservation (ver paymentMapping.buildReservationPaymentAttrs)
+    const etoBa = mirrorEtoPayment && contractID ? CID_TO_BA[String(contractID)] : '';
+    let etoMopXml = '';
+    if (etoBa) {
+      let duration = 1;
+      try {
+        duration = calculateRentalDays({
+          pickupDate, pickupTime: pickupTime || '1000', returnDate, returnTime: returnTime || '1000',
+          station: pickupStation, country: stationCountry,
+        });
+      } catch { /* mantém 1 */ }
+      etoMopXml = `\n        <meanOfPayment typeCode="VCH" voucherType="ETO" businessAccount="${escapeXml(etoBa)}" voucherCarCategory="${escapeXml(carCategory)}" voucherRentalDuration="${escapeXml(String(duration))}"/>`;
+    }
+
     // chargesDetail="TRE" is mandatory — ensures Total, Rental and Equipment breakdown
-    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    const buildXml = (withEtoMop: boolean) => `<?xml version="1.0" encoding="UTF-8"?>
 <message>
   <serviceRequest serviceCode="getQuote">
     <serviceContext language="pt_PT"/>
     <caller/>
     <serviceParameters>
-      <reservation chargesDetail="TRE" rateDetails="Y" prepaidMode="${resolvedPrepaidMode}" carCategory="${escapeXml(carCategory)}"${contractAttr}${rateIdAttr}>
+      <reservation chargesDetail="TRE" rateDetails="Y"${withEtoMop ? '' : ` prepaidMode="${resolvedPrepaidMode}"`} carCategory="${escapeXml(carCategory)}"${contractAttr}${rateIdAttr}>
         <checkout stationID="${escapeXml(pickupStation)}" date="${escapeXml(pickupDate)}" time="${escapeXml(pickupTime || '1000')}"/>
-        <checkin stationID="${escapeXml(returnStation || pickupStation)}" date="${escapeXml(returnDate)}" time="${escapeXml(returnTime || '1000')}"/>${equipmentXml}${insuranceXml}
+        <checkin stationID="${escapeXml(returnStation || pickupStation)}" date="${escapeXml(returnDate)}" time="${escapeXml(returnTime || '1000')}"/>${equipmentXml}${insuranceXml}${withEtoMop ? etoMopXml : ''}
       </reservation>
       <driver countryOfResidence="BR"${driverAge ? ` age="${escapeXml(String(driverAge))}"` : ''}/>
     </serviceParameters>
@@ -108,7 +131,25 @@ export async function POST(request: Request) {
       sourceFile: 'getQuote/route.ts',
     };
 
-    const xrsResponse = await callXRS(xmlRequest, config);
+    const isKO = (r: any) => {
+      const sr = r?.message?.serviceResponse || r?.serviceResponse;
+      const st = sr?.status?.$ || sr?.status;
+      return (sr?.$?.returnCode || sr?.returnCode || st?.returnCode) === 'KO' || !!(sr?.$?.errorCode || sr?.errorCode) || !sr?.reservation;
+    };
+
+    let etoMirror = false;
+    let xrsResponse: any;
+    if (etoMopXml) {
+      xrsResponse = await callXRS(buildXml(true), config);
+      if (isKO(xrsResponse)) {
+        console.warn('[getQuote] ⚠️ XRS recusou a cotação com meanOfPayment VCH ETO — refazendo no formato antigo (prepaidMode).');
+        xrsResponse = await callXRS(buildXml(false), config);
+      } else {
+        etoMirror = true;
+      }
+    } else {
+      xrsResponse = await callXRS(buildXml(false), config);
+    }
 
     // ── Detectar erros retornados pelo XRS (returnCode="KO", errorCode, etc.) ──────────
     const serviceResponse = xrsResponse?.message?.serviceResponse || xrsResponse?.serviceResponse;
@@ -183,6 +224,7 @@ export async function POST(request: Request) {
       _payerSplit: payerSplit ?? undefined,
       _duration: apiDuration,
       _ageLimit: ageLimit ?? undefined,
+      _etoMirror: etoMopXml ? etoMirror : undefined,
     });
 
   } catch (error: any) {

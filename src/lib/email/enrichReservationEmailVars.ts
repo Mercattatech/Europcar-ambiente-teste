@@ -15,6 +15,7 @@
  */
 import prisma from '@/lib/prisma';
 import { buildReservationEmailVars } from '@/lib/email/reservationEmailVars';
+import { buildCashSummaryFromVars } from '@/lib/email/cashSummaryHtml';
 import { buildStationEmailVars, extractStationCode, isStationCode } from '@/lib/europcar/stationInfo';
 
 export const RESERVATION_TRIGGERS = new Set([
@@ -51,7 +52,7 @@ export async function enrichReservationEmailVars(
           : reservation.customerData;
         booking = cd?.booking || null;
 
-        if (!filled(out.PAGO_ONLINE_LABEL)) {
+        if (!filled(out.PAGO_ONLINE_LABEL) || !filled(out.RESUMO_CAIXA)) {
           const { vars: full } = buildReservationEmailVars({
             customerData: cd,
             resNumber,
@@ -150,5 +151,8 @@ export function withReservationVarDefaults(vars: Record<string, string>): Record
   }
 
   if (!filled(out.PAGO_ONLINE_LABEL)) out.PAGO_ONLINE_LABEL = 'Pago online';
+  if (!filled(out.RESUMO_CAIXA)) {
+    try { out.RESUMO_CAIXA = buildCashSummaryFromVars(out); } catch { out.RESUMO_CAIXA = ''; }
+  }
   return out;
 }

@@ -437,6 +437,20 @@ export function counterNotice(localCurrency: string): string {
   return `Este valor será cobrado na retirada do veículo, em ${cur}, no cartão do condutor.`;
 }
 
+const CURRENCY_NAME_PT: Record<string, string> = {
+  CHF: 'francos suíços (CHF)', EUR: 'euros (EUR)', USD: 'dólares americanos (USD)', GBP: 'libras esterlinas (GBP)',
+  CAD: 'dólares canadenses (CAD)', AUD: 'dólares australianos (AUD)', BRL: 'reais (BRL)', AED: 'dirhams (AED)',
+  CLP: 'pesos chilenos (CLP)', UYU: 'pesos uruguaios (UYU)', ARS: 'pesos argentinos (ARS)', ZAR: 'rands sul-africanos (ZAR)',
+  NZD: 'dólares neozelandeses (NZD)', NOK: 'coroas norueguesas (NOK)', SEK: 'coroas suecas (SEK)', DKK: 'coroas dinamarquesas (DKK)',
+};
+
+/** Frase do bloco "Valor total" (igual ao resumo de caixa do checkout) */
+export function counterCurrencyNotice(localCurrency: string): string {
+  const cur = (localCurrency || '').toUpperCase();
+  const name = CURRENCY_NAME_PT[cur] || cur || 'moeda local';
+  return `O pagamento da retirada será realizado em ${name}, no balcão da Europcar.`;
+}
+
 /** Texto da franquia de um item "Incluso" (ex.: "franquia € 1.900,00 / R$ 11.043,74") */
 export function includedExcessText(item: IncludedItem, localCurrency: string): string {
   if (item.excessLocal === null && item.excessBRL === null) return '';

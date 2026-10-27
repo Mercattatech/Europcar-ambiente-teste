@@ -750,10 +750,13 @@ export default function CheckoutPage() {
 
   // Valor a cobrar online = total XRS − sobretaxa aeroporto (paga no balcão)
   // ETO com regra por linha: on-line = linhas com payer ba (payerList) + margem do painel.
+  // Com o split ativo NUNCA cai no cálculo antigo: sem linha com ba, on-line = 0 (tudo no balcão).
   const legacyBaseAmountBRL = Math.max(0, (totalBRL > 0 ? totalBRL : totalRateXRS) - airportSurchargeBRL);
-  const baseAmountBRL = paymentSplit?.online ? paymentSplit.online.subtotalBRL : legacyBaseAmountBRL;
+  const baseAmountBRL = paymentSplit ? (paymentSplit.online?.subtotalBRL ?? 0) : legacyBaseAmountBRL;
   const amountInCents = Math.round(baseAmountBRL * 100);
   const splitLoading = tariffType === 'ETO' && (splitStatus === 'loading' || splitStatus === 'idle');
+  // ETO sem nenhuma linha com ba: não há o que cobrar on-line — não é possível pagar esta tarifa no site.
+  const etoNothingOnline = !!paymentSplit && !paymentSplit.online && paymentMethod !== 'BALCAO';
   // Nomes PT-BR dos opcionais escolhidos (para itens que o mapa do XRS não traduz)
   const splitNameOverrides: Record<string, string> = {};
   for (const ins of booking?.xrsInsurances || []) if (ins?.code && ins?.name) splitNameOverrides[String(ins.code).toUpperCase()] = ins.name;
@@ -990,6 +993,7 @@ export default function CheckoutPage() {
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!booking) return;
+    if (splitLoading || etoNothingOnline) return; // nada a cobrar on-line (ou valores ainda sendo calculados)
     if (!validateEmail(email)) {
       setEmailError("Por favor, insira um e-mail válido.");
       return;
@@ -1896,7 +1900,12 @@ export default function CheckoutPage() {
             </div>
 
             <div className="text-right">
-              <button id="checkout-submit" disabled={loading || splitLoading || !acceptTermsReserva || !acceptTermsPais || (couponResult && !acceptCouponTerms)} type="submit" className="w-full md:w-auto bg-[#008d36] hover:bg-[#007a2d] text-white font-black py-4 md:py-5 px-8 md:px-10 rounded-lg shadow-lg uppercase tracking-wide text-base md:text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target">
+              {etoNothingOnline && (
+                <p id="checkout-eto-nothing-online" className="mb-3 text-sm text-amber-900 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+                  Nesta tarifa todos os valores são cobrados no balcão, na retirada (veja o resumo ao lado). Não há valor a pagar on-line — volte e escolha a tarifa de pagamento na retirada.
+                </p>
+              )}
+              <button id="checkout-submit" disabled={loading || splitLoading || etoNothingOnline || !acceptTermsReserva || !acceptTermsPais || (couponResult && !acceptCouponTerms)} type="submit" className="w-full md:w-auto bg-[#008d36] hover:bg-[#007a2d] text-white font-black py-4 md:py-5 px-8 md:px-10 rounded-lg shadow-lg uppercase tracking-wide text-base md:text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target">
                 {loading ? "Processando..." : splitLoading ? "Calculando valores..." : "Finalizar e Reservar Agora"}
               </button>
             </div>
