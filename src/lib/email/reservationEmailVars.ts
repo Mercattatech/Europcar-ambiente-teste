@@ -19,6 +19,7 @@ import { buildEmailCurrencyVars } from '@/lib/receiptLocales';
 import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 import { INSURANCE_NAMES_PT, type XrsSnapshot } from '@/lib/email/xrsReservationSnapshot';
 import { buildReservationDetailVars, calcCounterBRL } from '@/lib/email/reservationDetailVars';
+import { buildPaymentSplitEmailVars, getStoredPaymentSplit } from '@/lib/email/paymentSplitEmailVars';
 import { isZeroExcessBooking, ZERO_EXCESS_LABEL } from '@/lib/europcar/protectionSummary';
 
 // Mesmos códigos de proteção usados em bookXRS.ts / reservas/route.ts
@@ -308,6 +309,19 @@ export function buildReservationEmailVars(params: {
     console.warn('[reservationEmailVars] Falha ao montar detalhamento:', err?.message);
   }
 
+  // Regra de pagamento on-line (ba) × balcão — quando a reserva tem o split, ele manda
+  // nos blocos on-line/balcão/Incluso e no total.
+  let splitVars: Record<string, string> = {};
+  try {
+    const split = getStoredPaymentSplit(cd);
+    if (split) {
+      splitVars = buildPaymentSplitEmailVars(split, { quilometragem: detail.QUILOMETRAGEM });
+      totalBRL = split.totalBRL;
+    }
+  } catch (err: any) {
+    console.warn('[reservationEmailVars] Falha ao montar blocos on-line × balcão:', err?.message);
+  }
+
     const pickupStationCode = booking.pickupStation || '';
     const pickupStationName = booking.pickupStationName || pickupStationCode;
     const pickupStationAddress = booking.pickupStationAddress || booking.pickupAddress || booking.stationAddress || '';
@@ -357,6 +371,7 @@ export function buildReservationEmailVars(params: {
     LISTA_PROTECOES: lists.LISTA_PROTECOES,
     LISTA_EXTRAS: lists.LISTA_EXTRAS,
     ...detail,
+    ...splitVars,
     ...(params.extraVars || {}),
   };
 

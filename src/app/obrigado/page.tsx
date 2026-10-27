@@ -3,6 +3,8 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
+import PaymentSplitBlocks from "@/components/checkout/PaymentSplitBlocks";
+import type { PaymentSplit } from "@/lib/europcar/paymentSplit";
 
 function ObrigadoContent() {
   const searchParams = useSearchParams();
@@ -34,6 +36,17 @@ function ObrigadoContent() {
   })();
 
   const [conversionFired, setConversionFired] = useState(false);
+
+  // Regra on-line (payer ba) × balcão — gravada pelo checkout antes do redirecionamento
+  const [paymentSplit, setPaymentSplit] = useState<PaymentSplit | null>(null);
+  useEffect(() => {
+    if (!resNumber) return;
+    try {
+      const raw = sessionStorage.getItem(`europcar_payment_split_${resNumber}`);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed?.version === 1) setPaymentSplit(parsed);
+    } catch { /* ignora */ }
+  }, [resNumber]);
 
   // Fire Google conversion event once
   useEffect(() => {
@@ -100,6 +113,11 @@ function ObrigadoContent() {
           </div>
         )}
 
+        {paymentSplit && (
+          <div className="text-left mb-6" id="obrigado-payment-split">
+            <PaymentSplitBlocks split={paymentSplit} onlineTitle="Pago on-line" />
+          </div>
+        )}
 
 
         {/* Info box */}

@@ -33,6 +33,15 @@ O motor resolve **um nível** de bloco condicional — não aninhe `{{#A}}` dent
 | `LISTA_BALCAO` | itens cobrados no balcão (ex.: sobretaxa de aeroporto) |
 | `LISTA_INCLUIDOS` | km, coberturas incluídas, taxas de licença/administração, IVA % |
 | `LISTA_FRANQUIA` | franquia de cada proteção contratada ("franquia zero" quando 0, inclusive Proteção Premium) |
+| `LISTA_ONLINE` | itens pagos on-line (conta empresarial). **Vazio quando `isPriceSecret="Y"`** — só o subtotal aparece |
+
+### Regra on-line (conta empresarial) × balcão
+
+Quando a reserva tem `paymentSplit` (tarifas ETO — ver `src/lib/europcar/paymentSplit.ts`), as variáveis
+`VALOR_PAGO_ONLINE`, `LISTA_ONLINE`, `VALOR_BALCAO`, `LISTA_BALCAO` (itens + aviso de cobrança na retirada),
+`LISTA_INCLUIDOS` (proteções a 0,00 com franquia), `TOTAL_RESERVA`, `VALOR_TOTAL`, `VALOR_LOCAL` e `VALOR_BRL`
+passam a vir da regra por linha (`payer ba` = on-line, sem `ba` = balcão). `VALOR_VEICULO`, `VALOR_PROTECOES`
+e `VALOR_ACESSORIOS` ficam vazios (os itens já estão nos blocos).
 
 ## Lojas de retirada e devolução
 

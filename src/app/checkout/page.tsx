@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import LoginModal from "@/components/auth/LoginModal";
 import { calculateRentalDays, formatRentalDays } from "@/lib/europcar/rentalDuration";
 import { isZeroExcessBooking } from "@/lib/europcar/protectionSummary";
+import PaymentSplitBlocks from "@/components/checkout/PaymentSplitBlocks";
+import { useEtoPaymentSplit } from "./usePaymentSplit";
 
 export default function CheckoutPage() {
   const { data: session, status } = useSession();
@@ -491,6 +493,9 @@ export default function CheckoutPage() {
     setExtrasDetails(resolved);
   }, [booking]);
 
+  // Regra on-line (payer ba) × balcão (payer sem ba) — ETO: refaz a cotação com os opcionais
+  const { split: paymentSplit, status: splitStatus } = useEtoPaymentSplit(booking, setBooking);
+
   // ETO CIDs have their own separate flow — no price-comparison getQuote
   const ETO_CIDS = ['56935466', '56935495'];
 
@@ -619,6 +624,11 @@ export default function CheckoutPage() {
               sessionStorage.removeItem("europcar_journey_session");
               }
             } catch { }
+            // Regra on-line × balcão: leva os blocos para a tela de confirmação
+            try {
+              const b = JSON.parse(sessionStorage.getItem("europcar_booking") || "null");
+              if (b?.paymentSplit) sessionStorage.setItem(`europcar_payment_split_${d.resNumber}`, JSON.stringify(b.paymentSplit));
+            } catch { }
             // Redirect to thank you page
             window.location.href = `/obrigado?res=${encodeURIComponent(d.resNumber)}&method=PIX`;
           }
@@ -739,8 +749,20 @@ export default function CheckoutPage() {
   }, 0);
 
   // Valor a cobrar online = total XRS − sobretaxa aeroporto (paga no balcão)
-  const baseAmountBRL = Math.max(0, (totalBRL > 0 ? totalBRL : totalRateXRS) - airportSurchargeBRL);
+  // ETO com regra por linha: on-line = linhas com payer ba (payerList) + margem do painel.
+  const legacyBaseAmountBRL = Math.max(0, (totalBRL > 0 ? totalBRL : totalRateXRS) - airportSurchargeBRL);
+  const baseAmountBRL = paymentSplit?.online ? paymentSplit.online.subtotalBRL : legacyBaseAmountBRL;
   const amountInCents = Math.round(baseAmountBRL * 100);
+  const splitLoading = tariffType === 'ETO' && (splitStatus === 'loading' || splitStatus === 'idle');
+  // Nomes PT-BR dos opcionais escolhidos (para itens que o mapa do XRS não traduz)
+  const splitNameOverrides: Record<string, string> = {};
+  for (const ins of booking?.xrsInsurances || []) if (ins?.code && ins?.name) splitNameOverrides[String(ins.code).toUpperCase()] = ins.name;
+  for (const eq of booking?.xrsEquipment || []) if (eq?.code && eq?.name) splitNameOverrides[String(eq.code).toUpperCase()] = eq.name;
+  const rememberSplitForConfirmation = (res: string, serverSplit?: any) => {
+    const s = serverSplit || paymentSplit;
+    if (!res || !s) return;
+    try { sessionStorage.setItem(`europcar_payment_split_${res}`, JSON.stringify(s)); } catch { }
+  };
 
   // Para BALCÃO: total completo = veículo + proteções (xrsInsurances) + equipamentos + extras DB
   const _extrasSumBRL = extrasDetails.reduce((s: number, e: any) => {
@@ -834,6 +856,7 @@ export default function CheckoutPage() {
             }
           } catch { }
           // Redirect to thank you page after a brief delay (let on-request UI show first)
+          rememberSplitForConfirmation(json.resNumber, json.paymentSplit);
           setTimeout(() => {
             window.location.href = (() => {
               const redirectAmount = paymentMethod === 'BALCAO' ? balcaoFullAmountCents : amountInCents;
@@ -870,6 +893,7 @@ export default function CheckoutPage() {
             }
           } catch { }
           // Redirect to thank you page
+          rememberSplitForConfirmation(json.resNumber, json.paymentSplit);
           window.location.href = (() => {
               const redirectAmount = paymentMethod === 'BALCAO' ? balcaoFullAmountCents : amountInCents;
               const base = `/obrigado?res=${encodeURIComponent(json.resNumber)}&method=${paymentMethod === 'BALCAO' ? 'BALCAO' : 'CREDIT'}&amount=${redirectAmount}`;
@@ -1363,7 +1387,8 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Price breakdown */}
+              {/* Price breakdown (fluxo antigo — com split os itens aparecem nos blocos abaixo) */}
+              {!paymentSplit && (
               <div className="flex flex-col gap-1 border-t border-gray-200 pt-3 text-xs">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Aluguel ({currency})</span>
@@ -1426,9 +1451,17 @@ export default function CheckoutPage() {
                   </>
                 )}
               </div>
+              )}
 
               {/* Grand total — PIX (online vs balcão) */}
               {(() => {
+                if (paymentSplit) {
+                  return (
+                    <div className="mt-auto">
+                      <PaymentSplitBlocks split={paymentSplit} nameOverrides={splitNameOverrides} onlineTitle="Pagar agora via PIX" compact />
+                    </div>
+                  );
+                }
                 const totalBalcaoPIX = airportSurchargeBRL + extrasAndEquipTotal;
                 const totalReservaPIX = baseAmountBRL + totalBalcaoPIX;
                 return (
@@ -1863,8 +1896,8 @@ export default function CheckoutPage() {
             </div>
 
             <div className="text-right">
-              <button disabled={loading || !acceptTermsReserva || !acceptTermsPais || (couponResult && !acceptCouponTerms)} type="submit" className="w-full md:w-auto bg-[#008d36] hover:bg-[#007a2d] text-white font-black py-4 md:py-5 px-8 md:px-10 rounded-lg shadow-lg uppercase tracking-wide text-base md:text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target">
-                {loading ? "Processando..." : "Finalizar e Reservar Agora"}
+              <button id="checkout-submit" disabled={loading || splitLoading || !acceptTermsReserva || !acceptTermsPais || (couponResult && !acceptCouponTerms)} type="submit" className="w-full md:w-auto bg-[#008d36] hover:bg-[#007a2d] text-white font-black py-4 md:py-5 px-8 md:px-10 rounded-lg shadow-lg uppercase tracking-wide text-base md:text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-target">
+                {loading ? "Processando..." : splitLoading ? "Calculando valores..." : "Finalizar e Reservar Agora"}
               </button>
             </div>
           </form>
@@ -2094,6 +2127,26 @@ export default function CheckoutPage() {
                     return `${localSymbol || currency} ${val.toFixed(2).replace('.', ',')}`;
                   }
                 };
+
+                // Regra on-line (payer ba) × balcão — ETO com cotação recalculada
+                if (paymentSplit) {
+                  return (
+                    <PaymentSplitBlocks
+                      split={paymentSplit}
+                      nameOverrides={splitNameOverrides}
+                      onlineTitle={paymentMethod === 'PIX' ? 'Pagar on-line (PIX)' : 'Pagar on-line'}
+                      installments={paymentMethod === 'CREDIT' ? ccInstallments : 1}
+                    />
+                  );
+                }
+                if (splitLoading) {
+                  return (
+                    <div className="flex items-center gap-2 text-gray-500 text-sm py-4" id="split-loading">
+                      <div className="w-4 h-4 border-2 border-[#008d36] border-t-transparent rounded-full animate-spin" />
+                      <p>Calculando o que é pago on-line e o que é pago no balcão...</p>
+                    </div>
+                  );
+                }
 
                 const isZeroExcess = isZeroExcessBooking(booking);
 

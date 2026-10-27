@@ -3,6 +3,7 @@ import { buildReservationPaymentAttrs, buildCreateVoucherXml, CID_TO_BA } from '
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { parsePayerList } from '@/lib/europcar/parsePayerList';
 import { buildPricingSnapshot, readEtoMarkupPercent, isEtoContract, type PricingSnapshot } from '@/lib/commissions/pricingSnapshot';
+import { resolveBookedPaymentSplit } from '@/lib/europcar/paymentSplitBooking';
 
 export interface BookXRSParams {
   bookingData: any;
@@ -209,6 +210,21 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
 
   if (!resNumber) {
     throw new Error("Europcar não retornou número de reserva. Verifique os logs.");
+  }
+
+  // ── Regra de pagamento on-line (ba) × balcão — confere a reserva real ──
+  // Gravado no próprio customerData (os chamadores salvam `{ ...parsedData }` em seguida).
+  try {
+    const bookedSplit = resolveBookedPaymentSplit({
+      bookResNode,
+      bookingData,
+      resNumber,
+      chargedBRL: (paymentData.amountInCents || 0) / 100,
+      paymentMethod: paymentData.method,
+    });
+    if (bookedSplit && customerData) customerData.paymentSplit = bookedSplit;
+  } catch (splitErr: any) {
+    console.warn(`[xrsBook] Falha ao conferir o split on-line × balcão de ${resNumber}:`, splitErr?.message);
   }
 
   const xrsStatusCode: string = bookResNode?.$?.statusCode || 'S';

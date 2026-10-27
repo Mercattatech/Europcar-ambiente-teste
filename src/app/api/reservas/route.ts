@@ -11,6 +11,8 @@ import { getReservationErrorMessage } from '@/lib/cms/reservationErrors';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { registerFailedTransaction } from '@/lib/rejectionService';
 import { buildPricingSnapshot, readEtoMarkupPercent, isEtoContract, type PricingSnapshot } from '@/lib/commissions/pricingSnapshot';
+import { resolveBookedPaymentSplit } from '@/lib/europcar/paymentSplitBooking';
+import type { PaymentSplit } from '@/lib/europcar/paymentSplit';
 
 export const dynamic = 'force-dynamic';
 
@@ -455,6 +457,8 @@ export async function POST(request: Request) {
       let xrsWarnings: any[] = [];
       // NET (API) + markup aplicado, gravado na reserva para o relatório de comissões
       let pricingSnapshot: PricingSnapshot | null = null;
+      // Regra on-line (ba) × balcão confirmada com o XML da reserva (só tarifas com paymentSplit — ETO)
+      let paymentSplit: PaymentSplit | null = null;
       if (paymentApproved) {
         const car = bookingData.car || {};
         const pickupDate = bookingData.pickupDate;
@@ -718,6 +722,21 @@ export async function POST(request: Request) {
           }
         }
 
+        // ── Regra de pagamento on-line (ba) × balcão — confere a reserva real ──
+        // Nunca impede a reserva: em caso de erro fica o split da cotação (ou nenhum).
+        try {
+          paymentSplit = resolveBookedPaymentSplit({
+            bookResNode,
+            bookingData,
+            resNumber,
+            chargedBRL: (paymentData.amountInCents || 0) / 100,
+            paymentMethod: paymentData.method,
+          });
+        } catch (splitErr: any) {
+          console.warn(`[reservas] Falha ao conferir o split on-line × balcão de ${resNumber}:`, splitErr?.message);
+          paymentSplit = bookingData?.paymentSplit || null;
+        }
+
         if (resNumber) {
           try {
             const dFirstName = customerData.nome.trim();
@@ -868,6 +887,7 @@ export async function POST(request: Request) {
                 // Cupom de desconto aplicado
                 ...(couponData && { couponData }),
                 ...(pricingSnapshot && { pricingSnapshot }),
+                ...(paymentSplit && { paymentSplit }),
                 ...(xrsWarnings.length > 0 && { xrsWarnings }),
               })
            }
@@ -896,6 +916,7 @@ export async function POST(request: Request) {
             xrsInsurances: Array.isArray(xrsInsurances) ? xrsInsurances : [],
             xrsEquipment: Array.isArray(xrsEquipment) ? xrsEquipment : [],
             paymentMethod: paymentData.method,
+            ...(paymentSplit && { paymentSplit }),
           };
 
           // On-request → RESERVA_SOB_SOLICITACAO; BALCÃO ou pré-pago → RESERVA_SUCESSO
@@ -964,6 +985,7 @@ export async function POST(request: Request) {
          onRequest: isOnRequest,
          onRequestItems,
          accountCreated,
+         ...(paymentSplit && { paymentSplit }),
          cieloLog: `${cieloLog} | ${logOrigem}`
       });
 
