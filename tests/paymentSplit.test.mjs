@@ -292,3 +292,23 @@ test('quando isZeroExcess é true, oculta proteções básicas com franquia e ex
   assert.ok(zeroSplit.online.included.some((i) => i.label === 'Proteção Premium — Franquia Zero'));
   assert.ok(zeroSplit.online.included.some((i) => i.label === 'Taxas e licenças'));
 });
+
+test('quando isZeroExcess é true com PREMIUM PROTECTION PACKAGE no XML, remove a linha duplicada e mantém só a Franquia Zero', async () => {
+  const xml = buildXml({
+    resNumber: '1000000009',
+    totalBRL: '539.48',
+    totalEUR: '92.73',
+    lines: [
+      line({ ty: '00001', desc: 'Basic Rental', eur: '92.73', brl: '539.48', payer: BA }),
+      line({ ty: '00006', desc: 'PREMIUM PROTECTION PACKAGE', eur: '0.00', brl: '0.00', payer: BA, auxK: 'PPP' }),
+      line({ ty: '00090', desc: 'LICENSES &amp; FEES', eur: '0.00', brl: '0.00', payer: BA, auxK: 'LAF' }),
+    ],
+    payers: [payerBA('539.48', '92.73')],
+  });
+
+  const split = computePaymentSplit(await reservationOf(xml), { isZeroExcess: true, logger: null });
+  assert.ok(split);
+  assert.ok(split.online.included.some((i) => i.label === 'Proteção Premium — Franquia Zero'));
+  assert.ok(!split.online.included.some((i) => i.label === 'PREMIUM PROTECTION PACKAGE'));
+  assert.ok(split.online.included.some((i) => i.label === 'Taxas e licenças'));
+});

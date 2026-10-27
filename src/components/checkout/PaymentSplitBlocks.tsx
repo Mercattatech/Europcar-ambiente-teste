@@ -45,13 +45,19 @@ export default function PaymentSplitBlocks({
   const textSize = compact ? "text-[11px]" : "text-xs";
   const showLocal = !!cur && cur !== "BRL";
 
-  const isBasicProtection = (item: { code?: string; label: string }) => {
+  const isOtherProtection = (item: { code?: string; label: string }) => {
+    if (item.code === 'ZERO_EXCESS') return false;
     const c = (item.code || '').toUpperCase();
-    if (c === 'CDW' || c === 'THW' || c === 'LDW' || c === 'SLDW' || c === 'SPCDW' || c === 'SCDW') {
+    if (c === 'CDW' || c === 'THW' || c === 'LDW' || c === 'SLDW' || c === 'SPCDW' || c === 'SCDW' || c === 'WWI' || c === 'PAI' || c === 'SPPAI') {
       return true;
     }
-    if (/prote[cç][aã]o contra (roubo|danos)/i.test(item.label)) return true;
-    if (/accident & damage/i.test(item.label) || /theft protection/i.test(item.label)) return true;
+    const lbl = item.label || '';
+    if (/protection\s*package/i.test(lbl)) return true;
+    if (/pacote\s*de\s*prote[cç][aã]o/i.test(lbl)) return true;
+    if (/premium\s*protection/i.test(lbl) && !/franquia\s*zero/i.test(lbl)) return true;
+    if (/prote[cç][aã]o\s*contra\s*(roubo|danos)/i.test(lbl)) return true;
+    if (/accident\s*&\s*damage/i.test(lbl) || /theft\s*protection/i.test(lbl)) return true;
+    if (/damage\s*(waiver|protection)/i.test(lbl) || /collision\s*damage/i.test(lbl)) return true;
     return false;
   };
 
@@ -63,7 +69,7 @@ export default function PaymentSplitBlocks({
 
     let includedList = block.included || [];
     if (zeroExcess) {
-      includedList = includedList.filter((i) => !isBasicProtection(i));
+      includedList = includedList.filter((i) => !isOtherProtection(i));
       if (isOnline && !includedList.some((i) => i.code === 'ZERO_EXCESS')) {
         includedList = [
           {
