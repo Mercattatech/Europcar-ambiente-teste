@@ -17,6 +17,12 @@ export interface CheckoutSummaryConfig {
     showDailyRental: boolean; // Linha "Diárias"
     showZeroExcess: boolean; // Linha "Proteção Premium — Franquia Zero" (quando contratada)
     showBasicProtections: boolean; // "Proteção contra danos / roubo" (quando NÃO contratada franquia zero)
+    showSuperTheftWaiver: boolean; // "Super Proteção contra Roubo / Furto" (Super Theft Waiver / STHW)
+    showTheftWaiver: boolean; // "Proteção contra Roubo" (Theft Waiver / THW)
+    showCollisionDamageWaiver: boolean; // "Proteção contra Danos / Colisão" (Collision Damage Waiver / CDW / SCDW)
+    showGlassAndTyres: boolean; // "Vidros e Pneus" (Wheels & Windscreen / WWI)
+    showPersonalAccident: boolean; // "Acidentes Pessoais" (PAI / SPPAI)
+    showRoadsideAssistance: boolean; // "Assistência 24h em Viagem" (Roadside Assistance / RSA)
     showAirportSurcharge: boolean; // "Taxa de aeroporto"
     showOneWayCharge: boolean; // "Taxa de devolução em outra loja"
     showHighSeasonSurcharge: boolean; // "Sobretaxa de alta temporada"
@@ -55,6 +61,12 @@ export const DEFAULT_CHECKOUT_SUMMARY_CONFIG: CheckoutSummaryConfig = {
     showDailyRental: true,
     showZeroExcess: true,
     showBasicProtections: true,
+    showSuperTheftWaiver: true,
+    showTheftWaiver: true,
+    showCollisionDamageWaiver: true,
+    showGlassAndTyres: true,
+    showPersonalAccident: true,
+    showRoadsideAssistance: true,
     showAirportSurcharge: true,
     showOneWayCharge: true,
     showHighSeasonSurcharge: true,
@@ -98,6 +110,12 @@ export function normalizeCheckoutSummaryConfig(raw: any): CheckoutSummaryConfig 
       showDailyRental: raw.online?.showDailyRental ?? def.online.showDailyRental,
       showZeroExcess: raw.online?.showZeroExcess ?? def.online.showZeroExcess,
       showBasicProtections: raw.online?.showBasicProtections ?? def.online.showBasicProtections,
+      showSuperTheftWaiver: raw.online?.showSuperTheftWaiver ?? def.online.showSuperTheftWaiver,
+      showTheftWaiver: raw.online?.showTheftWaiver ?? def.online.showTheftWaiver,
+      showCollisionDamageWaiver: raw.online?.showCollisionDamageWaiver ?? def.online.showCollisionDamageWaiver,
+      showGlassAndTyres: raw.online?.showGlassAndTyres ?? def.online.showGlassAndTyres,
+      showPersonalAccident: raw.online?.showPersonalAccident ?? def.online.showPersonalAccident,
+      showRoadsideAssistance: raw.online?.showRoadsideAssistance ?? def.online.showRoadsideAssistance,
       showAirportSurcharge: raw.online?.showAirportSurcharge ?? def.online.showAirportSurcharge,
       showOneWayCharge: raw.online?.showOneWayCharge ?? def.online.showOneWayCharge,
       showHighSeasonSurcharge: raw.online?.showHighSeasonSurcharge ?? def.online.showHighSeasonSurcharge,
@@ -128,48 +146,124 @@ export function normalizeCheckoutSummaryConfig(raw: any): CheckoutSummaryConfig 
 export function isOnlineItemVisible(
   label: string,
   isZeroExcess: boolean,
-  cfg: CheckoutSummaryConfig = DEFAULT_CHECKOUT_SUMMARY_CONFIG
+  cfg: CheckoutSummaryConfig = DEFAULT_CHECKOUT_SUMMARY_CONFIG,
+  code?: string
 ): boolean {
   if (!cfg.online.enabled) return false;
 
   const lbl = (label || "").toLowerCase();
+  const c = (code || "").toUpperCase();
 
-  // Diárias
+  // 1. Diárias
   if (/di[aá]rias|basic rental/i.test(lbl)) {
     return cfg.online.showDailyRental;
   }
 
-  // Franquia Zero
-  if (/franquia zero/i.test(lbl)) {
+  // 2. Franquia Zero
+  if (/franquia\s*zero/i.test(lbl) || c === "ZERO_EXCESS") {
     return cfg.online.showZeroExcess;
   }
 
-  // Proteções básicas (apenas quando não for Franquia Zero)
-  if (/prote[cç][aã]o contra (roubo|danos)/i.test(lbl) || /accident & damage/i.test(lbl) || /theft protection/i.test(lbl)) {
-    if (isZeroExcess) return false;
+  // 3. Super Proteção contra Roubo (Super Theft Waiver / STHW)
+  if (
+    c === "STHW" ||
+    c === "SPTHW" ||
+    /super\s*theft/i.test(lbl) ||
+    /super.*roubo/i.test(lbl)
+  ) {
+    if (isZeroExcess) return false; // Parte integrante da Franquia Zero
+    return cfg.online.showSuperTheftWaiver;
+  }
+
+  // 4. Proteção contra Roubo (Theft Waiver / THW)
+  if (
+    c === "THW" ||
+    c === "THEFT" ||
+    c === "TW" ||
+    c === "TWC" ||
+    /theft\s*(waiver|charge|protection)?/i.test(lbl) ||
+    /contra\s*roubo/i.test(lbl)
+  ) {
+    if (isZeroExcess) return false; // Parte integrante da Franquia Zero
+    return cfg.online.showTheftWaiver;
+  }
+
+  // 5. Proteção contra Danos / Colisão (Damage Waiver / CDW / SCDW / LDW)
+  if (
+    c === "CDW" ||
+    c === "SCDW" ||
+    c === "SPCDW" ||
+    c === "LDW" ||
+    c === "SLDW" ||
+    /damage\s*(waiver|protection|charge)?/i.test(lbl) ||
+    /collision/i.test(lbl) ||
+    /contra\s*danos/i.test(lbl)
+  ) {
+    if (isZeroExcess) return false; // Parte integrante da Franquia Zero
+    return cfg.online.showCollisionDamageWaiver;
+  }
+
+  // 6. Vidros e Pneus (Wheels & Windscreen / WWI)
+  if (
+    c === "WWI" ||
+    c === "WIND" ||
+    c === "TIRE" ||
+    /vidro|pneu|windscreen|tyre|tire/i.test(lbl)
+  ) {
+    if (isZeroExcess) return false; // Parte integrante da Franquia Zero
+    return cfg.online.showGlassAndTyres;
+  }
+
+  // 7. Acidentes Pessoais (Personal Accident / PAI / SPPAI)
+  if (
+    c === "PAI" ||
+    c === "SPPAI" ||
+    /acidente\s*pessoal|personal\s*accident/i.test(lbl)
+  ) {
+    if (isZeroExcess) return false; // Parte integrante da Franquia Zero
+    return cfg.online.showPersonalAccident;
+  }
+
+  // 8. Assistência em Viagem 24h (Roadside Assistance / RSA)
+  if (
+    c === "RSA" ||
+    /roadside|assist[eê]ncia\s*(24h|em\s*viagem|na\s*estrada)/i.test(lbl)
+  ) {
+    if (isZeroExcess) return false; // Parte integrante da Franquia Zero
+    return cfg.online.showRoadsideAssistance;
+  }
+
+  // 9. Proteções básicas genéricas (quando NÃO for Franquia Zero)
+  if (
+    /prote[cç][aã]o contra (roubo|danos)/i.test(lbl) ||
+    /accident & damage/i.test(lbl) ||
+    /protection\s*package/i.test(lbl) ||
+    /waiver/i.test(lbl)
+  ) {
+    if (isZeroExcess) return false; // Subsumido pela Franquia Zero
     return cfg.online.showBasicProtections;
   }
 
-  // Taxa de aeroporto
+  // 10. Taxa de aeroporto
   if (/aeroporto|airport/i.test(lbl)) {
     return cfg.online.showAirportSurcharge;
   }
 
-  // Devolução em outra loja (One-way)
+  // 11. Devolução em outra loja (One-way)
   if (/outra loja|one-way/i.test(lbl)) {
     return cfg.online.showOneWayCharge;
   }
 
-  // Sobretaxa de alta temporada
+  // 12. Sobretaxa de alta temporada
   if (/alta temporada|high season/i.test(lbl)) {
     return cfg.online.showHighSeasonSurcharge;
   }
 
-  // Taxas e licenças
+  // 13. Taxas e licenças
   if (/licen[cç]as|taxas e licen[cç]as|licenses & fees/i.test(lbl)) {
     return cfg.online.showLicensesAndFees;
   }
 
-  // Demais itens
+  // 14. Demais itens
   return cfg.online.showOtherItems;
 }

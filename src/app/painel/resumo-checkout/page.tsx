@@ -51,6 +51,46 @@ const SAMPLE_SPLIT_WITH_COUNTER: PaymentSplit = {
         excessBRL: null,
       },
       {
+        code: "STHW",
+        chrgTy: "00021",
+        label: "SUPER THEFT WAIVER CHARGE",
+        side: "online",
+        excessLocal: null,
+        excessBRL: null,
+      },
+      {
+        code: "CDW",
+        chrgTy: "00020",
+        label: "Proteção contra Danos / Colisão (CDW)",
+        side: "online",
+        excessLocal: 1500.0,
+        excessBRL: 8700.0,
+      },
+      {
+        code: "WWI",
+        chrgTy: "00022",
+        label: "Proteção de Vidros e Pneus (WWI)",
+        side: "online",
+        excessLocal: null,
+        excessBRL: null,
+      },
+      {
+        code: "PAI",
+        chrgTy: "00023",
+        label: "Proteção de Acidentes Pessoais (PAI)",
+        side: "online",
+        excessLocal: null,
+        excessBRL: null,
+      },
+      {
+        code: "RSA",
+        chrgTy: "00024",
+        label: "Assistência 24h em Viagem (RSA)",
+        side: "online",
+        excessLocal: null,
+        excessBRL: null,
+      },
+      {
         code: "HSS",
         chrgTy: "00030",
         label: "Sobretaxa de alta temporada",
@@ -369,106 +409,193 @@ export default function PainelResumoCheckout() {
                     />
                   </div>
 
-                  <div className="border-t border-gray-800 pt-3">
-                    <p className="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-2">
-                      Variáveis e Linhas Exibidas
-                    </p>
-                    <div className="divide-y divide-gray-800/60">
-                      <Toggle
-                        label="Diárias"
-                        desc="Linha com o aluguel base do veículo"
-                        checked={config.online.showDailyRental}
-                        onChange={(val) =>
-                          setConfig((c) => ({
-                            ...c,
-                            online: { ...c.online, showDailyRental: val },
-                          }))
-                        }
-                      />
-                      <Toggle
-                        label="Proteção Premium — Franquia Zero"
-                        desc="Exibida como 'Incluso' quando o cliente seleciona Franquia Zero"
-                        badge="Franquia Zero"
-                        checked={config.online.showZeroExcess}
-                        onChange={(val) =>
-                          setConfig((c) => ({
-                            ...c,
-                            online: { ...c.online, showZeroExcess: val },
-                          }))
-                        }
-                      />
-                      <Toggle
-                        label="Proteções Básicas (Roubo e Danos)"
-                        desc="Exibidas com o valor da franquia quando NÃO for Franquia Zero"
-                        checked={config.online.showBasicProtections}
-                        onChange={(val) =>
-                          setConfig((c) => ({
-                            ...c,
-                            online: { ...c.online, showBasicProtections: val },
-                          }))
-                        }
-                      />
-                      <Toggle
-                        label="Taxas e Licenças"
-                        checked={config.online.showLicensesAndFees}
-                        onChange={(val) =>
-                          setConfig((c) => ({
-                            ...c,
-                            online: { ...c.online, showLicensesAndFees: val },
-                          }))
-                        }
-                      />
-                      <Toggle
-                        label="Sobretaxa de Alta Temporada"
-                        checked={config.online.showHighSeasonSurcharge}
-                        onChange={(val) =>
-                          setConfig((c) => ({
-                            ...c,
-                            online: { ...c.online, showHighSeasonSurcharge: val },
-                          }))
-                        }
-                      />
-                      <Toggle
-                        label="Taxa de Aeroporto"
-                        checked={config.online.showAirportSurcharge}
-                        onChange={(val) =>
-                          setConfig((c) => ({
-                            ...c,
-                            online: { ...c.online, showAirportSurcharge: val },
-                          }))
-                        }
-                      />
-                      <Toggle
-                        label="Taxa de Devolução em Outra Loja (One-Way)"
-                        checked={config.online.showOneWayCharge}
-                        onChange={(val) =>
-                          setConfig((c) => ({
-                            ...c,
-                            online: { ...c.online, showOneWayCharge: val },
-                          }))
-                        }
-                      />
-                      <Toggle
-                        label="Demais Taxas e Acessórios Opcionais"
-                        checked={config.online.showOtherItems}
-                        onChange={(val) =>
-                          setConfig((c) => ({
-                            ...c,
-                            online: { ...c.online, showOtherItems: val },
-                          }))
-                        }
-                      />
-                      <Toggle
-                        label="Aviso de Parcelamento Sem Juros"
-                        desc="Exibe a faixa 'Nx de R$ ... sem juros' para cartão de crédito"
-                        checked={config.online.showInstallmentsNotice}
-                        onChange={(val) =>
-                          setConfig((c) => ({
-                            ...c,
-                            online: { ...c.online, showInstallmentsNotice: val },
-                          }))
-                        }
-                      />
+                  <div className="border-t border-gray-800 pt-3 space-y-4">
+                    {/* Grupo de Proteções & Seguros */}
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-sm">🛡️</span>
+                        <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                          Proteções & Coberturas Extras
+                        </p>
+                      </div>
+                      <p className="text-[11px] text-gray-400 mb-2 leading-relaxed">
+                        Quando a <strong>Franquia Zero</strong> é contratada, as proteções básicas e super proteções são automaticamente unificadas nela. Quando não for Franquia Zero, você pode ativar/desativar cada cobertura individualmente:
+                      </p>
+                      <div className="divide-y divide-gray-800/60 bg-gray-950/40 rounded-xl px-3 border border-gray-800/60">
+                        <Toggle
+                          label="Proteção Premium — Franquia Zero"
+                          desc="Exibida como 'Incluso' quando o cliente seleciona Franquia Zero"
+                          badge="Franquia Zero"
+                          checked={config.online.showZeroExcess}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showZeroExcess: val },
+                            }))
+                          }
+                        />
+                        <Toggle
+                          label="Super Proteção contra Roubo (Super Theft Waiver / STHW)"
+                          desc="SUPER THEFT WAIVER CHARGE / Cobertura reforçada de roubo e furto"
+                          checked={config.online.showSuperTheftWaiver}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showSuperTheftWaiver: val },
+                            }))
+                          }
+                        />
+                        <Toggle
+                          label="Proteção contra Roubo (Theft Waiver / THW)"
+                          desc="Proteção padrão contra roubo e furto do veículo"
+                          checked={config.online.showTheftWaiver}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showTheftWaiver: val },
+                            }))
+                          }
+                        />
+                        <Toggle
+                          label="Proteção contra Danos / Colisão (Damage Waiver / CDW / SCDW)"
+                          desc="Cobertura de avarias, colisões e sinistros do veículo"
+                          checked={config.online.showCollisionDamageWaiver}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showCollisionDamageWaiver: val },
+                            }))
+                          }
+                        />
+                        <Toggle
+                          label="Proteções Básicas Genéricas (Roubo e Danos)"
+                          desc="Exibidas com o valor da franquia quando NÃO for Franquia Zero"
+                          checked={config.online.showBasicProtections}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showBasicProtections: val },
+                            }))
+                          }
+                        />
+                        <Toggle
+                          label="Vidros e Pneus (Wheels & Windscreen / WWI)"
+                          desc="Cobertura para quebra de vidros, retrovisores e furos de pneus"
+                          checked={config.online.showGlassAndTyres}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showGlassAndTyres: val },
+                            }))
+                          }
+                        />
+                        <Toggle
+                          label="Acidentes Pessoais (Personal Accident / PAI / SPPAI)"
+                          desc="Cobertura para condutor e passageiros em caso de acidente"
+                          checked={config.online.showPersonalAccident}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showPersonalAccident: val },
+                            }))
+                          }
+                        />
+                        <Toggle
+                          label="Assistência 24h em Viagem (Roadside Assistance / RSA)"
+                          desc="Guincho, reboque e suporte emergencial na estrada"
+                          checked={config.online.showRoadsideAssistance}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showRoadsideAssistance: val },
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {/* Grupo de Diárias, Taxas & Licenças */}
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-sm">📋</span>
+                        <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                          Diárias, Taxas Obrigatórias & Opcionais
+                        </p>
+                      </div>
+                      <div className="divide-y divide-gray-800/60 bg-gray-950/40 rounded-xl px-3 border border-gray-800/60">
+                        <Toggle
+                          label="Diárias"
+                          desc="Linha com o aluguel base do veículo"
+                          checked={config.online.showDailyRental}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showDailyRental: val },
+                            }))
+                          }
+                        />
+                        <Toggle
+                          label="Taxas e Licenças"
+                          checked={config.online.showLicensesAndFees}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showLicensesAndFees: val },
+                            }))
+                          }
+                        />
+                        <Toggle
+                          label="Sobretaxa de Alta Temporada"
+                          checked={config.online.showHighSeasonSurcharge}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showHighSeasonSurcharge: val },
+                            }))
+                          }
+                        />
+                        <Toggle
+                          label="Taxa de Aeroporto"
+                          checked={config.online.showAirportSurcharge}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showAirportSurcharge: val },
+                            }))
+                          }
+                        />
+                        <Toggle
+                          label="Taxa de Devolução em Outra Loja (One-Way)"
+                          checked={config.online.showOneWayCharge}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showOneWayCharge: val },
+                            }))
+                          }
+                        />
+                        <Toggle
+                          label="Demais Taxas e Acessórios Opcionais"
+                          checked={config.online.showOtherItems}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showOtherItems: val },
+                            }))
+                          }
+                        />
+                        <Toggle
+                          label="Aviso de Parcelamento Sem Juros"
+                          desc="Exibe a faixa 'Nx de R$ ... sem juros' para cartão de crédito"
+                          checked={config.online.showInstallmentsNotice}
+                          onChange={(val) =>
+                            setConfig((c) => ({
+                              ...c,
+                              online: { ...c.online, showInstallmentsNotice: val },
+                            }))
+                          }
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

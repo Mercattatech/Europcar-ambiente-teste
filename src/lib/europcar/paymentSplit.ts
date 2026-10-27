@@ -407,16 +407,28 @@ export function computePaymentSplit(reservationNode: any, options: PaymentSplitO
     const isOtherProtection = (item: IncludedItem) => {
       if (item.code === 'ZERO_EXCESS') return false;
       const c = (item.code || '').toUpperCase();
-      if (c === 'CDW' || c === 'THW' || c === 'LDW' || c === 'SLDW' || c === 'SPCDW' || c === 'SCDW' || c === 'WWI' || c === 'PAI' || c === 'SPPAI') {
+      if (
+        c === 'CDW' || c === 'THW' || c === 'LDW' || c === 'SLDW' ||
+        c === 'SPCDW' || c === 'SCDW' || c === 'WWI' || c === 'PAI' ||
+        c === 'SPPAI' || c === 'STHW' || c === 'SPTHW' || c === 'TW' ||
+        c === 'TWC' || c === 'THEFT' || c === 'RSA' || c === 'WIND' || c === 'TIRE'
+      ) {
         return true;
       }
       const lbl = item.label || '';
+      if (/theft/i.test(lbl)) return true; // Pegar SUPER THEFT WAIVER CHARGE, Theft Waiver, etc.
+      if (/waiver/i.test(lbl)) return true;
+      if (/roubo|furto/i.test(lbl)) return true;
       if (/protection\s*package/i.test(lbl)) return true;
       if (/pacote\s*de\s*prote[cç][aã]o/i.test(lbl)) return true;
       if (/premium\s*protection/i.test(lbl) && !/franquia\s*zero/i.test(lbl)) return true;
-      if (/prote[cç][aã]o\s*contra\s*(roubo|danos)/i.test(lbl)) return true;
-      if (/accident\s*&\s*damage/i.test(lbl) || /theft\s*protection/i.test(lbl)) return true;
-      if (/damage\s*(waiver|protection)/i.test(lbl) || /collision\s*damage/i.test(lbl)) return true;
+      if (/prote[cç][aã]o\s*contra\s*(roubo|danos|furto)/i.test(lbl)) return true;
+      if (/accident\s*&\s*damage/i.test(lbl)) return true;
+      if (/damage\s*(waiver|protection|charge)?/i.test(lbl)) return true;
+      if (/collision\s*(damage|waiver)?/i.test(lbl)) return true;
+      if (/vidro|pneu|windscreen|tyre|tire/i.test(lbl)) return true;
+      if (/acidente\s*pessoal|personal\s*accident/i.test(lbl)) return true;
+      if (/roadside\s*assistance|assist[eê]ncia\s*(24h|em\s*viagem|na\s*estrada)/i.test(lbl)) return true;
       return false;
     };
 

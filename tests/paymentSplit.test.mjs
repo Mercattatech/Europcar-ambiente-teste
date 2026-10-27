@@ -388,4 +388,33 @@ test('POA IATA — envia IATANumber 02170722 nas reservas POA / EXO para comissi
   assert.ok(xmlCustom.includes('IATANumber="99887766"'));
 });
 
+test('quando isZeroExcess é true com SUPER THEFT WAIVER CHARGE no XML, oculta do resumo e mantém apenas Franquia Zero', async () => {
+  const xml = buildXml({
+    resNumber: '1000000010',
+    totalBRL: '495.04',
+    totalEUR: '85.09',
+    lines: [
+      line({ ty: '00001', desc: 'Basic Rental', eur: '85.09', brl: '495.04', payer: BA }),
+      line({ ty: '00021', desc: 'SUPER THEFT WAIVER CHARGE', eur: '0.00', brl: '0.00', payer: BA, auxK: 'STHW' }),
+      line({ ty: '00090', desc: 'LICENSES &amp; FEES', eur: '0.00', brl: '0.00', payer: BA, auxK: 'LAF' }),
+    ],
+    payers: [payerBA('495.04', '85.09')],
+  });
+
+  const split = computePaymentSplit(await reservationOf(xml), { isZeroExcess: true, logger: null });
+  assert.ok(split);
+  assert.equal(split.isZeroExcess, true);
+
+  // Deve conter Proteção Premium — Franquia Zero
+  assert.ok(split.online.included.some((i) => i.label === 'Proteção Premium — Franquia Zero'));
+
+  // NÃO pode conter SUPER THEFT WAIVER CHARGE nem STHW
+  assert.ok(!split.online.included.some((i) => /theft/i.test(i.label)));
+  assert.ok(!split.online.included.some((i) => i.code === 'STHW'));
+
+  // Taxas e licenças continua presente
+  assert.ok(split.online.included.some((i) => i.label === 'Taxas e licenças'));
+});
+
+
 
