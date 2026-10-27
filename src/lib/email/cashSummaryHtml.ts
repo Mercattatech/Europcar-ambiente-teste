@@ -282,11 +282,20 @@ export function buildCashSummaryFromVars(v: Record<string, string>): string {
  * Se o template já tiver {{RESUMO_CAIXA}} (ou não tiver as seções conhecidas), volta inalterado.
  */
 export function upgradeTemplateWithCashSummary(html: string): string {
-  if (!html || /\{\{\s*RESUMO_CAIXA\s*\}\}/.test(html)) return html;
+  if (!html) return html;
+  let out = html;
   const PLACEHOLDER = '{{RESUMO_CAIXA}}';
-  // Confirmação / sob solicitação / confirmada / alterada: "Resumo de preço"
-  let out = html.replace(/(Resumo de preço<\/p>\s*)<table[\s\S]*?<\/table>/, (_m, head) => `${head.replace('Resumo de preço', 'Resumo de caixa')}${PLACEHOLDER}`);
-  // Cancelamento: "Valores da reserva cancelada"
-  out = out.replace(/(Valores da reserva cancelada<\/p>\s*)<table[\s\S]*?<\/table>/, (_m, head) => `${head}${PLACEHOLDER}`);
+  if (!/\{\{\s*RESUMO_CAIXA\s*\}\}/.test(out)) {
+    // Confirmação / sob solicitação / confirmada / alterada: "Resumo de preço"
+    out = out.replace(/(Resumo de preço<\/p>\s*)<table[\s\S]*?<\/table>/, (_m, head) => `${head.replace('Resumo de preço', 'Resumo de caixa')}${PLACEHOLDER}`);
+    // Cancelamento: "Valores da reserva cancelada"
+    out = out.replace(/(Valores da reserva cancelada<\/p>\s*)<table[\s\S]*?<\/table>/, (_m, head) => `${head}${PLACEHOLDER}`);
+  }
+  // Remove blocos redundantes de Detalhamento da reserva e Incluídos na reserva
+  out = out.replace(/<!--\s*DETALHAMENTO DA RESERVA\s*-->[\s\S]*?<\/tr>/gi, '');
+  out = out.replace(/<!--\s*(?:PROTEÇÕES E EXTRAS|INCLUÍDOS NA RESERVA)\s*-->[\s\S]*?<\/tr>/gi, '');
+  out = out.replace(/<tr>\s*<td[^>]*class="px"[^>]*>\s*<p[^>]*>\s*Detalhamento da reserva\s*<\/p>[\s\S]*?<\/tr>/gi, '');
+  out = out.replace(/<tr>\s*<td[^>]*class="px"[^>]*>\s*<p[^>]*>\s*Incluídos na reserva\s*<\/p>[\s\S]*?<\/tr>/gi, '');
+  out = out.replace(/\{\{#MOEDA_ESTRANGEIRA\}\}[\s\S]*?\{\{\/MOEDA_ESTRANGEIRA\}\}/gi, '');
   return out;
 }

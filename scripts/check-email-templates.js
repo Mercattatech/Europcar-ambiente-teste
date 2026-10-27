@@ -11,7 +11,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const RESERVATION_TRIGGERS = ['RESERVA_SUCESSO', 'RESERVA_SOB_SOLICITACAO', 'RESERVA_CONFIRMADA', 'RESERVA_ALTERADA'];
-const REQUIRED = ['LISTA_PROTECOES', 'LISTA_EXTRAS'];
+const REQUIRED = ['RESUMO_CAIXA'];
 
 const norm = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, '_');
 

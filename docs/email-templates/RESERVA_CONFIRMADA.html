@@ -165,48 +165,6 @@
   <td class="px" style="padding:26px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;">
     <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">Resumo de caixa</p>
     {{RESUMO_CAIXA}}
-    {{#MOEDA_ESTRANGEIRA}}<p style="margin:8px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8a948c;font-style:italic;">Valor na moeda local garantido. Estimativa em reais apenas para referência.</p>{{/MOEDA_ESTRANGEIRA}}
-  </td>
-</tr>
-
-<!-- DETALHAMENTO DA RESERVA -->
-<tr>
-  <td class="px" style="padding:26px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;">
-    <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">Detalhamento da reserva</p>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #dfe4dd;">
-      {{#TEXTO_DIARIAS}}<tr>
-        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Diárias cobradas</td>
-        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{TEXTO_DIARIAS}}</td>
-      </tr>{{/TEXTO_DIARIAS}}
-      {{#QUILOMETRAGEM}}<tr>
-        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Quilometragem</td>
-        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{QUILOMETRAGEM}}</td>
-      </tr>{{/QUILOMETRAGEM}}
-      {{#TARIFA}}<tr>
-        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Tarifa</td>
-        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{TARIFA}}</td>
-      </tr>{{/TARIFA}}
-      {{#CAMBIO}}<tr>
-        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Câmbio utilizado</td>
-        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{CAMBIO}}</td>
-      </tr>{{/CAMBIO}}
-    </table>
-    {{#CAMBIO}}<p style="margin:8px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8a948c;font-style:italic;">Valores em reais são estimativas pelo câmbio acima; a cobrança no balcão é feita na moeda local.</p>{{/CAMBIO}}
-  </td>
-</tr>
-
-<!-- PROTEÇÕES E EXTRAS -->
-<tr>
-  <td class="px" style="padding:26px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;">
-    <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">Incluídos na reserva</p>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f7f9f6;border:1px solid #dfe4dd;border-radius:8px;">
-      <tr><td style="padding:18px 20px;font-family:Arial,Helvetica,sans-serif;">
-        <p style="margin:0 0 8px 0;font-size:13px;font-weight:bold;color:#1f2421;">Proteções selecionadas:</p>
-        <p style="margin:0 0 16px 0;font-size:13px;line-height:22px;color:#3d463f;">{{LISTA_PROTECOES}}</p>
-        <p style="margin:0 0 8px 0;font-size:13px;font-weight:bold;color:#1f2421;">Acessórios e equipamentos:</p>
-        <p style="margin:0;font-size:13px;line-height:22px;color:#3d463f;">{{LISTA_EXTRAS}}</p>
-      </td></tr>
-    </table>
   </td>
 </tr>
 
