@@ -3214,12 +3214,7 @@ function VehiclesContent() {
                     </div>
                   </div>
 
-                  {/* ETO: Skip protections button */}
-                  {selectedTariffType === 'ETO' && (
-                    <div className="text-center mt-6">
-                      <button onClick={() => setProtectionsSkipped(true)} className="bg-[#e67e00] hover:bg-[#cc6f00] text-white font-black py-4 px-10 rounded-lg text-base uppercase tracking-wide shadow-lg transition-colors">{t('vehicles.continueNoProtection')}</button>
-                    </div>
-                  )}
+
                 </>
               ))}
               </div> {/* close p-8 wrapper */}
