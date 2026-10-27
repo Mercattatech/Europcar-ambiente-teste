@@ -120,8 +120,8 @@ test('1208543518 — separa on-line (ba) e balcão (dvrName) por linha', async (
   assert.deepEqual(
     split.online.included.map((i) => [i.label, includedExcessText(i, 'EUR'), i.side]),
     [
-      ['Proteção contra danos', 'franquia € 1.900,00 / R$ 11.043,74', 'online'],
-      ['Proteção contra roubo', 'franquia € 2.910,00 / R$ 16.914,36', 'online'],
+      ['Proteção contra danos', 'franquia € 1.900,00', 'online'],
+      ['Proteção contra roubo', 'franquia € 2.910,00', 'online'],
       ['Taxas e licenças', '', 'online'],
     ],
   );
@@ -131,8 +131,8 @@ test('1208543518 — separa on-line (ba) e balcão (dvrName) por linha', async (
   assert.deepEqual(
     split.included.map((i) => [i.label, includedExcessText(i, 'EUR')]),
     [
-      ['Proteção contra danos', 'franquia € 1.900,00 / R$ 11.043,74'],
-      ['Proteção contra roubo', 'franquia € 2.910,00 / R$ 16.914,36'],
+      ['Proteção contra danos', 'franquia € 1.900,00'],
+      ['Proteção contra roubo', 'franquia € 2.910,00'],
       ['Taxas e licenças', ''],
     ],
   );

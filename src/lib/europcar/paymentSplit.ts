@@ -462,11 +462,13 @@ export function counterCurrencyNotice(localCurrency: string): string {
   return `O pagamento da retirada será realizado em ${name}, no balcão da Europcar.`;
 }
 
-/** Texto da franquia de um item "Incluso" (ex.: "franquia € 1.900,00 / R$ 11.043,74") */
+/** Texto da franquia de um item "Incluso" (ex.: "franquia € 1.900,00") */
 export function includedExcessText(item: IncludedItem, localCurrency: string): string {
-  if (item.excessLocal === null && item.excessBRL === null) return '';
-  const parts: string[] = [];
-  if (item.excessLocal !== null) parts.push(formatMoney(item.excessLocal, localCurrency));
-  if (item.excessBRL !== null) parts.push(formatBRL(item.excessBRL));
-  return `franquia ${parts.join(' / ')}`;
+  if (item.excessLocal !== null) {
+    return `franquia ${formatMoney(item.excessLocal, localCurrency)}`;
+  }
+  if (item.excessBRL !== null) {
+    return `franquia ${formatBRL(item.excessBRL)}`;
+  }
+  return '';
 }

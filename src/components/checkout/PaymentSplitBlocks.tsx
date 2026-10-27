@@ -43,13 +43,15 @@ export default function PaymentSplitBlocks({
 
   const BlockContent = ({ block, side }: { block: NonNullable<PaymentSplit['online']>; side: 'online' | 'counter' }) => {
     const isOnline = side === 'online';
-    const hasLines = block.lines.length > 0;
+    const isVat = (l: SplitLine) => l.chrgTy === "00028" || /imposto|vat/i.test(l.label);
+    const visibleLines = block.lines.filter((l) => !isVat(l));
+    const hasLines = visibleLines.length > 0;
     const hasIncluded = block.included && block.included.length > 0;
     if (!hasLines && !hasIncluded) return null;
 
     return (
       <div className={`mt-3 pt-2.5 border-t border-gray-100 space-y-1.5 ${textSize} text-gray-700`}>
-        {block.lines.map((l, idx) => (
+        {visibleLines.map((l, idx) => (
           <div key={`${l.side}-${l.chrgTy}-${l.auxK}-${idx}`} className="flex items-start gap-1.5 min-w-0">
             <span className="text-gray-400 font-bold">-</span>
             <span>{labelOf(l)}</span>
@@ -163,11 +165,6 @@ export default function PaymentSplitBlocks({
             )}
           </div>
         </div>
-        {split.counter && (
-          <p className={`mt-3 pt-2.5 border-t border-amber-200/80 ${textSize} text-amber-950 leading-snug`}>
-            {counterCurrencyNotice(cur)}
-          </p>
-        )}
       </div>
     </div>
   );

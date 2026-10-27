@@ -45,15 +45,17 @@ export function buildPaymentSplitEmailVars(
   const online = split.online;
   const counter = split.counter;
 
+  const isVat = (l: SplitLine) => l.chrgTy === '00028' || /imposto|vat/i.test(l.label);
+
   const onlineItemsTxt: string[] = [];
   if (online && !split.isPriceSecret) {
-    onlineItemsTxt.push(...online.lines.map(lineTxt));
+    onlineItemsTxt.push(...online.lines.filter((l) => !isVat(l)).map(lineTxt));
     onlineItemsTxt.push(...(online.included || []).map(incTxt));
   }
 
   const counterItemsTxt: string[] = [];
   if (counter) {
-    counterItemsTxt.push(...counter.lines.map(lineTxt));
+    counterItemsTxt.push(...counter.lines.filter((l) => !isVat(l)).map(lineTxt));
     counterItemsTxt.push(...(counter.included || []).map(incTxt));
     counterItemsTxt.push(`<em>${esc(counterNotice(cur))}</em>`);
   }

@@ -138,9 +138,12 @@ export function buildCashSummaryFromSplit(
   const sub = (local: number) => (foreign ? `(${formatMoney(local, cur)})` : undefined);
   const val = (brl: number, local: number) => (foreign ? `${formatBRL(brl)} (${formatMoney(local, cur)})` : formatBRL(brl));
 
+  const isVat = (l: { chrgTy?: string; label: string }) => l.chrgTy === '00028' || /imposto|vat/i.test(l.label);
+
   const onlineItems: CashSummaryItem[] = [];
   if (split.online && !split.isPriceSecret) {
     for (const l of split.online.lines) {
+      if (isVat(l)) continue;
       onlineItems.push({ label: l.label, value: '' });
     }
     for (const i of split.online.included || []) {
@@ -177,6 +180,7 @@ export function buildCashSummaryFromSplit(
   const counterItems: CashSummaryItem[] = [];
   if (split.counter) {
     for (const l of split.counter.lines) {
+      if (isVat(l)) continue;
       counterItems.push({ label: l.label, value: '' });
     }
     for (const i of split.counter.included || []) {
@@ -208,7 +212,7 @@ export function buildCashSummaryFromSplit(
     online,
     counter,
     included: [],
-    total: { main: formatBRL(split.totalBRL), sub: sub(split.totalLocal), note: counterCurrencyNotice(cur) },
+    total: { main: formatBRL(split.totalBRL), sub: sub(split.totalLocal), note: '' },
   });
 }
 
@@ -240,11 +244,11 @@ export function buildCashSummaryFromVars(v: Record<string, string>): string {
   const isBalcao = /balc/i.test(String(v.FORMA_PAGAMENTO || '')) && !/cart|pix|voucher/i.test(String(v.FORMA_PAGAMENTO || ''));
   const onlineMain = stripTags(v.VALOR_PAGO_ONLINE || '') || 'R$ 0,00';
   const counterMain = stripTags(v.VALOR_BALCAO || '');
-  const counterItems = parseListLines(v.LISTA_BALCAO || '');
+  const counterItems = parseListLines(v.LISTA_BALCAO || '').filter((i) => !/imposto|vat/i.test(i.label));
   if (isBalcao && counterItems.length === 0 && v.TEXTO_DIARIAS) {
     counterItems.push({ label: `Aluguel do veículo (${v.TEXTO_DIARIAS}) + taxas`, value: '' });
   }
-  const onlineItems = parseListLines(v.LISTA_ONLINE || '');
+  const onlineItems = parseListLines(v.LISTA_ONLINE || '').filter((i) => !/imposto|vat/i.test(i.label));
   if (onlineItems.length === 0 && !isBalcao && v.TEXTO_DIARIAS && !/^R\$\s*0,00/.test(onlineMain)) {
     onlineItems.push({ label: `Diárias (${v.TEXTO_DIARIAS})`, value: '' });
   }
@@ -264,7 +268,7 @@ export function buildCashSummaryFromVars(v: Record<string, string>): string {
         : counterNotice(moeda),
     },
     included: [],
-    total: { main: stripTags(v.VALOR_TOTAL || v.TOTAL_RESERVA || ''), note: counterCurrencyNotice(moeda) },
+    total: { main: stripTags(v.VALOR_TOTAL || v.TOTAL_RESERVA || ''), note: '' },
   });
 }
 
