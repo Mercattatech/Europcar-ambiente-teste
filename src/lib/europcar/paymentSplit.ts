@@ -46,10 +46,23 @@ export interface SplitLine {
   priceLocal: number;
 }
 
+export interface IncludedItem {
+  code: string;
+  chrgTy: string;
+  label: string;
+  side: PaymentSide;
+  /** Franquia na moeda da locação (excessWithPOM) — null quando não há franquia */
+  excessLocal: number | null;
+  /** Franquia em BRL (bkExcessWithPOM) — null quando não há franquia */
+  excessBRL: number | null;
+}
+
 export interface SplitBlock {
   side: PaymentSide;
-  /** Linhas com valor (0,00 excluídas) */
+  /** Linhas cobradas com valor > 0 */
   lines: SplitLine[];
+  /** Itens inclusos (0,00) que pertencem a este lado (com BA no on-line, sem BA no balcão) */
+  included: IncludedItem[];
   /** Subtotal exibido/cobrado (payerList, ou soma das linhas se payerList ausente) — com markup no on-line */
   subtotalBRL: number;
   subtotalLocal: number;
@@ -64,16 +77,6 @@ export interface SplitBlock {
   payerListLocal: number | null;
   /** true quando a soma das linhas diverge do payerList (> 0,01) */
   mismatch: boolean;
-}
-
-export interface IncludedItem {
-  code: string;
-  chrgTy: string;
-  label: string;
-  /** Franquia na moeda da locação (excessWithPOM) — null quando não há franquia */
-  excessLocal: number | null;
-  /** Franquia em BRL (bkExcessWithPOM) — null quando não há franquia */
-  excessBRL: number | null;
 }
 
 export interface PaymentSplit {
@@ -272,6 +275,8 @@ export function computePaymentSplit(reservationNode: any, options: PaymentSplitO
   // ── Linhas de cobrança ──
   const onlineLines: SplitLine[] = [];
   const counterLines: SplitLine[] = [];
+  const onlineIncluded: IncludedItem[] = [];
+  const counterIncluded: IncludedItem[] = [];
   const included: IncludedItem[] = [];
   const includedKeys = new Set<string>();
   let onlineSumBRL = 0, onlineSumLocal = 0, counterSumBRL = 0, counterSumLocal = 0;
@@ -298,20 +303,24 @@ export function computePaymentSplit(reservationNode: any, options: PaymentSplitO
 
     const isZero = Math.abs(priceBRL) < 0.005 && Math.abs(priceLocal) < 0.005;
     if (isZero) {
-      // Proteções/taxas incluídas a 0,00 → lista "Incluso"
+      // Proteções/taxas incluídas a 0,00 → distribuídas no bloco on-line (com BA) ou balcão (sem BA)
       const isBasicRental = chrgTy === '00001' || originalDesc.toUpperCase().startsWith('BASIC RENTAL');
       if (!NEVER_INCLUDED_CHRGTY.has(chrgTy) && !isBasicRental && label) {
-        const key = label.toUpperCase();
+        const key = `${side}:${label.toUpperCase()}`;
         if (!includedKeys.has(key)) {
           includedKeys.add(key);
           const exc = auxK ? excessByCode.get(auxK) : undefined;
-          included.push({
+          const item: IncludedItem = {
             code: auxK || chrgTy,
             chrgTy,
             label,
+            side,
             excessLocal: exc && exc.local > 0 ? exc.local : null,
             excessBRL: exc && exc.brl > 0 ? exc.brl : null,
-          });
+          };
+          if (side === 'online') onlineIncluded.push(item);
+          else counterIncluded.push(item);
+          included.push(item);
         }
       }
       continue;
@@ -343,6 +352,7 @@ export function computePaymentSplit(reservationNode: any, options: PaymentSplitO
   const buildBlock = (
     side: PaymentSide,
     lines: SplitLine[],
+    blockIncluded: IncludedItem[],
     sumBRL: number,
     sumLocal: number,
     plBRL: number | null,
@@ -365,6 +375,7 @@ export function computePaymentSplit(reservationNode: any, options: PaymentSplitO
     return {
       side,
       lines,
+      included: blockIncluded,
       subtotalBRL: netSubtotalBRL,
       subtotalLocal: netSubtotalLocal,
       netSubtotalBRL,
@@ -377,12 +388,12 @@ export function computePaymentSplit(reservationNode: any, options: PaymentSplitO
     };
   };
 
-  // Bloco existe se houver linha com valor OU valor no payerList daquele lado
-  const showOnline = hasOnline || (plOnlineBRL ?? 0) > AMOUNT_TOLERANCE;
-  const showCounter = hasCounter || (plCounterBRL ?? 0) > AMOUNT_TOLERANCE;
+  // Bloco existe se houver linha com valor OU valor no payerList daquele lado OU itens inclusos
+  const showOnline = hasOnline || (plOnlineBRL ?? 0) > AMOUNT_TOLERANCE || onlineIncluded.length > 0;
+  const showCounter = hasCounter || (plCounterBRL ?? 0) > AMOUNT_TOLERANCE || counterIncluded.length > 0;
 
-  const online = showOnline ? buildBlock('online', onlineLines, onlineSumBRL, onlineSumLocal, plOnlineBRL, plOnlineLocal) : null;
-  const counter = showCounter ? buildBlock('counter', counterLines, counterSumBRL, counterSumLocal, plCounterBRL, plCounterLocal) : null;
+  const online = showOnline ? buildBlock('online', onlineLines, onlineIncluded, onlineSumBRL, onlineSumLocal, plOnlineBRL, plOnlineLocal) : null;
+  const counter = showCounter ? buildBlock('counter', counterLines, counterIncluded, counterSumBRL, counterSumLocal, plCounterBRL, plCounterLocal) : null;
 
   // ── Conferência com o totalRateEstimate (valores do XRS, sem markup) ──
   const netTotalBRL = round2((online?.netSubtotalBRL ?? 0) + (counter?.netSubtotalBRL ?? 0));

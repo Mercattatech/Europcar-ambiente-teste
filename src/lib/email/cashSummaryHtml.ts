@@ -29,6 +29,7 @@ export interface CashSummaryItem {
   label: string;
   /** Valor já formatado (vazio = só o texto) */
   value: string;
+  isIncluded?: boolean;
 }
 
 export interface CashSummaryBlock {
@@ -52,11 +53,17 @@ const FONT = 'font-family:Arial,Helvetica,sans-serif;';
 
 function itemsHtml(items: CashSummaryItem[], borderColor: string): string {
   if (items.length === 0) return '';
-  const rows = items.map((i) => `
+  const rows = items.map((i) => {
+    const bullet = i.isIncluded
+      ? `<span style="color:#008d36;font-weight:bold;">&#x2713;</span>`
+      : '-';
+    const valColor = i.isIncluded ? '#008d36' : '#1f2421';
+    return `
           <tr>
-            <td valign="top" style="${FONT}padding:3px 8px 3px 0;font-size:12px;line-height:18px;color:#3d463f;">-&nbsp;${esc(i.label)}</td>
-            <td align="right" valign="top" style="${FONT}padding:3px 0;font-size:12px;line-height:18px;color:#1f2421;font-weight:bold;white-space:nowrap;">${esc(i.value)}</td>
-          </tr>`).join('');
+            <td valign="top" style="${FONT}padding:3px 8px 3px 0;font-size:12px;line-height:18px;color:#3d463f;">${bullet}&nbsp;${esc(i.label)}</td>
+            <td align="right" valign="top" style="${FONT}padding:3px 0;font-size:12px;line-height:18px;color:${valColor};font-weight:bold;white-space:nowrap;">${esc(i.value)}</td>
+          </tr>`;
+  }).join('');
   return `
       <tr><td colspan="2" style="padding:10px 0 0 0;border-top:1px solid ${borderColor};">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows}
@@ -127,13 +134,34 @@ export function buildCashSummaryFromSplit(
   const sub = (local: number) => (foreign ? `(${formatMoney(local, cur)})` : undefined);
   const val = (brl: number, local: number) => (foreign ? `${formatBRL(brl)} (${formatMoney(local, cur)})` : formatBRL(brl));
 
+  const onlineItems: CashSummaryItem[] = [];
+  if (split.online && !split.isPriceSecret) {
+    for (const l of split.online.lines) {
+      onlineItems.push({ label: l.label, value: val(l.priceBRL, l.priceLocal) });
+    }
+    for (const i of split.online.included || []) {
+      const exc = includedExcessText(i, cur);
+      onlineItems.push({
+        label: `${i.label}${exc ? ` (${exc})` : ''}`,
+        value: 'Incluso',
+        isIncluded: true,
+      });
+    }
+    if (opts.quilometragem) {
+      onlineItems.push({
+        label: `Quilometragem: ${opts.quilometragem.toLowerCase()}`,
+        value: 'Incluso',
+        isIncluded: true,
+      });
+    }
+  }
+
   const online: CashSummaryBlock = split.online
     ? {
         title: opts.onlineTitle || 'Pagar on-line',
         main: formatBRL(split.online.subtotalBRL),
         sub: sub(split.online.subtotalLocal),
-        // isPriceSecret="Y": a tarifa da conta empresarial não é detalhada para o condutor
-        items: split.isPriceSecret ? [] : split.online.lines.map((l) => ({ label: l.label, value: val(l.priceBRL, l.priceLocal) })),
+        items: onlineItems,
       }
     : {
         title: opts.onlineTitle || 'Pagar on-line',
@@ -142,35 +170,44 @@ export function buildCashSummaryFromSplit(
         note: 'Nenhum valor a pagar on-line: todas as cobranças desta reserva são pagas no balcão.',
       };
 
+  const counterItems: CashSummaryItem[] = [];
+  if (split.counter) {
+    for (const l of split.counter.lines) {
+      counterItems.push({ label: l.label, value: val(l.priceBRL, l.priceLocal) });
+    }
+    for (const i of split.counter.included || []) {
+      const exc = includedExcessText(i, cur);
+      counterItems.push({
+        label: `${i.label}${exc ? ` (${exc})` : ''}`,
+        value: 'Incluso',
+        isIncluded: true,
+      });
+    }
+  }
+
   const counter: CashSummaryBlock = split.counter
     ? {
-        title: 'Pagar na retirada',
+        title: 'A pagar no balcão',
         main: formatBRL(split.counter.subtotalBRL),
         sub: sub(split.counter.subtotalLocal),
-        items: split.counter.lines.map((l) => ({ label: l.label, value: val(l.priceBRL, l.priceLocal) })),
+        items: counterItems,
         note: counterNotice(cur),
       }
     : {
-        title: 'Pagar na retirada',
+        title: 'A pagar no balcão',
         main: foreign ? formatMoney(0, cur) : formatBRL(0),
         items: [],
-        note: 'Nenhum valor adicional a pagar na retirada (apenas a caução temporária no cartão de crédito).',
+        note: 'Nenhum valor adicional a pagar no balcão (apenas a caução temporária no cartão de crédito).',
       };
-
-  const included: string[] = [];
-  if (opts.quilometragem) included.push(`Quilometragem: ${opts.quilometragem.toLowerCase()}`);
-  for (const i of split.included || []) {
-    const exc = includedExcessText(i, cur);
-    included.push(`${i.label}${exc ? ` (${exc})` : ''}`);
-  }
 
   return renderCashSummaryHtml({
     online,
     counter,
-    included,
+    included: [],
     total: { main: formatBRL(split.totalBRL), sub: sub(split.totalLocal), note: counterCurrencyNotice(cur) },
   });
 }
+
 
 // ─── A partir das variáveis do e-mail (reservas sem paymentSplit) ───────────────────────────
 

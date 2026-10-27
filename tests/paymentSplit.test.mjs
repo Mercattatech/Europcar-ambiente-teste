@@ -116,7 +116,18 @@ test('1208543518 — separa on-line (ba) e balcão (dvrName) por linha', async (
   assert.equal(split.totalMatches, true);
   assert.equal(formatBRLWithLocal(split.totalBRL, split.totalLocal, 'EUR'), 'R$ 1.462,83 (€ 251,67)');
 
-  // Incluso (0,00) com franquia
+  // Incluso (0,00) com franquia — distribuído no bloco on-line (pois tem BA)
+  assert.deepEqual(
+    split.online.included.map((i) => [i.label, includedExcessText(i, 'EUR'), i.side]),
+    [
+      ['Proteção contra danos', 'franquia € 1.900,00 / R$ 11.043,74', 'online'],
+      ['Proteção contra roubo', 'franquia € 2.910,00 / R$ 16.914,36', 'online'],
+      ['Taxas e licenças', '', 'online'],
+    ],
+  );
+  assert.deepEqual(split.counter.included, []);
+
+  // Incluso combinado (legado / compatibilidade)
   assert.deepEqual(
     split.included.map((i) => [i.label, includedExcessText(i, 'EUR')]),
     [
@@ -130,6 +141,31 @@ test('1208543518 — separa on-line (ba) e balcão (dvrName) por linha', async (
   assert.deepEqual(split.alerts, []);
   assert.equal(messages.filter((m) => m.includes('diverge')).length, 0);
   assert.ok([...split.online.lines, ...split.counter.lines].every((l) => l.priceBRL !== 0));
+});
+
+test('itens inclusos a 0,00 com payer dvrName vão para o bloco do balcão', async () => {
+  const xml = buildXml({
+    resNumber: '1000000004',
+    totalBRL: '1086.59',
+    totalEUR: '186.94',
+    lines: [
+      line({ ty: '00001', desc: 'Basic Rental', eur: '186.94', brl: '1086.59', payer: BA }),
+      line({ ty: '00006', desc: 'ACCIDENT &amp; DAMAGE PROTECTION', eur: '0.00', brl: '0.00', payer: BA, auxK: 'CDW' }),
+      line({ ty: '00090', desc: 'LICENSES &amp; FEES', eur: '0.00', brl: '0.00', payer: DVR, auxK: 'LAF' }),
+    ],
+    payers: [payerBA('1086.59', '186.94')],
+  });
+
+  const split = computePaymentSplit(await reservationOf(xml), { logger: null });
+  assert.ok(split);
+  assert.equal(split.online.included.length, 1);
+  assert.equal(split.online.included[0].label, 'Proteção contra danos');
+  assert.equal(split.online.included[0].side, 'online');
+
+  assert.ok(split.counter);
+  assert.equal(split.counter.included.length, 1);
+  assert.equal(split.counter.included[0].label, 'Taxas e licenças');
+  assert.equal(split.counter.included[0].side, 'counter');
 });
 
 test('1208543518 — markup (margem ETO) só no bloco on-line, linhas somam o subtotal', async () => {

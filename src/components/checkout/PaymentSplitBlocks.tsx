@@ -51,19 +51,43 @@ export default function PaymentSplitBlocks({
   const textSize = compact ? "text-[11px]" : "text-xs";
   const showLocal = !!cur && cur !== "BRL";
 
-  const LineList = ({ lines }: { lines: SplitLine[] }) => (
-    <div className={`mt-3 pt-2.5 border-t border-gray-100 space-y-1.5 ${textSize} text-gray-700`}>
-      {lines.map((l, idx) => (
-        <div key={`${l.side}-${l.chrgTy}-${l.auxK}-${idx}`} className="flex justify-between items-start gap-2">
-          <div className="flex items-start gap-1.5 min-w-0">
-            <span className="text-gray-400 font-bold">-</span>
-            <span>{labelOf(l)}</span>
+  const BlockContent = ({ block, side }: { block: NonNullable<PaymentSplit['online']>; side: 'online' | 'counter' }) => {
+    const isOnline = side === 'online';
+    const hasLines = block.lines.length > 0;
+    const hasIncluded = block.included && block.included.length > 0;
+    if (!hasLines && !hasIncluded) return null;
+
+    return (
+      <div className={`mt-3 pt-2.5 border-t border-gray-100 space-y-1.5 ${textSize} text-gray-700`}>
+        {block.lines.map((l, idx) => (
+          <div key={`${l.side}-${l.chrgTy}-${l.auxK}-${idx}`} className="flex justify-between items-start gap-2">
+            <div className="flex items-start gap-1.5 min-w-0">
+              <span className="text-gray-400 font-bold">-</span>
+              <span>{labelOf(l)}</span>
+            </div>
+            <Money brl={l.priceBRL} local={l.priceLocal} currency={cur} />
           </div>
-          <Money brl={l.priceBRL} local={l.priceLocal} currency={cur} />
-        </div>
-      ))}
-    </div>
-  );
+        ))}
+        {block.included.map((i, idx) => {
+          const exc = includedExcessText(i, cur);
+          return (
+            <div key={`${side}-inc-${i.code}-${idx}`} className="flex justify-between items-start gap-2">
+              <div className="flex items-start gap-1.5 min-w-0">
+                <span className={isOnline ? "text-[#008d36] font-bold" : "text-amber-700 font-bold"}>✓</span>
+                <span className={isOnline ? "text-gray-800" : "text-gray-800"}>
+                  {i.label}
+                  {exc && <span className="text-gray-500 font-normal"> ({exc})</span>}
+                </span>
+              </div>
+              <span className={isOnline ? "text-[#008d36] font-bold text-right shrink-0" : "text-amber-800 font-bold text-right shrink-0"}>
+                Incluso
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-3.5" data-testid="payment-split-blocks">
@@ -99,7 +123,7 @@ export default function PaymentSplitBlocks({
               )}
             </div>
           </div>
-          {!hideOnlineDetail && split.online.lines.length > 0 && <LineList lines={split.online.lines} />}
+          {!hideOnlineDetail && <BlockContent block={split.online} side="online" />}
           {installments > 1 && (
             <div className="mt-2 bg-emerald-50 border border-emerald-200/70 rounded-lg px-2.5 py-1 flex items-center justify-between text-[11px]">
               <span className="text-emerald-800 font-medium">Parcelamento:</span>
@@ -130,33 +154,10 @@ export default function PaymentSplitBlocks({
               )}
             </div>
           </div>
-          {split.counter.lines.length > 0 && <LineList lines={split.counter.lines} />}
+          <BlockContent block={split.counter} side="counter" />
           <p className={`mt-3 pt-2.5 border-t border-amber-200/80 ${textSize} text-amber-950 leading-snug`}>
             {counterNotice(cur)}
           </p>
-        </div>
-      )}
-
-      {split.included.length > 0 && (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4" id="split-included-block">
-          <div className="flex items-center gap-1.5 mb-2">
-            <span className="text-base">✅</span>
-            <span className="text-xs font-black uppercase tracking-wider text-gray-800">Incluso</span>
-          </div>
-          <div className={`space-y-1.5 ${textSize} text-gray-700`}>
-            {split.included.map((i) => {
-              const exc = includedExcessText(i, cur);
-              return (
-                <div key={`inc-${i.code}-${i.label}`} className="flex items-start gap-1.5">
-                  <span className="text-[#008d36] font-bold">✓</span>
-                  <span>
-                    {i.label}
-                    {exc && <span className="text-gray-500"> ({exc})</span>}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
 

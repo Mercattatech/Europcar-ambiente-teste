@@ -19,6 +19,7 @@ import {
   includedExcessText,
   type PaymentSplit,
   type SplitLine,
+  type IncludedItem,
 } from '@/lib/europcar/paymentSplit';
 
 const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -36,9 +37,26 @@ export function buildPaymentSplitEmailVars(
   const cur = split.localCurrency;
   const fmt = (brl: number, local: number) => formatBRLWithLocal(brl, local, cur);
   const lineTxt = (l: SplitLine) => `• ${esc(l.label)} — ${fmt(l.priceBRL, l.priceLocal)}`;
+  const incTxt = (i: IncludedItem) => {
+    const exc = includedExcessText(i, cur);
+    return `✓ ${esc(i.label)}${exc ? ` (${exc})` : ''} — Incluso`;
+  };
 
   const online = split.online;
   const counter = split.counter;
+
+  const onlineItemsTxt: string[] = [];
+  if (online && !split.isPriceSecret) {
+    onlineItemsTxt.push(...online.lines.map(lineTxt));
+    onlineItemsTxt.push(...(online.included || []).map(incTxt));
+  }
+
+  const counterItemsTxt: string[] = [];
+  if (counter) {
+    counterItemsTxt.push(...counter.lines.map(lineTxt));
+    counterItemsTxt.push(...(counter.included || []).map(incTxt));
+    counterItemsTxt.push(`<em>${esc(counterNotice(cur))}</em>`);
+  }
 
   const includedLines: string[] = [];
   if (opts.quilometragem) includedLines.push(`• Quilometragem: ${esc(opts.quilometragem.toLowerCase())}`);
@@ -49,13 +67,11 @@ export function buildPaymentSplitEmailVars(
 
   return {
     VALOR_PAGO_ONLINE: online ? fmt(online.subtotalBRL, online.subtotalLocal) : 'R$ 0,00 — nada foi cobrado online',
-    LISTA_ONLINE: online && !split.isPriceSecret ? online.lines.map(lineTxt).join('<br/>') : '',
+    LISTA_ONLINE: onlineItemsTxt.join('<br/>'),
     VALOR_BALCAO: counter
       ? fmt(counter.subtotalBRL, counter.subtotalLocal)
       : 'Nada a pagar — apenas a caução (bloqueio temporário no cartão)',
-    LISTA_BALCAO: counter
-      ? [...counter.lines.map(lineTxt), `<em>${esc(counterNotice(cur))}</em>`].join('<br/>')
-      : '',
+    LISTA_BALCAO: counterItemsTxt.join('<br/>'),
     LISTA_INCLUIDOS: includedLines.join('<br/>'),
     TOTAL_RESERVA: fmt(split.totalBRL, split.totalLocal),
     VALOR_TOTAL: fmt(split.totalBRL, split.totalLocal),
