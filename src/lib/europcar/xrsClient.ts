@@ -6,6 +6,7 @@ import { escapeXml } from '@/lib/europcar/xmlEscape';
 // ── CID Constants (Contract IDs) ──────────────────────────────
 // POA = tarifas públicas padrão
 export const DEFAULT_POA_CID = '57269673';
+export const DEFAULT_POA_IATA = '02170722';
 export const SECONDARY_POA_CID = '55138134';
 export const POA_CIDS = ['57269673', '55138134'];
 // ETO = tarifas corporativas com desconto
@@ -16,6 +17,7 @@ export const EXO_CID = '57269673';                // Mesmo CID da POA, IATA: 021
 
 export interface DynamicXRSContractConfig {
   poaCid: string;
+  poaIata: string;
   etoZeroExcessCid: string;
   etoZeroExcessBa: string;
   etoExcessCid: string;
@@ -27,6 +29,7 @@ export interface DynamicXRSContractConfig {
 export async function getDynamicXRSContractConfig(): Promise<DynamicXRSContractConfig> {
   const defaults: DynamicXRSContractConfig = {
     poaCid: DEFAULT_POA_CID,
+    poaIata: DEFAULT_POA_IATA,
     etoZeroExcessCid: ETO_CID_INTERNACIONAL,
     etoZeroExcessBa: '73804373',
     etoExcessCid: ETO_CID_LIQUIDO,
@@ -36,10 +39,20 @@ export async function getDynamicXRSContractConfig(): Promise<DynamicXRSContractC
   };
 
   try {
-    const dbConfig = await prisma.xRSConfig.findFirst();
-    if (!dbConfig) return defaults;
+    let cbIata: string | undefined;
+    try {
+      const cb = await prisma.contentBlock.findUnique({ where: { key: 'XRS_POA_IATA' } });
+      if (cb?.value_ptBR) cbIata = cb.value_ptBR.trim();
+    } catch {}
+
+    const dbConfig = await prisma.xRSConfig.findFirst() as any;
+    if (!dbConfig) {
+      if (cbIata) return { ...defaults, poaIata: cbIata };
+      return defaults;
+    }
     return {
       poaCid: dbConfig.poaCid || defaults.poaCid,
+      poaIata: cbIata || dbConfig.poaIata || defaults.poaIata,
       etoZeroExcessCid: dbConfig.etoZeroExcessCid || defaults.etoZeroExcessCid,
       etoZeroExcessBa: dbConfig.etoZeroExcessBa || defaults.etoZeroExcessBa,
       etoExcessCid: dbConfig.etoExcessCid || defaults.etoExcessCid,

@@ -825,10 +825,14 @@ export async function POST(request: Request) {
             if (isManualEXO) {
               // EXO manual: usa dados do voucher enviado pelo usuário
               vData = voucherData;
+            } else if (isPoaBalcao) {
+              // POA balcão: IATA específico configurado no painel para POA
+              const { poaIata } = await getDynamicXRSContractConfig();
+              vData = { type: 'EXO', iataNumber: poaIata || '02170722' };
             } else {
-              // EXO online / POA balcão: Europcar Brasil como agência IATA (configurável no painel)
+              // EXO online: Europcar Brasil como agência IATA (configurável no painel)
               const { exoIata } = await getDynamicXRSContractConfig();
-              vData = { type: 'EXO', iataNumber: exoIata };
+              vData = { type: 'EXO', iataNumber: exoIata || '02170722' };
             }
 
             const createVoucherXml = buildCreateVoucherXml(resNumber, vData, voucherAmount, voucherCurrency, carCategory, pickupDate, returnDate);

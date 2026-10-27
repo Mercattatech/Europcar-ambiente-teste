@@ -23,6 +23,7 @@ export default function PainelConfig() {
 
   // XRS Contracts State
   const [poaCid, setPoaCid] = useState("57269673");
+  const [poaIata, setPoaIata] = useState("02170722");
   const [etoZeroExcessCid, setEtoZeroExcessCid] = useState("56935495");
   const [etoZeroExcessBa, setEtoZeroExcessBa] = useState("73804373");
   const [etoExcessCid, setEtoExcessCid] = useState("56935466");
@@ -51,6 +52,7 @@ export default function PainelConfig() {
       if (cieloData.mcc) setMcc(cieloData.mcc);
 
       if (xrsData.poaCid) setPoaCid(xrsData.poaCid);
+      if (xrsData.poaIata) setPoaIata(xrsData.poaIata);
       if (xrsData.etoZeroExcessCid) setEtoZeroExcessCid(xrsData.etoZeroExcessCid);
       if (xrsData.etoZeroExcessBa) setEtoZeroExcessBa(xrsData.etoZeroExcessBa);
       if (xrsData.etoExcessCid) setEtoExcessCid(xrsData.etoExcessCid);
@@ -103,6 +105,7 @@ export default function PainelConfig() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           poaCid,
+          poaIata,
           etoZeroExcessCid,
           etoZeroExcessBa,
           etoExcessCid,
@@ -122,6 +125,7 @@ export default function PainelConfig() {
 
   const handleResetDefaults = () => {
     setPoaCid("57269673");
+    setPoaIata("02170722");
     setEtoZeroExcessCid("56935495");
     setEtoZeroExcessBa("73804373");
     setEtoExcessCid("56935466");
@@ -351,22 +355,36 @@ export default function PainelConfig() {
 
           <form onSubmit={handleSaveXrs} className="space-y-6">
             {/* Seção POA */}
-            <div className="bg-gray-800/50 border border-gray-700/60 rounded-lg p-4 space-y-3">
+            <div className="bg-gray-800/50 border border-gray-700/60 rounded-lg p-4 space-y-4">
               <div className="flex items-center gap-2">
                 <span className="bg-green-500/20 text-green-400 text-xs font-bold px-2 py-0.5 rounded">POA</span>
                 <h3 className="text-sm font-bold text-white">Pay On Arrival (Balcão / Tarifa Pública)</h3>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Contract ID (CID)</label>
-                <input
-                  type="text"
-                  required
-                  value={poaCid}
-                  onChange={e => setPoaCid(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white font-mono outline-none focus:border-green-600"
-                  placeholder="57269673"
-                />
-                <p className="text-[11px] text-gray-500 mt-1">Usado para reservas com pagamento direto no balcão.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Contract ID (CID)</label>
+                  <input
+                    type="text"
+                    required
+                    value={poaCid}
+                    onChange={e => setPoaCid(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white font-mono outline-none focus:border-green-600"
+                    placeholder="57269673"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">Usado para reservas com pagamento direto no balcão.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Número IATA Agência</label>
+                  <input
+                    type="text"
+                    required
+                    value={poaIata}
+                    onChange={e => setPoaIata(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white font-mono outline-none focus:border-green-600"
+                    placeholder="02170722"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">IATA enviado ao GreenWay para comissionamento das reservas balcão.</p>
+                </div>
               </div>
             </div>
 

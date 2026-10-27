@@ -29,6 +29,7 @@ model XRSConfig {
   callerCode       String
   password         String
   poaCid           String?  @default("57269673")
+  poaIata          String?  @default("02170722")
   etoZeroExcessCid String?  @default("56935495")
   etoZeroExcessBa  String?  @default("73804373")
   etoExcessCid     String?  @default("56935466")

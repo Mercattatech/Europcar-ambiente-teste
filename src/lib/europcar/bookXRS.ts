@@ -320,9 +320,12 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
       let vData: any;
       if (isManualEXO) {
         vData = voucherData;
+      } else if (isPoaBalcao) {
+        const { poaIata } = await getDynamicXRSContractConfig();
+        vData = { type: 'EXO', iataNumber: poaIata || '02170722' };
       } else {
         const { exoIata } = await getDynamicXRSContractConfig();
-        vData = { type: 'EXO', iataNumber: exoIata };
+        vData = { type: 'EXO', iataNumber: exoIata || '02170722' };
       }
 
       const createVoucherXml = buildCreateVoucherXml(resNumber, vData, voucherAmount, voucherCurrency, carCategory, pickupDate, returnDate);

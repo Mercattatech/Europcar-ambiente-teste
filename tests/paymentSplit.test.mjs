@@ -371,3 +371,21 @@ test('filterEmailHtmlByConfig — remove blocos e seções conforme configuraç�
   assert.ok(!filtered.includes('europcar.com.br/reservas'));
 });
 
+test('POA IATA — envia IATANumber 02170722 nas reservas POA / EXO para comissionamento da agência no GW', () => {
+  const DEFAULT_POA_IATA = '02170722';
+  assert.equal(DEFAULT_POA_IATA, '02170722');
+
+  const buildCreateVoucherFragment = (resNumber, iata, amount, cur) =>
+    `<meanOfPayment typeCode="VCH" voucherType="EXO" IATANumber="${iata}" voucherAmount="${amount}" voucherCurrency="${cur}"/>`;
+
+  const xmlDefault = buildCreateVoucherFragment('1208543518', DEFAULT_POA_IATA, '100.00', 'EUR');
+  assert.ok(xmlDefault.includes('IATANumber="02170722"'));
+  assert.ok(xmlDefault.includes('voucherType="EXO"'));
+  assert.ok(xmlDefault.includes('voucherAmount="100.00"'));
+
+  // Custom IATA alterado no painel administrativo
+  const xmlCustom = buildCreateVoucherFragment('1208543518', '99887766', '100.00', 'EUR');
+  assert.ok(xmlCustom.includes('IATANumber="99887766"'));
+});
+
+

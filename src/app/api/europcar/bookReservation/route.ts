@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { callXRS, DEFAULT_POA_CID } from '@/lib/europcar/xrsClient';
+import { callXRS, DEFAULT_POA_CID, getDynamicXRSContractConfig } from '@/lib/europcar/xrsClient';
 import { isValidXRSDate, isValidXRSTime } from '@/lib/europcar/validate';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
@@ -205,11 +205,15 @@ export async function POST(request: Request) {
       }
     }
 
-    if (resNumber && isVoucherEXO) {
+    const isETO = effectiveCID === '56935466' || effectiveCID === '56935495' || (voucherData && voucherData.type === 'ETO');
+    const isPoa = !isETO && (!voucherData || voucherData.type === 'POA');
+
+    if (resNumber && (isVoucherEXO || isPoa)) {
       try {
         const voucherAmount = body.car?.totalRateEstimate || body.car?.total || '0';
         const voucherCurrency = body.car?.bookingCurrencyOfTotalRateEstimate || body.car?.currency || 'EUR';
-        const iataNumber = voucherData.iataNumber || '02170722';
+        const { poaIata, exoIata } = await getDynamicXRSContractConfig();
+        const iataNumber = isVoucherEXO ? (voucherData?.iataNumber || exoIata || '02170722') : (poaIata || '02170722');
 
         const createVoucherXml = `<?xml version="1.0" encoding="UTF-8"?>
 <message>
@@ -227,9 +231,9 @@ export async function POST(request: Request) {
           action: 'createVoucher',
           sourceFile: 'bookReservation/route.ts'
         });
-        console.log(`[bookReservation] createVoucher (EXO) enviado com sucesso para a reserva ${resNumber}`);
+        console.log(`[bookReservation] createVoucher (${isVoucherEXO ? 'EXO' : 'POA'}, IATA ${iataNumber}) enviado com sucesso para a reserva ${resNumber}`);
       } catch (voucherErr: any) {
-        console.error(`[bookReservation] Erro ao criar voucher EXO para ${resNumber}:`, voucherErr.message);
+        console.error(`[bookReservation] Erro ao criar voucher para ${resNumber}:`, voucherErr.message);
       }
     }
 
