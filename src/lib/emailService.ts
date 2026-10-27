@@ -256,6 +256,21 @@ export async function sendTransactionalEmail(to: string, trigger: string, dataVa
         // têm só a tabela de valores trocada — títulos e textos informativos permanecem.
         const { upgradeTemplateWithCashSummary } = await import('@/lib/email/cashSummaryHtml');
         templateHtml = upgradeTemplateWithCashSummary(templateHtml);
+
+        // Aplica configurações do Resumo de E-mail (/painel/resumo-email)
+        try {
+          const { prisma } = await import('@/lib/prisma');
+          const { normalizeEmailSummaryConfig, filterEmailHtmlByConfig } = await import('@/lib/email/emailSummaryConfig');
+          const cfgBlock = await prisma.contentBlock.findUnique({
+            where: { key: 'EMAIL_SUMMARY_CONFIG' },
+            select: { value_ptBR: true },
+          });
+          const parsedConfig = cfgBlock?.value_ptBR ? JSON.parse(cfgBlock.value_ptBR) : null;
+          const emailCfg = normalizeEmailSummaryConfig(parsedConfig);
+          templateHtml = filterEmailHtmlByConfig(templateHtml, emailCfg);
+        } catch (cfgErr: any) {
+          console.warn('[Email] Falha ao aplicar EMAIL_SUMMARY_CONFIG:', cfgErr?.message);
+        }
       }
     } catch (enrichErr: any) {
       console.warn(`[Email] Enriquecimento de variáveis falhou (${trigger}):`, enrichErr?.message);

@@ -15,6 +15,11 @@ import {
   includedExcessText,
   counterNotice,
 } from '../src/lib/europcar/paymentSplit.ts';
+import {
+  DEFAULT_EMAIL_SUMMARY_CONFIG,
+  normalizeEmailSummaryConfig,
+  filterEmailHtmlByConfig,
+} from '../src/lib/email/emailSummaryConfig.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -312,3 +317,57 @@ test('quando isZeroExcess é true com PREMIUM PROTECTION PACKAGE no XML, remove 
   assert.ok(!split.online.included.some((i) => i.label === 'PREMIUM PROTECTION PACKAGE'));
   assert.ok(split.online.included.some((i) => i.label === 'Taxas e licenças'));
 });
+
+test('EmailSummaryConfig — padrão mantém 100% dos blocos ativos e normalizeEmailSummaryConfig preenche defaults', () => {
+  assert.equal(DEFAULT_EMAIL_SUMMARY_CONFIG.cashSummary.online.enabled, true);
+  assert.equal(DEFAULT_EMAIL_SUMMARY_CONFIG.cashSummary.counter.enabled, true);
+  assert.equal(DEFAULT_EMAIL_SUMMARY_CONFIG.cashSummary.total.enabled, true);
+  assert.equal(DEFAULT_EMAIL_SUMMARY_CONFIG.sections.franchiseBlock, true);
+  assert.equal(DEFAULT_EMAIL_SUMMARY_CONFIG.sections.section01, true);
+  assert.equal(DEFAULT_EMAIL_SUMMARY_CONFIG.sections.section04, true);
+
+  const normalized = normalizeEmailSummaryConfig({});
+  assert.equal(normalized.cashSummary.online.enabled, true);
+  assert.equal(normalized.cashSummary.online.title, 'Pagar on-line');
+  assert.equal(normalized.sections.franchiseBlock, true);
+});
+
+test('filterEmailHtmlByConfig — remove blocos e seções conforme configuração personalizada', () => {
+  const sampleHtml = `
+<!-- FRANQUIA, CAUÇÃO E COBRANÇAS -->
+<tr><td class="px"><p>Franquia, caução e cobranças</p>
+<p>Franquia das proteções contratadas</p><p>• Franquia zero</p>
+<p>O que a proteção não cobre</p><p>Exclusões aqui</p>
+</td></tr>
+<!-- ALERTA DOCUMENTOS -->
+<tr><td class="px">Na retirada apresente este e-mail e documento</td></tr>
+<tr><td class="px">01   Sua reserva<br>Informações importantes</td></tr>
+<!-- SUPORTE -->
+<tr><td class="px">Dúvidas? Acesse europcar.com.br/reservas</td></tr>
+`;
+
+  // Com tudo ligado: nada é removido
+  const full = filterEmailHtmlByConfig(sampleHtml, DEFAULT_EMAIL_SUMMARY_CONFIG);
+  assert.ok(full.includes('Franquia, caução e cobranças'));
+  assert.ok(full.includes('Na retirada apresente este e-mail'));
+  assert.ok(full.includes('01   Sua reserva'));
+  assert.ok(full.includes('europcar.com.br/reservas'));
+
+  // Com franquia e alerta desligados
+  const customCfg = {
+    ...DEFAULT_EMAIL_SUMMARY_CONFIG,
+    sections: {
+      ...DEFAULT_EMAIL_SUMMARY_CONFIG.sections,
+      franchiseBlock: false,
+      documentAlert: false,
+      section01: false,
+      supportLink: false,
+    },
+  };
+  const filtered = filterEmailHtmlByConfig(sampleHtml, customCfg);
+  assert.ok(!filtered.includes('Franquia, caução e cobranças'));
+  assert.ok(!filtered.includes('Na retirada apresente este e-mail'));
+  assert.ok(!filtered.includes('01   Sua reserva'));
+  assert.ok(!filtered.includes('europcar.com.br/reservas'));
+});
+

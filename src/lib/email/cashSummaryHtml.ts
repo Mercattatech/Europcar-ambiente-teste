@@ -46,7 +46,7 @@ export interface CashSummaryModel {
   online: CashSummaryBlock;
   counter: CashSummaryBlock;
   included: string[];
-  total: { main: string; sub?: string; note: string };
+  total: { title?: string; main: string; sub?: string; note: string };
 }
 
 const FONT = 'font-family:Arial,Helvetica,sans-serif;';
@@ -96,13 +96,46 @@ function blockHtml(
 </table>`;
 }
 
-export function renderCashSummaryHtml(m: CashSummaryModel): string {
-  const online = blockHtml('&#x1F4B3;', m.online, {
-    border: '#a7dcc0', title: '#064e3b', bg: '#ffffff', inner: '#d1fae5', mainColor: '#1f2421', subColor: '#6d7a70',
-  });
-  const counter = blockHtml('&#x1F3EA;', m.counter, {
-    border: '#fcd34d', title: '#451a03', bg: '#ffffff', inner: '#f3f4f6', mainColor: '#1f2421', subColor: '#6d7a70',
-  });
+import type { EmailSummaryConfig } from './emailSummaryConfig';
+
+export function renderCashSummaryHtml(m: CashSummaryModel, cfg?: EmailSummaryConfig['cashSummary']): string {
+  const showOnline = cfg?.online ? cfg.online.enabled : true;
+  const showCounter = cfg?.counter ? cfg.counter.enabled : true;
+  const showTotal = cfg?.total ? cfg.total.enabled : true;
+
+  const onlineBlock: CashSummaryBlock = {
+    title: cfg?.online?.title || m.online.title || 'Pagar on-line',
+    main: cfg?.online?.showSubtotalBRL !== false ? m.online.main : '',
+    sub: cfg?.online?.showSubtotalLocal !== false ? m.online.sub : undefined,
+    items: m.online.items,
+    note: m.online.note,
+  };
+
+  const counterBlock: CashSummaryBlock = {
+    title: cfg?.counter?.title || m.counter.title || 'A pagar no balcão',
+    main: cfg?.counter?.showSubtotalBRL !== false ? m.counter.main : '',
+    sub: cfg?.counter?.showSubtotalLocal !== false ? m.counter.sub : undefined,
+    items: cfg?.counter?.showItemsList !== false ? m.counter.items : [],
+    note: cfg?.counter?.showNotice !== false ? m.counter.note : undefined,
+  };
+
+  const totalBlock = {
+    title: cfg?.total?.title || m.total.title || 'Valor total',
+    main: cfg?.total?.showBRL !== false ? m.total.main : '',
+    sub: cfg?.total?.showLocal !== false ? m.total.sub : undefined,
+    note: m.total.note,
+  };
+
+  const online = showOnline
+    ? blockHtml('&#x1F4B3;', onlineBlock, {
+        border: '#a7dcc0', title: '#064e3b', bg: '#ffffff', inner: '#d1fae5', mainColor: '#1f2421', subColor: '#6d7a70',
+      })
+    : '';
+  const counter = showCounter
+    ? blockHtml('&#x1F3EA;', counterBlock, {
+        border: '#fcd34d', title: '#451a03', bg: '#ffffff', inner: '#f3f4f6', mainColor: '#1f2421', subColor: '#6d7a70',
+      })
+    : '';
   const included = m.included.length > 0 ? `
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 12px 0;border:1px solid #dfe4dd;border-radius:10px;background-color:#f7f9f6;">
   <tr><td style="${FONT}padding:14px 16px;">
@@ -110,20 +143,20 @@ export function renderCashSummaryHtml(m: CashSummaryModel): string {
     <p style="margin:0;font-size:12px;line-height:19px;color:#3d463f;">${m.included.map((t) => `<span style="color:#008d36;font-weight:bold;">&#x2713;</span>&nbsp;${esc(t)}`).join('<br>')}</p>
   </td></tr>
 </table>` : '';
-  const total = `
+  const total = showTotal ? `
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0;border:2px solid #fcd34d;border-radius:10px;background-color:#fffbeb;">
   <tr><td style="padding:14px 16px;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       <tr>
-        <td valign="top" style="${FONT}font-size:12px;letter-spacing:1px;color:#451a03;font-weight:900;text-transform:uppercase;">&#x1F7E2;&nbsp;Valor total</td>
+        <td valign="top" style="${FONT}font-size:12px;letter-spacing:1px;color:#451a03;font-weight:900;text-transform:uppercase;">&#x1F7E2;&nbsp;${esc(totalBlock.title)}</td>
         <td align="right" valign="top" style="${FONT}white-space:nowrap;">
-          <span style="font-size:19px;color:#451a03;font-weight:900;">${esc(m.total.main)}</span>${m.total.sub ? `<br><span style="font-size:12px;color:#92400e;font-weight:bold;">${esc(m.total.sub)}</span>` : ''}
+          <span style="font-size:19px;color:#451a03;font-weight:900;">${esc(totalBlock.main)}</span>${totalBlock.sub ? `<br><span style="font-size:12px;color:#92400e;font-weight:bold;">${esc(totalBlock.sub)}</span>` : ''}
         </td>
       </tr>
-      <tr><td colspan="2" style="${FONT}padding:10px 0 0 0;border-top:1px solid #fde68a;font-size:12px;line-height:18px;color:#451a03;">${esc(m.total.note)}</td></tr>
+      <tr><td colspan="2" style="${FONT}padding:10px 0 0 0;border-top:1px solid #fde68a;font-size:12px;line-height:18px;color:#451a03;">${esc(totalBlock.note)}</td></tr>
     </table>
   </td></tr>
-</table>`;
+</table>` : '';
   return `${online}${counter}${included}${total}`;
 }
 
@@ -131,7 +164,7 @@ export function renderCashSummaryHtml(m: CashSummaryModel): string {
 
 export function buildCashSummaryFromSplit(
   split: PaymentSplit,
-  opts: { onlineTitle?: string; quilometragem?: string } = {},
+  opts: { onlineTitle?: string; quilometragem?: string; config?: EmailSummaryConfig['cashSummary'] } = {},
 ): string {
   const cur = split.localCurrency;
   const foreign = !!cur && cur !== 'BRL';
@@ -140,13 +173,28 @@ export function buildCashSummaryFromSplit(
 
   const isVat = (l: { chrgTy?: string; label: string }) => l.chrgTy === '00028' || /imposto|vat/i.test(l.label);
 
+  const cfgOn = opts.config?.online;
+  const isOnlineItemVisible = (label: string) => {
+    if (!cfgOn) return true;
+    if (/diária|diarias|rental/i.test(label)) return cfgOn.showDailyRental !== false;
+    if (/franquia zero|premium/i.test(label)) return cfgOn.showZeroExcess !== false;
+    if (/básica|basica|roubo|danos|basic|theft|damage/i.test(label)) return cfgOn.showBasicProtections !== false;
+    if (/aeroporto|airport/i.test(label)) return cfgOn.showAirportSurcharge !== false;
+    if (/devolução em outra|one way|one-way/i.test(label)) return cfgOn.showOneWayCharge !== false;
+    if (/alta temporada|estação|season/i.test(label)) return cfgOn.showHighSeasonSurcharge !== false;
+    if (/licenciamento|emplacamento|taxa de circulação|fee|license/i.test(label)) return cfgOn.showLicensesAndFees !== false;
+    return cfgOn.showOtherItems !== false;
+  };
+
   const onlineItems: CashSummaryItem[] = [];
   if (split.online && !split.isPriceSecret) {
     for (const l of split.online.lines) {
       if (isVat(l)) continue;
+      if (!isOnlineItemVisible(l.label)) continue;
       onlineItems.push({ label: l.label, value: '' });
     }
     for (const i of split.online.included || []) {
+      if (!isOnlineItemVisible(i.label)) continue;
       const exc = includedExcessText(i, cur);
       onlineItems.push({
         label: `${i.label}${exc ? ` (${exc})` : ''}`,
@@ -154,7 +202,7 @@ export function buildCashSummaryFromSplit(
         isIncluded: true,
       });
     }
-    if (opts.quilometragem) {
+    if (opts.quilometragem && (cfgOn?.showOtherItems !== false)) {
       onlineItems.push({
         label: `Quilometragem: ${opts.quilometragem.toLowerCase()}`,
         value: 'Incluso',
@@ -165,13 +213,13 @@ export function buildCashSummaryFromSplit(
 
   const online: CashSummaryBlock = split.online
     ? {
-        title: opts.onlineTitle || 'Pagar on-line',
+        title: opts.config?.online?.title || opts.onlineTitle || 'Pagar on-line',
         main: formatBRL(split.online.subtotalBRL),
         sub: sub(split.online.subtotalLocal),
         items: onlineItems,
       }
     : {
-        title: opts.onlineTitle || 'Pagar on-line',
+        title: opts.config?.online?.title || opts.onlineTitle || 'Pagar on-line',
         main: formatBRL(0),
         items: [],
         note: 'Nenhum valor a pagar on-line: todas as cobranças desta reserva são pagas no balcão.',
@@ -195,14 +243,14 @@ export function buildCashSummaryFromSplit(
 
   const counter: CashSummaryBlock = split.counter
     ? {
-        title: 'A pagar no balcão',
+        title: opts.config?.counter?.title || 'A pagar no balcão',
         main: formatBRL(split.counter.subtotalBRL),
         sub: sub(split.counter.subtotalLocal),
         items: counterItems,
         note: counterNotice(cur),
       }
     : {
-        title: 'A pagar no balcão',
+        title: opts.config?.counter?.title || 'A pagar no balcão',
         main: foreign ? formatMoney(0, cur) : formatBRL(0),
         items: [],
         note: 'Nenhum valor adicional a pagar no balcão (apenas a caução temporária no cartão de crédito).',
@@ -213,7 +261,7 @@ export function buildCashSummaryFromSplit(
     counter,
     included: [],
     total: { main: formatBRL(split.totalBRL), sub: sub(split.totalLocal), note: '' },
-  });
+  }, opts.config);
 }
 
 
@@ -239,28 +287,44 @@ function parseListLines(html: string): CashSummaryItem[] {
     });
 }
 
-export function buildCashSummaryFromVars(v: Record<string, string>): string {
+export function buildCashSummaryFromVars(v: Record<string, string>, config?: EmailSummaryConfig['cashSummary']): string {
   const moeda = String(v.MOEDA || 'BRL').toUpperCase();
   const isBalcao = /balc/i.test(String(v.FORMA_PAGAMENTO || '')) && !/cart|pix|voucher/i.test(String(v.FORMA_PAGAMENTO || ''));
   const onlineMain = stripTags(v.VALOR_PAGO_ONLINE || '') || 'R$ 0,00';
   const counterMain = stripTags(v.VALOR_BALCAO || '');
+
+  const cfgOn = config?.online;
+  const isOnlineItemVisible = (label: string) => {
+    if (!cfgOn) return true;
+    if (/diária|diarias|rental/i.test(label)) return cfgOn.showDailyRental !== false;
+    if (/franquia zero|premium/i.test(label)) return cfgOn.showZeroExcess !== false;
+    if (/básica|basica|roubo|danos|basic|theft|damage/i.test(label)) return cfgOn.showBasicProtections !== false;
+    if (/aeroporto|airport/i.test(label)) return cfgOn.showAirportSurcharge !== false;
+    if (/devolução em outra|one way|one-way/i.test(label)) return cfgOn.showOneWayCharge !== false;
+    if (/alta temporada|estação|season/i.test(label)) return cfgOn.showHighSeasonSurcharge !== false;
+    if (/licenciamento|emplacamento|taxa de circulação|fee|license/i.test(label)) return cfgOn.showLicensesAndFees !== false;
+    return cfgOn.showOtherItems !== false;
+  };
+
   const counterItems = parseListLines(v.LISTA_BALCAO || '').filter((i) => !/imposto|vat/i.test(i.label));
   if (isBalcao && counterItems.length === 0 && v.TEXTO_DIARIAS) {
     counterItems.push({ label: `Aluguel do veículo (${v.TEXTO_DIARIAS}) + taxas`, value: '' });
   }
-  const onlineItems = parseListLines(v.LISTA_ONLINE || '').filter((i) => !/imposto|vat/i.test(i.label));
+  let onlineItems = parseListLines(v.LISTA_ONLINE || '').filter((i) => !/imposto|vat/i.test(i.label));
   if (onlineItems.length === 0 && !isBalcao && v.TEXTO_DIARIAS && !/^R\$\s*0,00/.test(onlineMain)) {
     onlineItems.push({ label: `Diárias (${v.TEXTO_DIARIAS})`, value: '' });
   }
+  onlineItems = onlineItems.filter((i) => isOnlineItemVisible(i.label));
+
   const nothingAtCounter = !counterMain || /^nada a pagar/i.test(counterMain);
   return renderCashSummaryHtml({
     online: {
-      title: v.PAGO_ONLINE_LABEL && !/^pago online$/i.test(v.PAGO_ONLINE_LABEL) ? v.PAGO_ONLINE_LABEL : 'Pagar on-line',
+      title: config?.online?.title || (v.PAGO_ONLINE_LABEL && !/^pago online$/i.test(v.PAGO_ONLINE_LABEL) ? v.PAGO_ONLINE_LABEL : 'Pagar on-line'),
       main: onlineMain,
       items: onlineItems,
     },
     counter: {
-      title: 'Pagar na retirada',
+      title: config?.counter?.title || 'Pagar na retirada',
       main: nothingAtCounter ? (moeda !== 'BRL' ? formatMoney(0, moeda) : formatBRL(0)) : counterMain,
       items: counterItems,
       note: nothingAtCounter
@@ -269,7 +333,7 @@ export function buildCashSummaryFromVars(v: Record<string, string>): string {
     },
     included: [],
     total: { main: stripTags(v.VALOR_TOTAL || v.TOTAL_RESERVA || ''), note: '' },
-  });
+  }, config);
 }
 
 // ─── Templates antigos (salvos no painel) sem {{RESUMO_CAIXA}} ──────────────────────────────

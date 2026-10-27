@@ -25,6 +25,7 @@ const sidebarLinks = [
    { href: "/painel/fidelidade", label: "Programas Fidelidade", icon: "✈️" },
    { href: "/painel/config", label: "Config Pagamento", icon: "💳" },
    { href: "/painel/resumo-checkout", label: "Resumo do Checkout", icon: "🧾" },
+   { href: "/painel/resumo-email", label: "Resumo dos E-mails", icon: "📧" },
    { href: "/painel/erros-reserva", label: "Erros de Reserva (CMS)", icon: "⚠️" },
    { href: "/painel/conteudo-site", label: "Conteúdo do Site", icon: "🌐" },
    { href: "/painel/termos", label: "Termos e Condições", icon: "📜" },
