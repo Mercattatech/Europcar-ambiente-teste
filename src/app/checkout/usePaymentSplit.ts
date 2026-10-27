@@ -16,6 +16,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { computePaymentSplit, type PaymentSplit } from "@/lib/europcar/paymentSplit";
+import { isZeroExcessBooking } from "@/lib/europcar/protectionSummary";
 
 // Mesma lista de códigos de proteção usada em api/reservas e bookXRS
 const INSURANCE_CODES = ['TPL', 'LDW', 'CDW', 'THW', 'SCDW', 'SPCDW', 'STHW', 'SPTHW', 'MEDIUM', 'PREMIUM', 'PREMPRE', 'PREMUP', 'RSA', 'APP', 'PAI', 'PEP', 'SLDW', 'WWI', 'SPAI', 'INTERIOR', 'PREMPLUS'];
@@ -114,7 +115,10 @@ export function useEtoPaymentSplit(booking: any, setBooking: (updater: (prev: an
           fallback(data?._errorCode || `HTTP ${res.status}`);
           return;
         }
-        const computed = computePaymentSplit(reservation, { onlineMarkupPercent: markup });
+        const computed = computePaymentSplit(reservation, {
+          onlineMarkupPercent: markup,
+          isZeroExcess: isZeroExcessBooking(booking),
+        });
         if (!computed) {
           fallback("cotação sem chargeList");
           return;

@@ -38,7 +38,11 @@ export function resolveBookedPaymentSplit(params: {
   let bookSplit: PaymentSplit | null = null;
   try {
     bookSplit = params.bookResNode
-      ? computePaymentSplit(params.bookResNode, { onlineMarkupPercent: markup, resNumber: params.resNumber })
+      ? computePaymentSplit(params.bookResNode, {
+          onlineMarkupPercent: markup,
+          resNumber: params.resNumber,
+          isZeroExcess: quoteSplit.isZeroExcess,
+        })
       : null;
   } catch (err: any) {
     console.warn(`${tag} ⚠️ falha ao calcular o split da reserva:`, err?.message);

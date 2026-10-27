@@ -87,6 +87,8 @@ export interface PaymentSplit {
   /** Moeda da reserva (ex.: BRL) */
   bookingCurrency: string;
   isPriceSecret: boolean;
+  /** Se a reserva possui Proteção Premium / Franquia Zero */
+  isZeroExcess?: boolean;
   /** Markup aplicado ao bloco on-line (percentual, ex.: 10 = 10%) */
   onlineMarkupPercent: number;
   online: SplitBlock | null;
@@ -113,6 +115,8 @@ export interface PaymentSplitOptions {
   onlineMarkupPercent?: number;
   /** resNumber para os logs quando o nó não tem (ex.: cotação). */
   resNumber?: string | null;
+  /** Se a reserva possui Proteção Premium / Franquia Zero */
+  isZeroExcess?: boolean;
   /** Logger (default: console). Use `null` para silenciar. */
   logger?: Pick<Console, 'warn'> | null;
 }
@@ -388,6 +392,53 @@ export function computePaymentSplit(reservationNode: any, options: PaymentSplitO
     };
   };
 
+  // ── Proteção Premium (Franquia Zero): oculta as proteções básicas (CDW/THW) e adiciona Franquia Zero ──
+  const isZeroExcess = Boolean(
+    options.isZeroExcess ?? (
+      attrsOf(reservationNode).zeroExcess === 'true' ||
+      attrsOf(reservationNode).zeroExcess === true ||
+      attrsOf(reservationNode).contractID === '56935495' ||
+      attrsOf(reservationNode?.quote).contractID === '56935495' ||
+      attrsOf(reservationNode?.rate).contractID === '56935495'
+    )
+  );
+
+  if (isZeroExcess) {
+    const isBasicProtection = (item: IncludedItem) => {
+      const c = (item.code || '').toUpperCase();
+      if (c === 'CDW' || c === 'THW' || c === 'LDW' || c === 'SLDW' || c === 'SPCDW' || c === 'SCDW') {
+        return true;
+      }
+      if (/prote[cç][aã]o contra (roubo|danos)/i.test(item.label)) return true;
+      if (/accident & damage/i.test(item.label) || /theft protection/i.test(item.label)) return true;
+      return false;
+    };
+
+    const filterInc = (list: IncludedItem[]) => list.filter((i) => !isBasicProtection(i));
+
+    const newOnlineInc = filterInc(onlineIncluded);
+    const premiumItem: IncludedItem = {
+      code: 'ZERO_EXCESS',
+      chrgTy: 'ZERO_EXCESS',
+      label: 'Proteção Premium — Franquia Zero',
+      side: 'online',
+      excessLocal: null,
+      excessBRL: null,
+    };
+    newOnlineInc.unshift(premiumItem);
+    onlineIncluded.length = 0;
+    onlineIncluded.push(...newOnlineInc);
+
+    const newCounterInc = filterInc(counterIncluded);
+    counterIncluded.length = 0;
+    counterIncluded.push(...newCounterInc);
+
+    const newInc = filterInc(included);
+    newInc.unshift(premiumItem);
+    included.length = 0;
+    included.push(...newInc);
+  }
+
   // Bloco existe se houver linha com valor OU valor no payerList daquele lado OU itens inclusos
   const showOnline = hasOnline || (plOnlineBRL ?? 0) > AMOUNT_TOLERANCE || onlineIncluded.length > 0;
   const showCounter = hasCounter || (plCounterBRL ?? 0) > AMOUNT_TOLERANCE || counterIncluded.length > 0;
@@ -426,6 +477,7 @@ export function computePaymentSplit(reservationNode: any, options: PaymentSplitO
     localCurrency,
     bookingCurrency,
     isPriceSecret,
+    isZeroExcess,
     onlineMarkupPercent: markupPct,
     online,
     counter,

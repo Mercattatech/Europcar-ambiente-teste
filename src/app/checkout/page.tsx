@@ -1462,7 +1462,13 @@ export default function CheckoutPage() {
                 if (paymentSplit) {
                   return (
                     <div className="mt-auto">
-                      <PaymentSplitBlocks split={paymentSplit} nameOverrides={splitNameOverrides} onlineTitle="Pagar agora via PIX" compact />
+                      <PaymentSplitBlocks
+                        split={paymentSplit}
+                        nameOverrides={splitNameOverrides}
+                        onlineTitle="Pagar agora via PIX"
+                        compact
+                        isZeroExcess={isZeroExcessBooking(booking)}
+                      />
                     </div>
                   );
                 }
@@ -2013,6 +2019,9 @@ export default function CheckoutPage() {
                     const isAirport = d.includes('aeroporto') || d.includes('airport') ||
                       d.includes('ferroviária') || d.includes('railway') ||
                       d === 'sobretaxa de aeroporto/estação ferroviária';
+                    const isZero = isZeroExcessBooking(booking);
+                    const isBasic = i.code === 'CDW' || i.code === 'THW' || i.code === 'LDW' || d.includes('colis') || d.includes('roubo') || d.includes('dano');
+                    if (isZero && isBasic) return false;
                     return (paymentMethod === 'BALCAO' || !isAirport) && (i.type === 'M' || i.type === 'I' || i.includedInTotal === 'Y');
                   }).map((ins: any, idx: number) => (
                     <div key={idx} className="flex justify-between">
@@ -2145,6 +2154,7 @@ export default function CheckoutPage() {
                       nameOverrides={splitNameOverrides}
                       onlineTitle={paymentMethod === 'PIX' ? 'Pagar on-line (PIX)' : 'Pagar on-line'}
                       installments={paymentMethod === 'CREDIT' ? ccInstallments : 1}
+                      isZeroExcess={isZeroExcessBooking(booking)}
                     />
                   );
                 }

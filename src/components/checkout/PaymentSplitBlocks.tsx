@@ -26,6 +26,8 @@ interface Props {
   /** Parcelamento do cartão (mostra "Nx de R$ ...") */
   installments?: number;
   compact?: boolean;
+  /** Indica se a reserva possui Proteção Premium (Franquia Zero) */
+  isZeroExcess?: boolean;
 }
 
 export default function PaymentSplitBlocks({
@@ -35,18 +37,48 @@ export default function PaymentSplitBlocks({
   hideOnlineDetail = false,
   installments = 1,
   compact = false,
+  isZeroExcess,
 }: Props) {
+  const zeroExcess = isZeroExcess ?? split.isZeroExcess ?? false;
   const cur = split.localCurrency;
   const labelOf = (l: SplitLine) => (!l.mapped && l.auxK && nameOverrides[l.auxK]) || l.label;
   const textSize = compact ? "text-[11px]" : "text-xs";
   const showLocal = !!cur && cur !== "BRL";
+
+  const isBasicProtection = (item: { code?: string; label: string }) => {
+    const c = (item.code || '').toUpperCase();
+    if (c === 'CDW' || c === 'THW' || c === 'LDW' || c === 'SLDW' || c === 'SPCDW' || c === 'SCDW') {
+      return true;
+    }
+    if (/prote[cç][aã]o contra (roubo|danos)/i.test(item.label)) return true;
+    if (/accident & damage/i.test(item.label) || /theft protection/i.test(item.label)) return true;
+    return false;
+  };
 
   const BlockContent = ({ block, side }: { block: NonNullable<PaymentSplit['online']>; side: 'online' | 'counter' }) => {
     const isOnline = side === 'online';
     const isVat = (l: SplitLine) => l.chrgTy === "00028" || /imposto|vat/i.test(l.label);
     const visibleLines = block.lines.filter((l) => !isVat(l));
     const hasLines = visibleLines.length > 0;
-    const hasIncluded = block.included && block.included.length > 0;
+
+    let includedList = block.included || [];
+    if (zeroExcess) {
+      includedList = includedList.filter((i) => !isBasicProtection(i));
+      if (isOnline && !includedList.some((i) => i.code === 'ZERO_EXCESS')) {
+        includedList = [
+          {
+            code: 'ZERO_EXCESS',
+            chrgTy: 'ZERO_EXCESS',
+            label: 'Proteção Premium — Franquia Zero',
+            side: 'online',
+            excessLocal: null,
+            excessBRL: null,
+          },
+          ...includedList,
+        ];
+      }
+    }
+    const hasIncluded = includedList.length > 0;
     if (!hasLines && !hasIncluded) return null;
 
     return (
@@ -57,7 +89,7 @@ export default function PaymentSplitBlocks({
             <span>{labelOf(l)}</span>
           </div>
         ))}
-        {block.included.map((i, idx) => {
+        {includedList.map((i, idx) => {
           const exc = includedExcessText(i, cur);
           return (
             <div key={`${side}-inc-${i.code}-${idx}`} className="flex justify-between items-start gap-2">

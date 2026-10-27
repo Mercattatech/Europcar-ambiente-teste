@@ -275,3 +275,20 @@ test('formatação BRL e EUR', () => {
   assert.equal(formatMoney(239.47, 'EUR'), '€ 239,47');
   assert.equal(formatMoney(0, 'EUR'), '€ 0,00');
 });
+
+test('quando isZeroExcess é true, oculta proteções básicas com franquia e exibe Proteção Premium — Franquia Zero', async () => {
+  const xml = XML_1208543518;
+  const standardSplit = computePaymentSplit(await reservationOf(xml), { isZeroExcess: false, logger: null });
+  // Sem franquia zero: exibe as proteções básicas com franquia
+  assert.ok(standardSplit.online.included.some((i) => i.label === 'Proteção contra danos'));
+  assert.ok(standardSplit.online.included.some((i) => i.label === 'Proteção contra roubo'));
+  assert.ok(!standardSplit.online.included.some((i) => i.label.includes('Franquia Zero')));
+
+  // Com franquia zero (Proteção Premium): oculta as proteções básicas e exibe Proteção Premium — Franquia Zero
+  const zeroSplit = computePaymentSplit(await reservationOf(xml), { isZeroExcess: true, logger: null });
+  assert.equal(zeroSplit.isZeroExcess, true);
+  assert.ok(!zeroSplit.online.included.some((i) => i.label === 'Proteção contra danos'));
+  assert.ok(!zeroSplit.online.included.some((i) => i.label === 'Proteção contra roubo'));
+  assert.ok(zeroSplit.online.included.some((i) => i.label === 'Proteção Premium — Franquia Zero'));
+  assert.ok(zeroSplit.online.included.some((i) => i.label === 'Taxas e licenças'));
+});
