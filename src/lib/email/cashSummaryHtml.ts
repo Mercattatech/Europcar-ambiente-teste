@@ -58,10 +58,14 @@ function itemsHtml(items: CashSummaryItem[], borderColor: string): string {
       ? `<span style="color:#008d36;font-weight:bold;">&#x2713;</span>`
       : '-';
     const valColor = i.isIncluded ? '#008d36' : '#1f2421';
+    const valTd = i.value
+      ? `<td align="right" valign="top" style="${FONT}padding:3px 0;font-size:12px;line-height:18px;color:${valColor};font-weight:bold;white-space:nowrap;">${esc(i.value)}</td>`
+      : '';
+    const colSpan = i.value ? '' : ' colspan="2"';
     return `
           <tr>
-            <td valign="top" style="${FONT}padding:3px 8px 3px 0;font-size:12px;line-height:18px;color:#3d463f;">${bullet}&nbsp;${esc(i.label)}</td>
-            <td align="right" valign="top" style="${FONT}padding:3px 0;font-size:12px;line-height:18px;color:${valColor};font-weight:bold;white-space:nowrap;">${esc(i.value)}</td>
+            <td${colSpan} valign="top" style="${FONT}padding:3px 8px 3px 0;font-size:12px;line-height:18px;color:#3d463f;">${bullet}&nbsp;${esc(i.label)}</td>
+            ${valTd}
           </tr>`;
   }).join('');
   return `
@@ -137,7 +141,7 @@ export function buildCashSummaryFromSplit(
   const onlineItems: CashSummaryItem[] = [];
   if (split.online && !split.isPriceSecret) {
     for (const l of split.online.lines) {
-      onlineItems.push({ label: l.label, value: val(l.priceBRL, l.priceLocal) });
+      onlineItems.push({ label: l.label, value: '' });
     }
     for (const i of split.online.included || []) {
       const exc = includedExcessText(i, cur);
@@ -173,7 +177,7 @@ export function buildCashSummaryFromSplit(
   const counterItems: CashSummaryItem[] = [];
   if (split.counter) {
     for (const l of split.counter.lines) {
-      counterItems.push({ label: l.label, value: val(l.priceBRL, l.priceLocal) });
+      counterItems.push({ label: l.label, value: '' });
     }
     for (const i of split.counter.included || []) {
       const exc = includedExcessText(i, cur);
@@ -213,7 +217,7 @@ export function buildCashSummaryFromSplit(
 
 const stripTags = (s: string) => String(s || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
 
-/** "• Sobretaxa de aeroporto — € 12,80 (≈ R$ 77,29)" → { label, value } */
+/** "• Sobretaxa de aeroporto — € 12,80" ou "• Proteção contra roubo — Incluso" ou "• Diárias" */
 function parseListLines(html: string): CashSummaryItem[] {
   return String(html || '')
     .split(/<br\s*\/?>/i)
@@ -221,7 +225,13 @@ function parseListLines(html: string): CashSummaryItem[] {
     .filter((l) => l && !/^este valor será cobrado/i.test(l))
     .map((l) => {
       const idx = l.lastIndexOf(' — ');
-      return idx > 0 ? { label: l.slice(0, idx).trim(), value: l.slice(idx + 3).trim() } : { label: l, value: '' };
+      if (idx > 0) {
+        const label = l.slice(0, idx).trim();
+        const value = l.slice(idx + 3).trim();
+        const isIncluded = /^incluso$/i.test(value);
+        return { label, value: isIncluded ? 'Incluso' : '', isIncluded };
+      }
+      return { label: l, value: '' };
     });
 }
 

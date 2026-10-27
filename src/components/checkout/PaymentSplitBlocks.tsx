@@ -28,16 +28,6 @@ interface Props {
   compact?: boolean;
 }
 
-function Money({ brl, local, currency, strong }: { brl: number; local: number; currency: string; strong?: boolean }) {
-  const showLocal = !!currency && currency !== "BRL";
-  return (
-    <span className="text-right shrink-0 whitespace-nowrap">
-      <span className={strong ? "font-black text-gray-900" : "font-semibold text-gray-900"}>{formatBRL(brl)}</span>
-      {showLocal && <span className="text-gray-500 font-medium"> ({formatMoney(local, currency)})</span>}
-    </span>
-  );
-}
-
 export default function PaymentSplitBlocks({
   split,
   nameOverrides = {},
@@ -60,12 +50,9 @@ export default function PaymentSplitBlocks({
     return (
       <div className={`mt-3 pt-2.5 border-t border-gray-100 space-y-1.5 ${textSize} text-gray-700`}>
         {block.lines.map((l, idx) => (
-          <div key={`${l.side}-${l.chrgTy}-${l.auxK}-${idx}`} className="flex justify-between items-start gap-2">
-            <div className="flex items-start gap-1.5 min-w-0">
-              <span className="text-gray-400 font-bold">-</span>
-              <span>{labelOf(l)}</span>
-            </div>
-            <Money brl={l.priceBRL} local={l.priceLocal} currency={cur} />
+          <div key={`${l.side}-${l.chrgTy}-${l.auxK}-${idx}`} className="flex items-start gap-1.5 min-w-0">
+            <span className="text-gray-400 font-bold">-</span>
+            <span>{labelOf(l)}</span>
           </div>
         ))}
         {block.included.map((i, idx) => {

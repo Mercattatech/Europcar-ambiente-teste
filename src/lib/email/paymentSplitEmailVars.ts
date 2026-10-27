@@ -36,7 +36,7 @@ export function buildPaymentSplitEmailVars(
 ): Record<string, string> {
   const cur = split.localCurrency;
   const fmt = (brl: number, local: number) => formatBRLWithLocal(brl, local, cur);
-  const lineTxt = (l: SplitLine) => `• ${esc(l.label)} — ${fmt(l.priceBRL, l.priceLocal)}`;
+  const lineTxt = (l: SplitLine) => `• ${esc(l.label)}`;
   const incTxt = (i: IncludedItem) => {
     const exc = includedExcessText(i, cur);
     return `✓ ${esc(i.label)}${exc ? ` (${exc})` : ''} — Incluso`;

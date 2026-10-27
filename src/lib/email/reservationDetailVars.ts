@@ -116,8 +116,7 @@ export function buildReservationDetailVars(p: DetailVarsParams): Record<string, 
   for (const c of counter) {
     const brl = num(c.priceInBookingCurrency) > 0 ? num(c.priceInBookingCurrency) : num(c.rentalPriceInBookingCurrencyAI);
     const local = num(c.price);
-    if (brl <= 0 && local <= 0) continue;
-    counterLines.push(`• ${c.descr || c.code} — ${fmtBoth(local, brl)}`);
+    counterLines.push(`• ${c.descr || c.code}`);
   }
   const counterBRL = calcCounterBRL(booking, car, rate);
   const isPrepaid = p.paymentMethod !== 'BALCAO';
