@@ -10,7 +10,7 @@
  * ⚠️ O valor da CAUÇÃO NÃO é informado pelo XRS — por isso o e-mail traz só o texto explicativo
  *    (ver template), nunca um valor.
  */
-import type { ExtraLine } from '@/lib/email/reservationEmailVars';
+import type { ExtraLine, EquipLine } from '@/lib/email/reservationEmailVars';
 import type { XrsSnapshot } from '@/lib/email/xrsReservationSnapshot';
 import { isZeroExcessBooking, ZERO_EXCESS_LABEL } from '@/lib/europcar/protectionSummary';
 
@@ -38,13 +38,34 @@ const chargeBRL = (c: any, rate: number): number => {
 };
 
 /**
- * Total (R$) das cobranças pagas no balcão (ex.: sobretaxa de aeroporto) da reserva.
+ * Total (R$) das cobranças pagas no balcão (ex.: sobretaxa de aeroporto, equipamentos) da reserva.
  * Fallback: amountToPayOnArrival da cotação.
  */
-export function calcCounterBRL(booking: any, car: any, rate: number): number {
+export function calcCounterBRL(
+  booking: any,
+  car: any,
+  rate: number,
+  equipBRL = 0,
+  quoteSnapshot?: { amountToPayOnArrival?: number; amountToPayOnArrivalBooking?: number },
+): number {
   const quoteIns: any[] = Array.isArray(booking?.quoteInsurances) ? booking.quoteInsurances : [];
-  const sum = quoteIns.filter(isCounterCharge).reduce((s, c) => s + chargeBRL(c, rate), 0);
-  return sum > 0 ? sum : num(car?.amountToPayOnArrivalInBookingCurrency);
+  const insSum = quoteIns.filter(isCounterCharge).reduce((s, c) => s + chargeBRL(c, rate), 0);
+
+  const snapBooking = num(quoteSnapshot?.amountToPayOnArrivalBooking);
+  const snapLocal = num(quoteSnapshot?.amountToPayOnArrival);
+  const arrivalBRL = num(car?.amountToPayOnArrivalInBookingCurrency) > 0
+    ? num(car.amountToPayOnArrivalInBookingCurrency)
+    : (snapBooking > 0
+      ? snapBooking
+      : (num(car?.amountToPayOnArrival) > 0 && rate > 0
+        ? num(car.amountToPayOnArrival) * rate
+        : (snapLocal > 0 && rate > 0
+          ? snapLocal * rate
+          : 0)));
+
+  // Balcão = taxas/sobretaxas pagas na retirada + equipamentos (sempre cobrados na retirada)
+  const sumWithEquip = insSum + equipBRL;
+  return Math.max(sumWithEquip, arrivalBRL);
 }
 
 const fmtLocal = (amount: number, currency: string): string => {
@@ -68,6 +89,7 @@ export interface DetailVarsParams {
   /** 1 unidade da moeda local = X BRL */
   rate: number;
   extras: ExtraLine[];
+  equipment?: EquipLine[];
   vehicleBRL: number;
   insBRL: number;
   equipBRL: number;
@@ -110,15 +132,26 @@ export function buildReservationDetailVars(p: DetailVarsParams): Record<string, 
   if (p.paymentMethod === 'BALCAO') TARIFA = 'Pagar no balcão';
   else if (booking?.tariffType === 'ETO') TARIFA = 'Pagar agora — cancelamento grátis';
 
-  // ── Cobranças pagas no balcão (ex.: sobretaxa de aeroporto) ─
+  // ── Cobranças pagas no balcão (ex.: sobretaxa de aeroporto, equipamentos) ─
   const counter = quoteIns.filter(isCounterCharge);
   const counterLines: string[] = [];
   for (const c of counter) {
     const brl = num(c.priceInBookingCurrency) > 0 ? num(c.priceInBookingCurrency) : num(c.rentalPriceInBookingCurrencyAI);
     const local = num(c.price);
-    counterLines.push(`• ${c.descr || c.code}`);
+    const pair = brl > 0 ? ` — ${p.fmtPair(brl)}` : (local > 0 && rate > 0 ? ` — ${p.fmtPair(local * rate)}` : '');
+    counterLines.push(`• ${c.descr || c.code}${pair}`);
   }
-  const counterBRL = calcCounterBRL(booking, car, rate);
+
+  // Equipamentos são sempre pagos no balcão na retirada
+  if (Array.isArray(p.equipment) && p.equipment.length > 0) {
+    for (const eq of p.equipment) {
+      const eqTotalBRL = eq.totalBRL > 0 ? eq.totalBRL : (eq.priceBRL > 0 ? eq.priceBRL * d * (eq.qty || 1) : 0);
+      const pair = eqTotalBRL > 0 ? ` — ${p.fmtPair(eqTotalBRL)}` : '';
+      counterLines.push(`• ${eq.name || eq.code}${eq.qty > 1 ? ` ×${eq.qty}` : ''}${pair}`);
+    }
+  }
+
+  const counterBRL = calcCounterBRL(booking, car, rate, p.equipBRL, xrs?.quote);
   const isPrepaid = p.paymentMethod !== 'BALCAO';
   const showSplit = isPrepaid && counterBRL > 0;
 
@@ -171,7 +204,17 @@ export function buildReservationDetailVars(p: DetailVarsParams): Record<string, 
     );
   }
 
-  const totalFull = p.vehicleBRL + p.insBRL + p.equipBRL;
+  // Total completo da reserva:
+  // Se pré-pago: o que foi pago online (paidBRL) + o que deve ser pago no balcão (counterBRL)
+  // Se balcão: todas as cobranças da reserva
+  let totalFull = 0;
+  if (!isPrepaid) {
+    totalFull = p.vehicleBRL + p.insBRL + p.equipBRL;
+    if (totalFull <= 0) totalFull = counterBRL;
+  } else {
+    const onlinePart = p.paidBRL > 0 ? p.paidBRL : (p.vehicleBRL + p.insBRL);
+    totalFull = onlinePart + counterBRL;
+  }
 
   // ── Pago online × a pagar no balcão (SEMPRE informado) ──────
   // Pago online é em reais (cartão/PIX); o balcão é cobrado na moeda local.

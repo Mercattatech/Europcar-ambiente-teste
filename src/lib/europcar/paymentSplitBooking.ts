@@ -13,6 +13,7 @@
  * POA (pagar no balcão / pré-pago EXO) segue o fluxo antigo.
  */
 import { computePaymentSplit, formatBRL, AMOUNT_TOLERANCE, type PaymentSplit } from '@/lib/europcar/paymentSplit';
+import { isZeroExcessBooking } from '@/lib/europcar/protectionSummary';
 
 export function resolveBookedPaymentSplit(params: {
   bookResNode: any;
@@ -25,9 +26,29 @@ export function resolveBookedPaymentSplit(params: {
   const quoteSplit: PaymentSplit | null = params.bookingData?.paymentSplit?.version === 1
     ? params.bookingData.paymentSplit
     : null;
-  if (!quoteSplit) return null;
 
   const tag = `[paymentSplit] resNumber=${params.resNumber || '-'}`;
+
+  // Se não temos quoteSplit prévio, mas temos o nó real da reserva retornado pela Europcar:
+  // calcula o split diretamente a partir do bookResNode
+  if (!quoteSplit) {
+    if (params.bookResNode) {
+      try {
+        const directSplit = computePaymentSplit(params.bookResNode, {
+          resNumber: params.resNumber,
+          isZeroExcess: isZeroExcessBooking(params.bookingData),
+        });
+        if (directSplit) {
+          console.log(`${tag} ✅ split calculado diretamente do bookResNode: on-line ${formatBRL(directSplit.online?.subtotalBRL ?? 0)} · balcão ${formatBRL(directSplit.counter?.subtotalBRL ?? 0)}`);
+          return directSplit;
+        }
+      } catch (err: any) {
+        console.warn(`${tag} ⚠️ falha ao calcular split direto do bookResNode:`, err?.message);
+      }
+    }
+    return null;
+  }
+
   const markup = Number(quoteSplit.onlineMarkupPercent) || 0;
   const withRes = (s: PaymentSplit, extraAlert?: string): PaymentSplit => ({
     ...s,

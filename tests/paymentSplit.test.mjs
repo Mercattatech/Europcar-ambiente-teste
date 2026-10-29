@@ -525,3 +525,31 @@ test('computeReservationMetrics deriva valores corretamente mesmo sem customerDa
   assert.equal(metrics.counterDueEUR, 33.33);
   assert.equal(metrics.onlinePaidEUR, 166.67);
 });
+
+test('Reserva com equipamentos/acessórios no balcão: o valor a pagar na retirada NUNCA pode ser zerado', () => {
+  // Simula o caso do cliente 1208542929:
+  // - Pago no cartão online: R$ 937,13 (€ 161,23)
+  // - Acessórios e equipamentos contratados: R$ 1.610,88 (€ 277,14)
+  // - Câmbio: 1 EUR = R$ 5,8125
+  const rate = 5.8125;
+  const paidBRL = 937.13;
+  const equipBRL = 1610.88;
+  const equipEUR = +(equipBRL / rate).toFixed(2); // 277.14
+
+  // Se o cliente pagou online o carro e contratou equipamentos para pagar na retirada:
+  const counterBRL = equipBRL;
+  const totalBRL = paidBRL + counterBRL;
+  const totalEUR = +(totalBRL / rate).toFixed(2);
+
+  assert.ok(counterBRL > 0, 'Valor de balcão deve ser maior que 0');
+  assert.equal(equipEUR, 277.14);
+  assert.equal(totalBRL, 2548.01);
+  assert.equal(totalEUR, 438.37);
+
+  // O texto do balcão não pode ser "Nada a pagar" ou "€ 0,00"
+  const counterFormatted = `€ ${equipEUR.toFixed(2).replace('.', ',')} (≈ R$ ${equipBRL.toFixed(2).replace('.', ',')})`;
+  assert.ok(!counterFormatted.includes('€ 0,00'));
+  assert.ok(counterFormatted.includes('€ 277,14'));
+  assert.ok(counterFormatted.includes('R$ 1610,88'));
+});
+

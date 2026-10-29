@@ -50,7 +50,13 @@ export interface XrsSnapshot {
     totalBooking: number;
     /** 1 unidade da moeda local = X na moeda de pagamento (ex.: 1 EUR = 6,18 BRL) */
     exchangeRate: number;
+    /** Valor a pagar no balcão informado pelo XRS (moeda local) */
+    amountToPayOnArrival?: number;
+    /** Valor a pagar no balcão informado pelo XRS (moeda de pagamento) */
+    amountToPayOnArrivalBooking?: number;
   };
+  /** Nó completo reservation do XRS (quando disponível) */
+  raw?: any;
 }
 
 /**
@@ -145,15 +151,20 @@ export function extractSnapshotFromXrsReservation(raw: any): XrsSnapshot {
     const totalLocal = num(q.totalRateEstimate);
     const totalBooking = num(q.totalRateEstimateInBookingCurrency);
     const exch = num(q.exchangeRate) || (totalLocal > 0 && totalBooking > 0 ? totalBooking / totalLocal : 0);
+    const arrivalLocal = num(q.amountToPayOnArrival);
+    const arrivalBooking = num(q.amountToPayOnArrivalInBookingCurrency);
     snapshot.quote = {
       currency: q.currency ? String(q.currency).toUpperCase() : undefined,
       bookingCurrency: (q.bookingCurrency || q.bookingCurrencyOfTotalRateEstimate) ? String(q.bookingCurrency || q.bookingCurrencyOfTotalRateEstimate).toUpperCase() : undefined,
       totalLocal,
       totalBooking,
       exchangeRate: exch,
+      amountToPayOnArrival: arrivalLocal > 0 ? arrivalLocal : undefined,
+      amountToPayOnArrivalBooking: arrivalBooking > 0 ? arrivalBooking : undefined,
     };
   }
 
+  snapshot.raw = raw;
   return snapshot;
 }
 

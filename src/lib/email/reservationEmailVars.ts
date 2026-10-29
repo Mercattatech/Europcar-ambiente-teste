@@ -21,6 +21,7 @@ import { INSURANCE_NAMES_PT, type XrsSnapshot } from '@/lib/email/xrsReservation
 import { buildReservationDetailVars, calcCounterBRL } from '@/lib/email/reservationDetailVars';
 import { buildPaymentSplitEmailVars, getStoredPaymentSplit } from '@/lib/email/paymentSplitEmailVars';
 import { buildCashSummaryFromSplit, buildCashSummaryFromVars } from '@/lib/email/cashSummaryHtml';
+import { computePaymentSplit } from '@/lib/europcar/paymentSplit';
 import { isZeroExcessBooking, ZERO_EXCESS_LABEL } from '@/lib/europcar/protectionSummary';
 
 // Mesmos códigos de proteção usados em bookXRS.ts / reservas/route.ts
@@ -261,10 +262,9 @@ export function buildReservationEmailVars(params: {
   const isBalcao = paymentMethod === 'BALCAO';
   const extrasTotalBRL = insBRL + equipBRL;
 
+  const counterBRL = calcCounterBRL(booking, car, rateForCounter, equipBRL, params.xrs?.quote);
   const prepaidWithPaid = !isBalcao && paidBRL > 0;
-  const fullPrepaidBRL = prepaidWithPaid
-    ? paidBRL + calcCounterBRL(booking, car, rateForCounter)
-    : 0;
+  const fullPrepaidBRL = prepaidWithPaid ? paidBRL + counterBRL : 0;
 
   // Em reservas BALCAO, vehicleBRLNet é frequentemente a cotação consolidada do XRS (veículo + proteções + extras).
   // Se vehicleBRLNet > extrasTotalBRL, o veículo puro é (vehicleBRLNet - extrasTotalBRL).
@@ -272,7 +272,11 @@ export function buildReservationEmailVars(params: {
   let totalBRL = 0;
 
   if (prepaidWithPaid) {
-    vehicleBRL = Math.max(0, fullPrepaidBRL - insBRL - equipBRL);
+    // Em reservas pré-pagas (cartão/PIX já pago):
+    // paidBRL cobriu o veículo (+ eventuais proteções online). O valor do veículo não deve
+    // subtrair equipamentos, pois equipamentos são pagos na retirada no balcão da estação.
+    vehicleBRL = Math.max(0, paidBRL - insBRL);
+    if (vehicleBRL === 0 && vehicleBRLNet > 0) vehicleBRL = vehicleBRLNet;
     totalBRL = params.preferPaidAmount ? paidBRL : fullPrepaidBRL;
   } else if (isBalcao) {
     if (extrasTotalBRL > 0 && vehicleBRLNet > extrasTotalBRL) {
@@ -298,6 +302,7 @@ export function buildReservationEmailVars(params: {
       currency: cv.MOEDA,
       rate: rateForCounter,
       extras: lists.extras,
+      equipment: lists.equipment,
       vehicleBRL,
       insBRL,
       equipBRL,
@@ -315,7 +320,17 @@ export function buildReservationEmailVars(params: {
   let splitVars: Record<string, string> = {};
   let cashSummaryFromSplit = '';
   try {
-    const split = getStoredPaymentSplit(cd);
+    let split = getStoredPaymentSplit(cd);
+    if (!split && params.xrs?.raw) {
+      try {
+        split = computePaymentSplit(params.xrs.raw, {
+          resNumber: params.resNumber,
+          isZeroExcess: isZeroExcessBooking(booking),
+        });
+      } catch (splitDeriveErr: any) {
+        console.warn('[reservationEmailVars] Falha ao derivar split do nó raw XRS:', splitDeriveErr?.message);
+      }
+    }
     if (split) {
       splitVars = buildPaymentSplitEmailVars(split, { quilometragem: detail.QUILOMETRAGEM });
       cashSummaryFromSplit = buildCashSummaryFromSplit(split, {
