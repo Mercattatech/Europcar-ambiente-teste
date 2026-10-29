@@ -138,17 +138,23 @@ export function computeReservationMetrics(res: any, parsedCustomerData?: any): P
   const splitOnlineBRL = Number(split?.online?.subtotalBRL || 0);
   const hasOnlinePayment = chargedBRL > 0 || splitOnlineBRL > 0;
 
-  const rawPm = String(parsed?.paymentMethod || parsed?.paymentData?.method || '').toUpperCase().trim();
+  const rawPm = String(
+    res?.paymentMethod ||
+    parsed?.paymentMethod ||
+    parsed?.paymentData?.method ||
+    (quoteFromResponse?.isPrepaid === 'N' ? 'BALCAO' : '') ||
+    ''
+  ).toUpperCase().trim();
   let paymentMethod: 'PIX' | 'CREDIT' | 'BALCAO' | 'VOUCHER' | 'UNKNOWN' = 'UNKNOWN';
 
   if (rawPm === 'PIX' || isPendingPix) {
     paymentMethod = 'PIX';
-  } else if (rawPm === 'CREDIT' || rawPm === 'CARTAO' || parsed?.creditCard || parsed?.cardLastFour || parsed?.cieloPaymentId || status === 'CONFIRMED_PREPAID') {
-    paymentMethod = 'CREDIT';
+  } else if (rawPm === 'BALCAO' || status === 'CONFIRMED_NON_PREPAID' || quoteFromResponse?.isPrepaid === 'N') {
+    paymentMethod = 'BALCAO';
   } else if (rawPm === 'VOUCHER' || status === 'VOUCHER') {
     paymentMethod = 'VOUCHER';
-  } else if (rawPm === 'BALCAO' || status === 'CONFIRMED_NON_PREPAID') {
-    paymentMethod = 'BALCAO';
+  } else if (rawPm === 'CREDIT' || rawPm === 'CARTAO' || parsed?.creditCard || parsed?.cardLastFour || parsed?.cieloPaymentId || status === 'CONFIRMED_PREPAID') {
+    paymentMethod = 'CREDIT';
   } else if (hasOnlinePayment) {
     paymentMethod = 'CREDIT';
   } else if (status === 'ON_REQUEST' || status === 'CONFIRMED') {
@@ -161,7 +167,8 @@ export function computeReservationMetrics(res: any, parsedCustomerData?: any): P
   const isCreditCard = paymentMethod === 'CREDIT' && !isCancelled;
   const isCounter = paymentMethod === 'BALCAO' && !isCancelled;
   const isVoucher = paymentMethod === 'VOUCHER' && !isCancelled;
-  const isPrepaid = isPixPaid || isCreditCard || (hasOnlinePayment && !isCancelled);
+  // Se for balcão (pagamento na retirada), NUNCA é pré-pago
+  const isPrepaid = paymentMethod !== 'BALCAO' && (isPixPaid || isCreditCard || (hasOnlinePayment && !isCancelled));
 
   // Cobranças específicas de balcão (Aeroporto, acessórios, extras)
   const AIRPORT_CODES = ['APF','APT','AIRPORTFEE','APS','ASF','APF2','APTF','STF'];

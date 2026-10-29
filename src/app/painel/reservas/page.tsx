@@ -2396,13 +2396,17 @@ export default function PainelReservas() {
                                               <span className="font-semibold text-emerald-400">
                                                  R$ {metrics.onlinePaidBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                               </span>
-                                              {metrics.onlinePaidEUR > 0 ? <span className="text-gray-400 text-xs"> (€ {metrics.onlinePaidEUR.toFixed(2)})</span> : null}
+                                              {metrics.onlinePaidEUR > 0 && metrics.currencyLocal !== 'BRL' ? <span className="text-gray-400 text-xs"> (€ {metrics.onlinePaidEUR.toFixed(2)})</span> : null}
                                            </p>
                                            <p className="text-gray-200 mt-1">
                                               <strong>🏪 A Pagar na Retirada:</strong>{' '}
-                                              {metrics.counterDueEUR > 0.05 || metrics.counterDueBRL > 0.05 ? (
+                                              {metrics.counterDueBRL > 0.05 || (metrics.currencyLocal !== 'BRL' && metrics.counterDueEUR > 0.05) ? (
                                                  <span className="font-semibold text-amber-400">
-                                                    € {metrics.counterDueEUR.toFixed(2)} <span className="text-amber-400/80 text-xs">(~R$ {metrics.counterDueBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</span>
+                                                    {metrics.currencyLocal !== 'BRL' && metrics.counterDueEUR > 0 ? (
+                                                       <>€ {metrics.counterDueEUR.toFixed(2)} <span className="text-amber-400/80 text-xs">(~R$ {metrics.counterDueBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</span></>
+                                                    ) : (
+                                                       <>R$ {metrics.counterDueBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>
+                                                    )}
                                                  </span>
                                               ) : (
                                                  <span className="text-emerald-400 text-xs font-semibold">R$ 0,00 (Quitado online)</span>
@@ -2423,12 +2427,13 @@ export default function PainelReservas() {
                                               <span className="font-bold text-white">
                                                  R$ {metrics.totalGeralBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                               </span>
-                                              {metrics.totalGeralEUR > 0 ? <span className="text-gray-400"> (€ {metrics.totalGeralEUR.toFixed(2)})</span> : null}
+                                              {metrics.totalGeralEUR > 0 && metrics.currencyLocal !== 'BRL' ? <span className="text-gray-400"> (€ {metrics.totalGeralEUR.toFixed(2)})</span> : null}
                                            </p>
                                            <p className="text-gray-300"><strong>Câmbio:</strong> {(() => {
+                                              const cur = String(metrics.currencyLocal || parsed?.booking?.car?.currency || 'BRL').toUpperCase();
+                                              if (cur === 'BRL') return 'Moeda nacional (BRL)';
                                               const xrsRate = parseFloat(parsed?.booking?.car?.exchangeRate || parsed?.booking?.exchangeRate || '0');
                                               if (xrsRate > 0) {
-                                                const cur = String(parsed?.booking?.car?.currency || 'EUR').toUpperCase();
                                                 return `1 ${cur} = ${xrsRate.toFixed(4)} BRL`;
                                               }
                                               return '—';

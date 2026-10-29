@@ -552,4 +552,49 @@ test('Reserva com equipamentos/acessórios no balcão: o valor a pagar na retira
   assert.ok(counterFormatted.includes('€ 277,14'));
   assert.ok(counterFormatted.includes('R$ 1610,88'));
 });
+test('Reserva BALCAO (isPrepaid=N, contractID=55138134, ex: 1208660280): valor online é 0 e balcão é o total da cotação', () => {
+  const balcaoRes = {
+    resNumber: '1208660280',
+    status: 'CONFIRMED',
+    paymentMethod: 'BALCAO',
+    amountInCents: 53259, // total do contrato registrado no checkout
+    bookingResponse: JSON.stringify({
+      reservation: {
+        contractID: '55138134',
+        quote: {
+          currency: 'BRL',
+          bookingCurrencyOfTotalRateEstimate: 'BRL',
+          totalRateEstimate: '532.59',
+          totalRateEstimateInBookingCurrency: '532.59',
+          isPrepaid: 'N',
+          chargeList: {
+            chargeLine: [
+              { act: 'AS', chrgTy: '00001', chrgTyDesc: 'Basic Rental', price: '354.80', priceInBookingCurrency: '354.80' },
+              { act: 'AS', chrgTy: '00005', chrgTyDesc: 'Basic Rental-Discount', price: '-35.48', priceInBookingCurrency: '-35.48' },
+              { act: 'AS', chrgTy: '00079', chrgTyDesc: 'LOSS DAMAGE WAIVER', price: '143.80', priceInBookingCurrency: '143.80' },
+              { act: 'AS', chrgTy: '00028', chrgTyDesc: 'VAT', price: '69.47', priceInBookingCurrency: '69.47' },
+            ],
+          },
+          payerList: {
+            payer: {
+              chargeAllocatedInBookingCurrency: '532.59',
+              dueToPayInBookingCurrency: '532.59',
+              dvrName: 'Jeferson Oliveira',
+            },
+          },
+        },
+      },
+    }),
+    customerData: '{}',
+  };
 
+  const metrics = computeReservationMetrics(balcaoRes);
+
+  assert.equal(metrics.paymentMethod, 'BALCAO');
+  assert.equal(metrics.isPrepaid, false);
+  assert.equal(metrics.isCounter, true);
+  assert.equal(metrics.onlinePaidBRL, 0);
+  assert.equal(metrics.counterDueBRL, 532.59);
+  assert.equal(metrics.totalGeralBRL, 532.59);
+  assert.equal(metrics.currencyLocal, 'BRL');
+});
