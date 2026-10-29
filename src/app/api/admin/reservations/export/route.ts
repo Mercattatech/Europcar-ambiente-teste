@@ -227,12 +227,14 @@ export async function GET(req: Request) {
                activeCount++;
                activeTotalEUR += totalEURNum;
                activeTotalBRL += totalBRLNum;
-               if (metrics.isPrepaid) activePrepaidBRL += totalBRLNum;
-               else activeCounterBRL += totalBRLNum;
+               activePrepaidBRL += (metrics.onlinePaidBRL || 0);
+               activeCounterBRL += (metrics.isCounter ? totalBRLNum : (metrics.counterDueBRL || 0));
             }
 
             const totalBRLStr = totalBRLNum > 0 ? totalBRLNum.toFixed(2) : "";
             const totalEURStr = totalEURNum > 0 ? totalEURNum.toFixed(2) : "";
+            const prepaidBRLNum = metrics.onlinePaidBRL || 0;
+            const counterBRLNum = metrics.isCounter ? totalBRLNum : (metrics.counterDueBRL || 0);
 
             const row = [
                res.resNumber || "",
@@ -245,8 +247,8 @@ export async function GET(req: Request) {
                totalEURStr,
                "", // Comissão - a ser preenchido manualmente se necessário
                totalBRLStr,
-               metrics.isPrepaid && !metrics.isCancelled ? totalBRLStr : "",
-               !metrics.isPrepaid && !metrics.isCancelled ? totalBRLStr : "",
+               prepaidBRLNum > 0 && !metrics.isCancelled ? prepaidBRLNum.toFixed(2) : "",
+               counterBRLNum > 0 && !metrics.isCancelled ? counterBRLNum.toFixed(2) : "",
                getPaymentMethodLabel(res, parsed),
                car?.exchangeRate ? parseFloat(car.exchangeRate).toFixed(4) : "",
                car?.exchangeRate ? "EUR/BRL" : "",

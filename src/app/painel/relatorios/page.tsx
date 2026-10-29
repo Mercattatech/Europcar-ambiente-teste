@@ -185,13 +185,12 @@ export default function PainelRelatorios() {
 
    const totalActivePixBRL = targetReservations
       .filter(r => r.metrics.isPixPaid || (isPendingPixFilter && r.metrics.isPendingPix))
-      .reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+      .reduce((sum, r) => sum + (r.metrics.onlinePaidBRL || r.metrics.amountBRL), 0);
    const totalActiveCreditBRL = targetReservations
       .filter(r => r.metrics.isCreditCard)
-      .reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+      .reduce((sum, r) => sum + (r.metrics.onlinePaidBRL || r.metrics.amountBRL), 0);
    const totalActiveCounterBRL = targetReservations
-      .filter(r => r.metrics.isCounter)
-      .reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+      .reduce((sum, r) => sum + (r.metrics.isCounter ? r.metrics.totalGeralBRL : (r.metrics.counterDueBRL || 0)), 0);
    const totalActiveVoucherBRL = targetReservations
       .filter(r => r.metrics.isVoucher)
       .reduce((sum, r) => sum + r.metrics.amountBRL, 0);

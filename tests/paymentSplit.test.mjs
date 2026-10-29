@@ -20,6 +20,7 @@ import {
   normalizeEmailSummaryConfig,
   filterEmailHtmlByConfig,
 } from '../src/lib/email/emailSummaryConfig.ts';
+import { computeReservationMetrics } from '../src/lib/europcar/reservationMetrics.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -415,6 +416,88 @@ test('quando isZeroExcess é true com SUPER THEFT WAIVER CHARGE no XML, oculta d
   // Taxas e licenças continua presente
   assert.ok(split.online.included.some((i) => i.label === 'Taxas e licenças'));
 });
+// ── Testes de Métricas de Reserva no Painel (/painel) ────────────────────────
 
+test('computeReservationMetrics prioriza paymentSplit de customerData e calcula totalGeral, online e balcão com precisão', () => {
+  const dummyRes = {
+    id: 'res-split-001',
+    resNumber: '1208543518',
+    status: 'CONFIRMED',
+    amountInCents: 139192, // R$ 1.391,92 pago online no cartão/PIX
+    bookingResponse: JSON.stringify({
+      reservation: {
+        quote: {
+          totalRateEstimate: '251.67',
+          totalRateEstimateInBookingCurrency: '1462.83',
+          currency: 'EUR',
+          bookingCurrencyOfTotalRateEstimate: 'BRL',
+        },
+      },
+    }),
+    customerData: JSON.stringify({
+      paymentSplit: {
+        online: {
+          subtotalBRL: 1391.92,
+          subtotalLocal: 239.47,
+          currencyLocal: 'EUR',
+          items: [{ label: 'Diárias', brl: 1391.92, local: 239.47 }],
+        },
+        counter: {
+          subtotalBRL: 70.91,
+          subtotalLocal: 12.20,
+          currencyLocal: 'EUR',
+          items: [{ label: 'Taxa de Devolução (One-Way)', brl: 70.91, local: 12.20 }],
+        },
+        totalBRL: 1462.83,
+        totalLocal: 251.67,
+        currencyLocal: 'EUR',
+        hasSplit: true,
+      },
+    }),
+  };
 
+  const metrics = computeReservationMetrics(dummyRes);
 
+  assert.equal(metrics.hasSplit, true);
+  assert.equal(metrics.onlinePaidBRL, 1391.92);
+  assert.equal(metrics.counterDueBRL, 70.91);
+  assert.equal(metrics.totalGeralBRL, 1462.83);
+  assert.equal(metrics.amountBRL, 1462.83); // Total do contrato deve bater com o total geral
+  assert.equal(metrics.onlinePaidEUR, 239.47);
+  assert.equal(metrics.counterDueEUR, 12.20);
+  assert.equal(metrics.totalGeralEUR, 251.67);
+  assert.equal(metrics.currencyLocal, 'EUR');
+  assert.ok(metrics.counterNotice?.includes('12,20'));
+});
+
+test('computeReservationMetrics deriva valores corretamente mesmo sem customerData.paymentSplit (reserva legada)', () => {
+  const dummyLegacyRes = {
+    id: 'res-legacy-002',
+    resNumber: '1208543519',
+    status: 'CONFIRMED',
+    amountInCents: 100000, // R$ 1.000,00 pago online
+    bookingResponse: JSON.stringify({
+      reservation: {
+        quote: {
+          totalRateEstimate: '200.00',
+          totalRateEstimateInBookingCurrency: '1200.00', // Câmbio 6.00
+          currency: 'EUR',
+          bookingCurrencyOfTotalRateEstimate: 'BRL',
+        },
+      },
+    }),
+    customerData: '{}',
+  };
+
+  const metrics = computeReservationMetrics(dummyLegacyRes);
+
+  assert.equal(metrics.hasSplit, true);
+  assert.equal(metrics.onlinePaidBRL, 1000.00);
+  assert.equal(metrics.counterDueBRL, 200.00); // 1200 - 1000 = 200
+  assert.equal(metrics.totalGeralBRL, 1200.00);
+  assert.equal(metrics.amountBRL, 1200.00);
+  assert.equal(metrics.totalGeralEUR, 200.00);
+  // Câmbio 1200 / 200 = 6.0 -> 200 BRL / 6 = 33.33 EUR
+  assert.equal(metrics.counterDueEUR, 33.33);
+  assert.equal(metrics.onlinePaidEUR, 166.67);
+});

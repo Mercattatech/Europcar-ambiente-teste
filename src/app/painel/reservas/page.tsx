@@ -856,9 +856,11 @@ export default function PainelReservas() {
       ? cancelledList
       : activeList;
 
-   const totalActiveBRL = targetList.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
-   const totalCancelledBRL = cancelledList.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
-   const totalPendingPixBRL = pendingPixList.reduce((sum, r) => sum + r.metrics.amountBRL, 0);
+   const totalActiveBRL = targetList.reduce((sum, r) => sum + r.metrics.totalGeralBRL, 0);
+   const totalActiveOnlineBRL = targetList.reduce((sum, r) => sum + r.metrics.onlinePaidBRL, 0);
+   const totalActiveCounterBRL = targetList.reduce((sum, r) => sum + r.metrics.counterDueBRL, 0);
+   const totalCancelledBRL = cancelledList.reduce((sum, r) => sum + r.metrics.totalGeralBRL, 0);
+   const totalPendingPixBRL = pendingPixList.reduce((sum, r) => sum + r.metrics.totalGeralBRL, 0);
 
    return (
       <div className="space-y-6">
@@ -2004,7 +2006,18 @@ export default function PainelReservas() {
                   R$ {totalActiveBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                </p>
                <p className="text-[10px] text-gray-500 mt-0.5">
-                  {isPendingPixFilter ? "PIX pendente de pagamento" : isCancelledFilter ? "Reservas canceladas" : "Exclui canceladas e pendentes"}
+                  {isPendingPixFilter
+                     ? "PIX pendente de pagamento"
+                     : isCancelledFilter
+                     ? "Reservas canceladas"
+                     : (
+                        <span>
+                           <strong className="text-emerald-400">R$ {totalActiveOnlineBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong> online
+                           {totalActiveCounterBRL > 0.05 && (
+                              <span> · <strong className="text-amber-400">R$ {totalActiveCounterBRL.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong> balcão</span>
+                           )}
+                        </span>
+                     )}
                </p>
             </div>
             <div className="bg-gray-900 border border-cyan-900/30 rounded-xl p-3.5">
@@ -2080,25 +2093,36 @@ export default function PainelReservas() {
                                  )}
                               </td>
                               <td className="px-4 py-4">
-                                 <div className="font-bold text-green-400">
-                                    {metrics.isPrepaid ? (
-                                       <>
-                                          R$ {(metrics.onlinePaidBRL || metrics.amountBRL).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                          {metrics.counterDueBRL && metrics.counterDueBRL > 0.05 ? (
-                                             <div className="text-[10px] text-amber-400 font-semibold mt-0.5">
-                                                + R$ {metrics.counterDueBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} no balcão
-                                             </div>
-                                          ) : null}
-                                       </>
-                                    ) : (
-                                       <>
-                                          R$ {metrics.amountBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                          <div className="text-[10px] text-amber-400 font-semibold mt-0.5">
-                                             (no balcão)
-                                          </div>
-                                       </>
+                                 {/* Total geral da locação (bate 100% com o voucher do cliente) */}
+                                 <div className="font-bold text-white text-xs">
+                                    R$ {metrics.totalGeralBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    {metrics.totalGeralEUR > 0 && String(parsed?.booking?.car?.currency || 'EUR').toUpperCase() !== 'BRL' && (
+                                       <span className="text-gray-400 font-normal ml-1 text-[11px]">
+                                          (€ {metrics.totalGeralEUR.toFixed(2)})
+                                       </span>
                                     )}
                                  </div>
+
+                                 {metrics.isPrepaid ? (
+                                    metrics.counterDueBRL && metrics.counterDueBRL > 0.05 ? (
+                                       <div className="mt-0.5 space-y-0.5">
+                                          <div className="text-[10px] text-emerald-400 font-semibold leading-tight">
+                                             ✓ R$ {metrics.onlinePaidBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} online
+                                          </div>
+                                          <div className="text-[10px] text-amber-400 font-semibold leading-tight">
+                                             + {metrics.counterDueEUR > 0 ? `€ ${metrics.counterDueEUR.toFixed(2)} ` : ''}(~R$ {metrics.counterDueBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}) balcão
+                                          </div>
+                                       </div>
+                                    ) : (
+                                       <div className="text-[10px] text-emerald-400 font-semibold mt-0.5">
+                                          ✓ 100% pago online
+                                       </div>
+                                    )
+                                 ) : (
+                                    <div className="text-[10px] text-blue-300 font-semibold mt-0.5">
+                                       🏪 a pagar no balcão
+                                    </div>
+                                 )}
                                  <div className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1">
                                     {metrics.days ? <span>{metrics.days} dias</span> : null}
                                     {metrics.isOneWay && (
