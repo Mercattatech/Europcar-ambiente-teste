@@ -807,35 +807,58 @@ export async function POST(request: Request) {
         // Dispara para:
         //   - Pagamentos online (CREDIT capturado / PIX) em QUALQUER contrato
         //   - Voucher manual EXO
-        //   - POA (pagar no balcão): mesmo IATA do EXO — sem ele a reserva não
-        //     gera comissão para a agência (confirmado pelo dono do site).
+        // ── createVoucher: registra split ETO ou EXO no GreenWay ──────────────
+        // Fluxo em 2 etapas: bookReservation (prepaidMode=NP) → createVoucher
+        // Rafael: "VCH must have the complete data: ETO, EXO, etc."
+        //
+        // Dispara para:
+        //   - Pagamentos online (CREDIT capturado / PIX) em QUALQUER contrato
+        //   - Voucher manual EXO
+        //   - Reservas POA (balcão ou tarifa pública POA): envia o IATA do painel para comissionamento no GW
         const isPrepaidOnline = paymentData.method === 'PIX' || (paymentData.method === 'CREDIT' && !!capturedCreditCard?.captured);
         const isETO = contractID === '56935466' || contractID === '56935495';
-        // ETO: meanOfPayment vai direto no bookReservationRQ — createVoucher NÃO é suportado (Antonio/Europcar).
         const isOnlineEXO = isPrepaidOnline && !isETO;
         const isManualEXO = paymentData.method === 'VOUCHER' && voucherData?.type === 'EXO';
+        const isPoaContract = contractID === DEFAULT_POA_CID || contractID === '55138134' || bookingData.tariffType === 'POA' || paymentData.method === 'BALCAO';
         const isPoaBalcao = paymentData.method === 'BALCAO' && !isETO;
 
-        if (resNumber && (isOnlineEXO || isManualEXO || isPoaBalcao)) {
+        if (resNumber && (isOnlineEXO || isManualEXO || isPoaBalcao || isPoaContract)) {
           try {
-            const voucherAmount = car.totalRateEstimate || car.total || '0';
-            const voucherCurrency = car.bookingCurrencyOfTotalRateEstimate || car.currency || 'EUR';
+            // Usa cotação oficial confirmada pelo XRS bookReservation como prioridade máxima
+            const quoteNode = bookResNode?.quote?.$ || bookResNode?.quote;
+            const confirmedCurrency = quoteNode?.currency || quoteNode?.bookingCurrency || car.bookingCurrencyOfTotalRateEstimate || car.currency || 'EUR';
+            const confirmedTotal = quoteNode?.totalRateEstimate || quoteNode?.totalRateEstimateInBookingCurrency || car.totalRateEstimate || car.totalRateEstimateInBookingCurrency || car.total || '0';
+            const parsedNum = parseFloat(confirmedTotal);
+            const voucherAmount = !isNaN(parsedNum) && parsedNum > 0 ? parsedNum.toFixed(2) : '0.00';
+            const voucherCurrency = confirmedCurrency;
 
             let vData: any;
             if (isManualEXO) {
-              // EXO manual: usa dados do voucher enviado pelo usuário
               vData = voucherData;
-            } else if (isPoaBalcao) {
-              // POA balcão: IATA específico configurado no painel para POA
+            } else if (isPoaContract || isPoaBalcao) {
+              // POA: IATA específico configurado no painel administrativo para POA
               const { poaIata } = await getDynamicXRSContractConfig();
-              vData = { type: 'EXO', iataNumber: poaIata || '02170722' };
+              vData = { type: 'EXO', iataNumber: poaIata || '02170722', id: resNumber };
             } else {
-              // EXO online: Europcar Brasil como agência IATA (configurável no painel)
-              const { exoIata } = await getDynamicXRSContractConfig();
-              vData = { type: 'EXO', iataNumber: exoIata || '02170722' };
+              // Outros EXO online: Europcar Brasil como agência IATA
+              const { exoIata, poaIata } = await getDynamicXRSContractConfig();
+              vData = { type: 'EXO', iataNumber: exoIata || poaIata || '02170722', id: resNumber };
             }
 
-            const createVoucherXml = buildCreateVoucherXml(resNumber, vData, voucherAmount, voucherCurrency, carCategory, pickupDate, returnDate);
+            const createVoucherXml = buildCreateVoucherXml(
+              resNumber,
+              vData,
+              voucherAmount,
+              voucherCurrency,
+              carCategory,
+              pickupDate,
+              returnDate,
+              bookingData.pickupTime || '1000',
+              bookingData.returnTime || '1000',
+              bookingData.duration,
+              pickupStation,
+              bookingData.stationCountry || customerData.pais,
+            );
 
             const voucherRes = await callXRS(createVoucherXml, {
               callerCode: process.env.XRS_CALLER_CODE || 'DEMO',
@@ -847,7 +870,7 @@ export async function POST(request: Request) {
             if (voucherErrors) {
               console.error(`[reservas] ⚠️ GW recusou createVoucher (${vData.type}, IATA ${vData.iataNumber || '-'}) para ${resNumber}:`, JSON.stringify(voucherErrors));
             } else {
-              console.log(`[reservas] createVoucher (${vData.type}, IATA ${vData.iataNumber || '-'}) aceito pelo GW para a reserva ${resNumber}`);
+              console.log(`[reservas] createVoucher (${vData.type}, IATA ${vData.iataNumber || '-'}, valor ${voucherCurrency} ${voucherAmount}) aceito pelo GW para a reserva ${resNumber}`);
             }
           } catch (voucherErr: any) {
             // createVoucher falhar NÃO deve abortar a reserva — o resNumber já existe.

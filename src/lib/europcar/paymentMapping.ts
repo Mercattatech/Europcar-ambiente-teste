@@ -4,9 +4,6 @@
 // reservas/route.ts (fluxo síncrono: CREDIT/BALCAO/VOUCHER) e bookXRS.ts
 // (fluxo assíncrono: PIX confirmado).
 
-import { escapeXml } from '@/lib/europcar/xmlEscape';
-import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
-
 export const CID_TO_BA: Record<string, string> = {
   '56935466': '73675595',  // ETO Líquido (Excesso)
   '56935495': '73804373',  // ETO Internacional (Excesso Zero)
@@ -46,6 +43,17 @@ export interface PaymentAttrsContext {
   merchantOrderId?: string;
 }
 
+/** Escapa caracteres especiais XML para atributos ou nós */
+function escapeXml(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function voucherDurationDays(
   pickupDate?: string,
   returnDate?: string,
@@ -55,15 +63,44 @@ function voucherDurationDays(
   station?: string,
   country?: string
 ): number {
-  return calculateRentalDays({
-    pickupDate,
-    pickupTime,
-    returnDate,
-    returnTime,
-    station,
-    country,
-    apiDuration,
-  });
+  if (typeof apiDuration === 'number' && apiDuration > 0) return apiDuration;
+  if (!pickupDate || !returnDate) return 0;
+
+  const cleanPick = pickupDate.replace(/\D/g, '');
+  const cleanRet = returnDate.replace(/\D/g, '');
+  if (cleanPick.length >= 8 && cleanRet.length >= 8) {
+    const y1 = parseInt(cleanPick.slice(0, 4), 10);
+    const m1 = parseInt(cleanPick.slice(4, 6), 10) - 1;
+    const d1 = parseInt(cleanPick.slice(6, 8), 10);
+    const y2 = parseInt(cleanRet.slice(0, 4), 10);
+    const m2 = parseInt(cleanRet.slice(4, 6), 10) - 1;
+    const d2 = parseInt(cleanRet.slice(6, 8), 10);
+
+    const tPick = (pickupTime || '1000').replace(/\D/g, '').padEnd(4, '0');
+    const h1 = parseInt(tPick.slice(0, 2), 10) || 0;
+    const min1 = parseInt(tPick.slice(2, 4), 10) || 0;
+
+    const tRet = (returnTime || '1000').replace(/\D/g, '').padEnd(4, '0');
+    const h2 = parseInt(tRet.slice(0, 2), 10) || 0;
+    const min2 = parseInt(tRet.slice(2, 4), 10) || 0;
+
+    const dt1 = new Date(Date.UTC(y1, m1, d1, h1, min1));
+    const dt2 = new Date(Date.UTC(y2, m2, d2, h2, min2));
+
+    const diffMs = dt2.getTime() - dt1.getTime();
+    if (diffMs <= 0) return 0;
+
+    const diffHours = diffMs / (1000 * 60 * 60);
+    const fullDays = Math.floor(diffHours / 24);
+    const remainingMinutes = (diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60);
+
+    const isBrazil = (country && ['BR', 'BRA', 'BRASIL', 'BRAZIL'].includes(country.toUpperCase())) ||
+      (station && station.toUpperCase().startsWith('POA'));
+    const graceMinutes = isBrazil ? 59 : 29;
+
+    return remainingMinutes > graceMinutes ? fullDays + 1 : Math.max(1, fullDays);
+  }
+  return 0;
 }
 
 /** Constrói o fragmento <meanOfPayment typeCode="VCH" .../> para o bookReservation inicial.
@@ -182,37 +219,46 @@ export function buildCreateVoucherXml(
   country?: string,
 ): string {
   const isETO = voucherData.type === 'ETO';
+  const duration = voucherDurationDays(
+    pickupDate,
+    returnDate,
+    pickupTime,
+    returnTime,
+    apiDuration,
+    station,
+    country,
+  );
+
+  // Antonio/Rafael (Europcar): voucherID deve ser numérico, máximo 8 dígitos
+  const rawId = voucherData.id || resNumber;
+  const numericVoucherID = (rawId && /^\d{1,8}$/.test(rawId.replace(/\D/g, '')))
+    ? rawId.replace(/\D/g, '').slice(-8)
+    : Date.now().toString().slice(-8);
+
+  const durationAttr = duration > 0 ? ` voucherRentalDuration="${escapeXml(String(duration))}"` : '';
+  const carCategoryAttr = carCategory ? ` voucherCarCategory="${escapeXml(carCategory)}"` : '';
 
   if (isETO) {
-    const duration = voucherDurationDays(
-      pickupDate,
-      returnDate,
-      pickupTime,
-      returnTime,
-      apiDuration,
-      station,
-      country,
-    );
     return `<?xml version="1.0" encoding="UTF-8"?>
 <message>
   <serviceRequest serviceCode="createVoucher">
     <serviceParameters>
       <reservation resNumber="${escapeXml(resNumber)}">
-        <meanOfPayment typeCode="VCH" voucherType="ETO" businessAccount="${escapeXml(voucherData.businessAccount || '')}" voucherAmount="${escapeXml(voucherAmount)}" voucherCurrency="${escapeXml(voucherCurrency)}" voucherCarCategory="${escapeXml(carCategory || '')}" voucherRentalDuration="${escapeXml(duration)}"/>
+        <meanOfPayment typeCode="VCH" voucherType="ETO" voucherID="${escapeXml(numericVoucherID)}" businessAccount="${escapeXml(voucherData.businessAccount || '')}" voucherAmount="${escapeXml(voucherAmount)}" voucherCurrency="${escapeXml(voucherCurrency)}"${carCategoryAttr}${durationAttr}/>
       </reservation>
     </serviceParameters>
   </serviceRequest>
 </message>`;
   }
 
-  // EXO (Voucher de Agência): estrutura exata homologada por Antonio (Europcar)
+  // EXO (Voucher de Agência / POA): dados completos de meanOfPayment VCH exigidos pelo GreenWay (Rafael/Europcar)
   const iata = voucherData.iataNumber || '02170722';
   return `<?xml version="1.0" encoding="UTF-8"?>
 <message>
   <serviceRequest serviceCode="createVoucher">
     <serviceParameters>
       <reservation resNumber="${escapeXml(resNumber)}">
-        <meanOfPayment typeCode="VCH" voucherType="EXO" IATANumber="${escapeXml(iata)}" voucherAmount="${escapeXml(voucherAmount)}" voucherCurrency="${escapeXml(voucherCurrency)}"/>
+        <meanOfPayment typeCode="VCH" voucherType="EXO" voucherID="${escapeXml(numericVoucherID)}" IATANumber="${escapeXml(iata)}" voucherAmount="${escapeXml(voucherAmount)}" voucherCurrency="${escapeXml(voucherCurrency)}"${carCategoryAttr}${durationAttr}/>
       </reservation>
     </serviceParameters>
   </serviceRequest>

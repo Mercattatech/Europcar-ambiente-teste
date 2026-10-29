@@ -21,6 +21,7 @@ import {
   filterEmailHtmlByConfig,
 } from '../src/lib/email/emailSummaryConfig.ts';
 import { computeReservationMetrics } from '../src/lib/europcar/reservationMetrics.ts';
+import { buildCreateVoucherXml } from '../src/lib/europcar/paymentMapping.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -372,21 +373,44 @@ test('filterEmailHtmlByConfig — remove blocos e seções conforme configuraç�
   assert.ok(!filtered.includes('europcar.com.br/reservas'));
 });
 
-test('POA IATA — envia IATANumber 02170722 nas reservas POA / EXO para comissionamento da agência no GW', () => {
+test('POA IATA — envia IATANumber 02170722 nas reservas POA / EXO com payload VCH completo no GW', () => {
   const DEFAULT_POA_IATA = '02170722';
   assert.equal(DEFAULT_POA_IATA, '02170722');
 
-  const buildCreateVoucherFragment = (resNumber, iata, amount, cur) =>
-    `<meanOfPayment typeCode="VCH" voucherType="EXO" IATANumber="${iata}" voucherAmount="${amount}" voucherCurrency="${cur}"/>`;
+  const xmlDefault = buildCreateVoucherXml(
+    '1208543518',
+    { type: 'EXO', iataNumber: DEFAULT_POA_IATA },
+    '100.00',
+    'EUR',
+    'MDMR',
+    '20261101',
+    '20261108',
+  );
 
-  const xmlDefault = buildCreateVoucherFragment('1208543518', DEFAULT_POA_IATA, '100.00', 'EUR');
-  assert.ok(xmlDefault.includes('IATANumber="02170722"'));
+  assert.ok(xmlDefault.includes('serviceCode="createVoucher"'));
+  assert.ok(xmlDefault.includes('resNumber="1208543518"'));
   assert.ok(xmlDefault.includes('voucherType="EXO"'));
+  assert.ok(xmlDefault.includes('IATANumber="02170722"'));
   assert.ok(xmlDefault.includes('voucherAmount="100.00"'));
+  assert.ok(xmlDefault.includes('voucherCurrency="EUR"'));
+  assert.ok(xmlDefault.includes('voucherCarCategory="MDMR"'));
+  assert.ok(xmlDefault.includes('voucherRentalDuration="7"'));
+  assert.ok(xmlDefault.includes('voucherID='));
 
   // Custom IATA alterado no painel administrativo
-  const xmlCustom = buildCreateVoucherFragment('1208543518', '99887766', '100.00', 'EUR');
+  const xmlCustom = buildCreateVoucherXml(
+    '1208543519',
+    { type: 'EXO', iataNumber: '99887766' },
+    '250.50',
+    'EUR',
+    'CDMR',
+    '20261101',
+    '20261104',
+  );
   assert.ok(xmlCustom.includes('IATANumber="99887766"'));
+  assert.ok(xmlCustom.includes('voucherAmount="250.50"'));
+  assert.ok(xmlCustom.includes('voucherCarCategory="CDMR"'));
+  assert.ok(xmlCustom.includes('voucherRentalDuration="3"'));
 });
 
 test('quando isZeroExcess é true com SUPER THEFT WAIVER CHARGE no XML, oculta do resumo e mantém apenas Franquia Zero', async () => {

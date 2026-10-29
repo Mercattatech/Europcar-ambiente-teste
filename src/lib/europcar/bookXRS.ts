@@ -302,33 +302,46 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
 
   // ── createVoucher: registra split ETO ou EXO no GreenWay ──────────────
   // Fluxo em 2 etapas: bookReservation (prepaidMode=NP) → createVoucher
-  // Mesma lógica de reservas/route.ts (fluxo síncrono CREDIT) — aqui cobre
-  // o fluxo assíncrono PIX (confirmado via pix-status/cron/sync-pix).
   const isPrepaidOnline = paymentData.method === 'PIX' || paymentData.method === 'CREDIT';
   const isETO = contractID === '56935466' || contractID === '56935495';
-  // ETO: meanOfPayment vai direto no bookReservationRQ — createVoucher NÃO é suportado (Antonio/Europcar).
   const isOnlineEXO = isPrepaidOnline && !isETO;
   const isManualEXO = paymentData.method === 'VOUCHER' && voucherData?.type === 'EXO';
-  // POA (pagar no balcão): mesmo IATA do EXO — necessário para a comissão da agência.
+  const isPoaContract = contractID === DEFAULT_POA_CID || contractID === '55138134' || bookingData.tariffType === 'POA' || paymentData.method === 'BALCAO';
   const isPoaBalcao = paymentData.method === 'BALCAO' && !isETO;
 
-  if (resNumber && (isOnlineEXO || isManualEXO || isPoaBalcao)) {
+  if (resNumber && (isOnlineEXO || isManualEXO || isPoaBalcao || isPoaContract)) {
     try {
-      const voucherAmount = car.totalRateEstimate || car.total || '0';
-      const voucherCurrency = car.bookingCurrencyOfTotalRateEstimate || car.currency || 'EUR';
+      const confirmedCurrency = quoteNode?.currency || quoteNode?.bookingCurrency || car.bookingCurrencyOfTotalRateEstimate || car.currency || 'EUR';
+      const confirmedTotal = quoteNode?.totalRateEstimate || quoteNode?.totalRateEstimateInBookingCurrency || car.totalRateEstimate || car.totalRateEstimateInBookingCurrency || car.total || '0';
+      const parsedNum = parseFloat(confirmedTotal);
+      const voucherAmount = !isNaN(parsedNum) && parsedNum > 0 ? parsedNum.toFixed(2) : '0.00';
+      const voucherCurrency = confirmedCurrency;
 
       let vData: any;
       if (isManualEXO) {
         vData = voucherData;
-      } else if (isPoaBalcao) {
+      } else if (isPoaContract || isPoaBalcao) {
         const { poaIata } = await getDynamicXRSContractConfig();
-        vData = { type: 'EXO', iataNumber: poaIata || '02170722' };
+        vData = { type: 'EXO', iataNumber: poaIata || '02170722', id: resNumber };
       } else {
-        const { exoIata } = await getDynamicXRSContractConfig();
-        vData = { type: 'EXO', iataNumber: exoIata || '02170722' };
+        const { exoIata, poaIata } = await getDynamicXRSContractConfig();
+        vData = { type: 'EXO', iataNumber: exoIata || poaIata || '02170722', id: resNumber };
       }
 
-      const createVoucherXml = buildCreateVoucherXml(resNumber, vData, voucherAmount, voucherCurrency, carCategory, pickupDate, returnDate);
+      const createVoucherXml = buildCreateVoucherXml(
+        resNumber,
+        vData,
+        voucherAmount,
+        voucherCurrency,
+        carCategory,
+        pickupDate,
+        returnDate,
+        bookingData.pickupTime || '1000',
+        bookingData.returnTime || '1000',
+        bookingData.duration,
+        pickupStation,
+        bookingData.stationCountry || customerData.pais,
+      );
 
       const voucherRes = await callXRS(createVoucherXml, {
         callerCode: process.env.XRS_CALLER_CODE || 'DEMO',
@@ -340,7 +353,7 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
       if (voucherErrors) {
         console.error(`[xrsBook] ⚠️ GW recusou createVoucher (${vData.type}, IATA ${vData.iataNumber || '-'}) para ${resNumber}:`, JSON.stringify(voucherErrors));
       } else {
-        console.log(`[xrsBook] createVoucher (${vData.type}, IATA ${vData.iataNumber || '-'}) aceito pelo GW para a reserva ${resNumber}`);
+        console.log(`[xrsBook] createVoucher (${vData.type}, IATA ${vData.iataNumber || '-'}, valor ${voucherCurrency} ${voucherAmount}) aceito pelo GW para a reserva ${resNumber}`);
       }
     } catch (voucherErr: any) {
       console.error(`[xrsBook] Erro ao criar voucher para ${resNumber}:`, voucherErr.message);

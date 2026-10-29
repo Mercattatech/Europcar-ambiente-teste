@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { callXRS, DEFAULT_POA_CID, getDynamicXRSContractConfig } from '@/lib/europcar/xrsClient';
+import { callXRS, DEFAULT_POA_CID, getDynamicXRSContractConfig, getXRSErrors } from '@/lib/europcar/xrsClient';
+import { buildCreateVoucherXml } from '@/lib/europcar/paymentMapping';
 import { isValidXRSDate, isValidXRSTime } from '@/lib/europcar/validate';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
@@ -210,28 +211,41 @@ export async function POST(request: Request) {
 
     if (resNumber && (isVoucherEXO || isPoa)) {
       try {
-        const voucherAmount = body.car?.totalRateEstimate || body.car?.total || '0';
-        const voucherCurrency = body.car?.bookingCurrencyOfTotalRateEstimate || body.car?.currency || 'EUR';
+        const quoteNode = xrsResponse?.message?.serviceResponse?.reservation?.quote?.$ || xrsResponse?.serviceResponse?.reservation?.quote?.$ || body.car?.quote;
+        const confirmedCurrency = quoteNode?.currency || quoteNode?.bookingCurrency || body.car?.currency || body.car?.bookingCurrencyOfTotalRateEstimate || 'EUR';
+        const confirmedTotal = quoteNode?.totalRateEstimate || quoteNode?.totalRateEstimateInBookingCurrency || body.car?.totalRateEstimate || body.car?.total || '0';
+        const parsedNum = parseFloat(confirmedTotal);
+        const voucherAmount = !isNaN(parsedNum) && parsedNum > 0 ? parsedNum.toFixed(2) : '0.00';
+        const voucherCurrency = confirmedCurrency;
+
         const { poaIata, exoIata } = await getDynamicXRSContractConfig();
         const iataNumber = isVoucherEXO ? (voucherData?.iataNumber || exoIata || '02170722') : (poaIata || '02170722');
+        const vData = { type: 'EXO', iataNumber, id: resNumber };
 
-        const createVoucherXml = `<?xml version="1.0" encoding="UTF-8"?>
-<message>
-  <serviceRequest serviceCode="createVoucher">
-    <serviceParameters>
-      <reservation resNumber="${escapeXml(resNumber)}">
-        <meanOfPayment typeCode="VCH" voucherType="EXO" IATANumber="${escapeXml(iataNumber)}" voucherAmount="${escapeXml(voucherAmount)}" voucherCurrency="${escapeXml(voucherCurrency)}"/>
-      </reservation>
-    </serviceParameters>
-  </serviceRequest>
-</message>`;
-        await callXRS(createVoucherXml, {
+        const createVoucherXml = buildCreateVoucherXml(
+          resNumber,
+          vData,
+          voucherAmount,
+          voucherCurrency,
+          carCategory,
+          pickupDate,
+          returnDate,
+          pickupTime || '1000',
+          returnTime || '1000',
+        );
+
+        const voucherRes = await callXRS(createVoucherXml, {
           callerCode: process.env.XRS_CALLER_CODE || 'DEMO',
           password: process.env.XRS_PASSWORD || 'DEMO',
           action: 'createVoucher',
           sourceFile: 'bookReservation/route.ts'
         });
-        console.log(`[bookReservation] createVoucher (${isVoucherEXO ? 'EXO' : 'POA'}, IATA ${iataNumber}) enviado com sucesso para a reserva ${resNumber}`);
+        const voucherErrors = getXRSErrors(voucherRes);
+        if (voucherErrors) {
+          console.error(`[bookReservation] ⚠️ GW recusou createVoucher (${isVoucherEXO ? 'EXO' : 'POA'}, IATA ${iataNumber}) para ${resNumber}:`, JSON.stringify(voucherErrors));
+        } else {
+          console.log(`[bookReservation] createVoucher (${isVoucherEXO ? 'EXO' : 'POA'}, IATA ${iataNumber}, valor ${voucherCurrency} ${voucherAmount}) aceito pelo GW para a reserva ${resNumber}`);
+        }
       } catch (voucherErr: any) {
         console.error(`[bookReservation] Erro ao criar voucher para ${resNumber}:`, voucherErr.message);
       }

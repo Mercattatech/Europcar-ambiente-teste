@@ -220,10 +220,12 @@ export function getXRSErrors(parsedData: any): any {
   if (parsedData?.Errors) return parsedData.Errors;
   if (parsedData?.Response?.Errors) return parsedData.Response.Errors;
   if (parsedData?.Envelope?.Body?.Fault) return parsedData.Envelope.Body.Fault;
-  // XRS serviceResponse with returnCode="KO" and errorList (age validation, etc.)
+  // XRS serviceResponse with returnCode="KO" e errorList/errors
   const sr = parsedData?.message?.serviceResponse || parsedData?.serviceResponse;
-  const status = sr?.status?.$ || sr?.status;
-  if (status?.returnCode === 'KO' && sr?.errorList) return sr.errorList;
+  const retCode = sr?.$?.returnCode || sr?.returnCode || sr?.status?.$?.returnCode || sr?.status?.returnCode;
+  if (retCode === 'KO') {
+    return sr?.errorList || sr?.errors || sr?.error || sr?.$?.errorCode || sr?.errorCode || { returnCode: 'KO' };
+  }
   return null;
 }
 
