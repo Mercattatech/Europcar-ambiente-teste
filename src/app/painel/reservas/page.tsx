@@ -2096,7 +2096,7 @@ export default function PainelReservas() {
                                  {/* Total geral da locação (bate 100% com o voucher do cliente) */}
                                  <div className="font-bold text-white text-xs">
                                     R$ {metrics.totalGeralBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                    {metrics.totalGeralEUR > 0 && String(parsed?.booking?.car?.currency || 'EUR').toUpperCase() !== 'BRL' && (
+                                    {metrics.totalGeralEUR > 0 && metrics.currencyLocal !== 'BRL' && (
                                        <span className="text-gray-400 font-normal ml-1 text-[11px]">
                                           (€ {metrics.totalGeralEUR.toFixed(2)})
                                        </span>
