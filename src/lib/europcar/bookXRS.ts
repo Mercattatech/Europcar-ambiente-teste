@@ -1,4 +1,4 @@
-import { callXRS, DEFAULT_POA_CID, DEFAULT_POA_IATA, getDynamicXRSContractConfig, getXRSErrors } from '@/lib/europcar/xrsClient';
+import { callXRS, DEFAULT_POA_CID, getDynamicXRSContractConfig, getXRSErrors } from '@/lib/europcar/xrsClient';
 import { buildReservationPaymentAttrs, buildCreateVoucherXml, CID_TO_BA } from '@/lib/europcar/paymentMapping';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { parsePayerList } from '@/lib/europcar/parsePayerList';
@@ -29,11 +29,6 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
   let rateId = car.rateId;
   let productDataAttr = '';
 
-  const xrsContractConfig = await getDynamicXRSContractConfig();
-  const resolvedPoaIata = xrsContractConfig.poaIata || DEFAULT_POA_IATA;
-  const isETO = contractID === '56935466' || contractID === '56935495' || (voucherData && voucherData.type === 'ETO');
-  const isPOA = !isETO || contractID === xrsContractConfig.poaCid || contractID === DEFAULT_POA_CID || contractID === '55138134' || bookingData.tariffType === 'POA' || paymentData.method === 'BALCAO';
-
   // Pagamento já capturado pela Cielo antes desta função ser chamada (PIX confirmado,
   // ou reprocessamento de CREDIT) → prepaidMode="PP" com valor e percentual quitados.
   const paymentAttrs = buildReservationPaymentAttrs({
@@ -46,7 +41,6 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
     pickupDate,
     returnDate,
     merchantOrderId: paymentData.merchantOrderId,
-    iataNumber: isPOA ? resolvedPoaIata : undefined,
   });
 
   // Refresh rateId via getQuote
@@ -136,7 +130,7 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
 <message>
 <serviceRequest serviceCode="bookReservation">
 <serviceParameters>
-  <reservation carCategory="${escapeXml(carCategory)}" rateId="${escapeXml(rateId)}"${paymentAttrs.prepaidAttrs}${paymentAttrs.iataAttr || ''}${contractAttr}${productDataAttr} chargesDetail="TRE" preferredLanguage="${escapeXml(bookingData.xrsLanguage || 'pt_BR')}" email="${escapeXml(customerData.email.trim())}"${flightAttr}>
+  <reservation carCategory="${escapeXml(carCategory)}" rateId="${escapeXml(rateId)}"${paymentAttrs.prepaidAttrs}${contractAttr}${productDataAttr} chargesDetail="TRE" preferredLanguage="${escapeXml(bookingData.xrsLanguage || 'pt_BR')}" email="${escapeXml(customerData.email.trim())}"${flightAttr}>
     <checkout stationID="${escapeXml(pickupStation)}" date="${escapeXml(pickupDate)}" time="${escapeXml(bookingData.pickupTime || '1000')}"/>
     <checkin stationID="${escapeXml(returnStation)}" date="${escapeXml(returnDate)}" time="${escapeXml(bookingData.returnTime || '1000')}"/>
     <equipmentList>${equipmentXml}</equipmentList>${insuranceXml ? `\n        <insuranceList>${insuranceXml}\n        </insuranceList>` : ''}${paymentAttrs.meanOfPaymentXml}${loyaltyXml}
@@ -309,6 +303,7 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
   // ── createVoucher: registra split ETO ou EXO no GreenWay ──────────────
   // Fluxo em 2 etapas: bookReservation (prepaidMode=NP) → createVoucher
   const isPrepaidOnline = paymentData.method === 'PIX' || paymentData.method === 'CREDIT';
+  const isETO = contractID === '56935466' || contractID === '56935495';
   const isOnlineEXO = isPrepaidOnline && !isETO;
   const isManualEXO = paymentData.method === 'VOUCHER' && voucherData?.type === 'EXO';
   const isPoaContract = contractID === DEFAULT_POA_CID || contractID === '55138134' || bookingData.tariffType === 'POA' || paymentData.method === 'BALCAO';
@@ -326,9 +321,11 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
       if (isManualEXO) {
         vData = voucherData;
       } else if (isPoaContract || isPoaBalcao) {
-        vData = { type: 'EXO', iataNumber: resolvedPoaIata, id: resNumber };
+        const { poaIata } = await getDynamicXRSContractConfig();
+        vData = { type: 'EXO', iataNumber: poaIata || '02170722', id: resNumber };
       } else {
-        vData = { type: 'EXO', iataNumber: xrsContractConfig.exoIata || resolvedPoaIata, id: resNumber };
+        const { exoIata, poaIata } = await getDynamicXRSContractConfig();
+        vData = { type: 'EXO', iataNumber: exoIata || poaIata || '02170722', id: resNumber };
       }
 
       const createVoucherXml = buildCreateVoucherXml(

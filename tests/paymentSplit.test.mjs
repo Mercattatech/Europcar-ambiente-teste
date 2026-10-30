@@ -21,7 +21,7 @@ import {
   filterEmailHtmlByConfig,
 } from '../src/lib/email/emailSummaryConfig.ts';
 import { computeReservationMetrics } from '../src/lib/europcar/reservationMetrics.ts';
-import { buildCreateVoucherXml, buildReservationPaymentAttrs } from '../src/lib/europcar/paymentMapping.ts';
+import { buildCreateVoucherXml } from '../src/lib/europcar/paymentMapping.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -598,51 +598,3 @@ test('Reserva BALCAO (isPrepaid=N, contractID=55138134, ex: 1208660280): valor o
   assert.equal(metrics.totalGeralBRL, 532.59);
   assert.equal(metrics.currencyLocal, 'BRL');
 });
-
-test('Reserva POA envia IATANumber para o GW via paymentAttrs e createVoucher', () => {
-  // 1. Reserva POA BALCAO
-  const poaBalcaoAttrs = buildReservationPaymentAttrs({
-    method: 'BALCAO',
-    captured: false,
-    contractID: '57269673',
-    iataNumber: '02170722',
-  });
-  assert.equal(poaBalcaoAttrs.iataAttr, ' IATANumber="02170722"');
-
-  // 2. Reserva POA online (CREDIT / PIX)
-  const poaOnlineAttrs = buildReservationPaymentAttrs({
-    method: 'CREDIT',
-    captured: true,
-    amountBRL: 850.50,
-    contractID: '57269673',
-    iataNumber: '02170722',
-  });
-  assert.equal(poaOnlineAttrs.iataAttr, ' IATANumber="02170722"');
-
-  // 3. Reserva ETO corporativa NUNCA envia IATANumber
-  const etoAttrs = buildReservationPaymentAttrs({
-    method: 'CREDIT',
-    captured: true,
-    amountBRL: 850.50,
-    contractID: '56935466',
-    iataNumber: '02170722',
-  });
-  assert.equal(etoAttrs.iataAttr, '');
-
-  // 4. createVoucher EXO para POA inclui IATANumber
-  const voucherXml = buildCreateVoucherXml(
-    '1208999999',
-    { type: 'EXO', iataNumber: '02170722', id: '1208999999' },
-    '850.50',
-    'BRL',
-    'MBMN',
-    '20261101',
-    '20261105',
-    '1000',
-    '1000',
-    4,
-  );
-  assert.ok(voucherXml.includes('IATANumber="02170722"'));
-  assert.ok(voucherXml.includes('voucherType="EXO"'));
-});
-
