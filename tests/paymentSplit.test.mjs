@@ -21,7 +21,7 @@ import {
   filterEmailHtmlByConfig,
 } from '../src/lib/email/emailSummaryConfig.ts';
 import { computeReservationMetrics } from '../src/lib/europcar/reservationMetrics.ts';
-import { buildCreateVoucherXml } from '../src/lib/europcar/paymentMapping.ts';
+import { buildCreateVoucherXml, buildReservationPaymentAttrs } from '../src/lib/europcar/paymentMapping.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -598,3 +598,38 @@ test('Reserva BALCAO (isPrepaid=N, contractID=55138134, ex: 1208660280): valor o
   assert.equal(metrics.totalGeralBRL, 532.59);
   assert.equal(metrics.currencyLocal, 'BRL');
 });
+
+test('Reserva POA é SEMPRE no destino (prepaidMode="NP") e envia IATANumber para o GW', () => {
+  // 1. Reserva POA BALCAO: prepaidMode="NP" (pagamento no destino) + IATANumber
+  const poaBalcaoAttrs = buildReservationPaymentAttrs({
+    method: 'BALCAO',
+    captured: false,
+    contractID: '57269673',
+    iataNumber: '02170722',
+  });
+  assert.equal(poaBalcaoAttrs.prepaidAttrs, ' prepaidMode="NP"');
+  assert.equal(poaBalcaoAttrs.iataAttr, ' IATANumber="02170722"');
+
+  // 2. Reserva POA online/qualquer: prepaidMode="NP" (sempre destino) + IATANumber
+  const poaOnlineAttrs = buildReservationPaymentAttrs({
+    method: 'CREDIT',
+    captured: true,
+    amountBRL: 850.50,
+    contractID: '57269673',
+    iataNumber: '02170722',
+  });
+  assert.equal(poaOnlineAttrs.prepaidAttrs, ' prepaidMode="NP"');
+  assert.equal(poaOnlineAttrs.iataAttr, ' IATANumber="02170722"');
+
+  // 3. Reserva ETO corporativa NUNCA envia IATANumber
+  const etoAttrs = buildReservationPaymentAttrs({
+    method: 'CREDIT',
+    captured: true,
+    amountBRL: 850.50,
+    contractID: '56935466',
+    iataNumber: '02170722',
+  });
+  assert.equal(etoAttrs.iataAttr, '');
+  assert.equal(etoAttrs.prepaidAttrs, '');
+});
+

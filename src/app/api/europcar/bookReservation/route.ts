@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { callXRS, DEFAULT_POA_CID, getDynamicXRSContractConfig, getXRSErrors } from '@/lib/europcar/xrsClient';
+import { callXRS, DEFAULT_POA_CID, DEFAULT_POA_IATA, getDynamicXRSContractConfig, getXRSErrors } from '@/lib/europcar/xrsClient';
 import { buildCreateVoucherXml } from '@/lib/europcar/paymentMapping';
 import { isValidXRSDate, isValidXRSTime } from '@/lib/europcar/validate';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
@@ -29,9 +29,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Horário inválido. Use o formato HHMM.' }, { status: 400 });
     }
 
+    const xrsContractConfig = await getDynamicXRSContractConfig();
+    const resolvedPoaIata = xrsContractConfig.poaIata || DEFAULT_POA_IATA;
+
     // Use POA CID as default when no contractID is provided
     const effectiveCID = contractID || DEFAULT_POA_CID;
     const contractAttr = ` contractID="${escapeXml(effectiveCID)}" type="C"`;
+    const isETO = effectiveCID === '56935466' || effectiveCID === '56935495' || (voucherData && voucherData.type === 'ETO');
+    const isPoa = !isETO && (!voucherData || voucherData.type === 'POA' || effectiveCID === xrsContractConfig.poaCid || effectiveCID === DEFAULT_POA_CID);
+    const iataAttr = (isPoa && resolvedPoaIata) ? ` IATANumber="${escapeXml(resolvedPoaIata)}"` : '';
 
     // CID to BA mapping for ETO vouchers (provided by Europcar)
     const cidToBa: Record<string, string> = {
@@ -116,7 +122,7 @@ export async function POST(request: Request) {
 <message>
   <serviceRequest serviceCode="bookReservation">
     <serviceParameters>
-      <reservation carCategory="${escapeXml(carCategory)}" rateId="${escapeXml(rateId)}" chargesDetail="TRE"${prepaidModeAttr}${contractAttr} email="${escapeXml(driverData?.email || '')}"${flightAttr}>
+      <reservation carCategory="${escapeXml(carCategory)}" rateId="${escapeXml(rateId)}" chargesDetail="TRE"${prepaidModeAttr}${iataAttr}${contractAttr} email="${escapeXml(driverData?.email || '')}"${flightAttr}>
         <checkout stationID="${escapeXml(pickupStation)}" date="${escapeXml(pickupDate)}" time="${escapeXml(pickupTime || '1000')}"/>
         <checkin stationID="${escapeXml(returnStation || pickupStation)}" date="${escapeXml(returnDate)}" time="${escapeXml(returnTime || '1000')}"/>
         <equipmentList>${equipmentXml}</equipmentList>${insuranceXml ? `\n        <insuranceList>${insuranceXml}\n        </insuranceList>` : ''}${meanOfPaymentXml}${loyaltyXml}
@@ -206,10 +212,9 @@ export async function POST(request: Request) {
       }
     }
 
-    const isETO = effectiveCID === '56935466' || effectiveCID === '56935495' || (voucherData && voucherData.type === 'ETO');
-    const isPoa = !isETO && (!voucherData || voucherData.type === 'POA');
-
-    if (resNumber && (isVoucherEXO || isPoa)) {
+    // createVoucher APENAS para voucher pré-pago da agência (EXO).
+    // Toda reserva POA é SEMPRE pagamento no destino (prepaidMode="NP") com IATANumber no nó <reservation>.
+    if (resNumber && isVoucherEXO) {
       try {
         const quoteNode = xrsResponse?.message?.serviceResponse?.reservation?.quote?.$ || xrsResponse?.serviceResponse?.reservation?.quote?.$ || body.car?.quote;
         const confirmedCurrency = quoteNode?.currency || quoteNode?.bookingCurrency || body.car?.currency || body.car?.bookingCurrencyOfTotalRateEstimate || 'EUR';
@@ -218,8 +223,7 @@ export async function POST(request: Request) {
         const voucherAmount = !isNaN(parsedNum) && parsedNum > 0 ? parsedNum.toFixed(2) : '0.00';
         const voucherCurrency = confirmedCurrency;
 
-        const { poaIata, exoIata } = await getDynamicXRSContractConfig();
-        const iataNumber = isVoucherEXO ? (voucherData?.iataNumber || exoIata || '02170722') : (poaIata || '02170722');
+        const iataNumber = voucherData?.iataNumber || xrsContractConfig.exoIata || resolvedPoaIata;
         const vData = { type: 'EXO', iataNumber, id: resNumber };
 
         const createVoucherXml = buildCreateVoucherXml(
