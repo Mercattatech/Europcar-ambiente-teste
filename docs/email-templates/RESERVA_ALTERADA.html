@@ -2,27 +2,52 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
 <title>Reserva {{NUMERO_RESERVA}} alterada — Europcar Brasil</title>
 <style>
+* { box-sizing: border-box; }
+body { margin:0; padding:0; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; width:100% !important; }
+table { border-collapse:collapse; mso-table-lspace:0pt; mso-table-rspace:0pt; }
+img { border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; }
 @media only screen and (max-width:620px){
-.col{display:block !important;width:100% !important;max-width:100% !important;}
-.px{padding-left:20px !important;padding-right:20px !important;}
-.h1{font-size:22px !important;}
-.money{font-size:20px !important;}
+  .outer-td { padding: 12px 6px !important; }
+  .main-table { width: 100% !important; max-width: 100% !important; min-width: 100% !important; border-radius: 8px !important; }
+  .px { padding-left: 14px !important; padding-right: 14px !important; }
+  .card-pad { padding: 14px 14px !important; }
+  .hdr-pad { padding: 16px 14px !important; }
+  .banner-pad { padding: 14px 14px !important; }
+  .h1 { font-size: 20px !important; line-height: 26px !important; }
+  .res-number { font-size: 22px !important; line-height: 28px !important; letter-spacing: 2px !important; }
+  .money { font-size: 19px !important; }
+  .col { display: block !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; }
+  .col-divider-r { border-right: none !important; border-bottom: 1px solid #dfe4dd !important; }
+  .col-spacer-1 { padding: 0 0 12px 0 !important; width: 100% !important; }
+  .col-spacer-2 { padding: 0 !important; width: 100% !important; }
+  .meta-label { width: 40% !important; font-size: 12px !important; padding: 8px 6px 8px 0 !important; }
+  .meta-val { width: 60% !important; font-size: 13px !important; padding: 8px 0 !important; }
 }
 </style>
-<!--[if mso]><style>body,table,td,a{font-family:Arial,Helvetica,sans-serif !important;}</style><![endif]-->
+<!--[if mso]>
+<style>
+  body,table,td,p,a,li,blockquote { font-family:Arial,Helvetica,sans-serif !important; }
+</style>
+<![endif]-->
 </head>
 <body style="margin:0;padding:0;background-color:#eef1ed;-webkit-text-size-adjust:100%;">
 <span style="display:none;font-size:1px;color:#eef1ed;max-height:0;overflow:hidden;">Reserva {{NUMERO_RESERVA}} alterada &bull; {{CARRO}} &bull; Retirada em {{NOME_LOJA_RETIRADA}} em {{DATA_RETIRADA}}</span>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#eef1ed;">
-<tr><td align="center" style="padding:24px 12px;">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:600px;background-color:#ffffff;border:1px solid #dfe4dd;border-radius:10px;overflow:hidden;">
+<tr><td align="center" class="outer-td" style="padding:24px 12px;">
+<!--[if (gte mso 9)|(IE)]>
+<table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0">
+<tr><td>
+<![endif]-->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="main-table" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #dfe4dd;border-radius:10px;overflow:hidden;box-sizing:border-box;">
 
 <!-- HEADER -->
 <tr>
-  <td style="background-color:#008d36;padding:22px 28px;font-family:Arial,Helvetica,sans-serif;">
+  <td class="hdr-pad" style="background-color:#008d36;padding:22px 28px;font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       <tr>
         <td align="left" style="line-height:0;font-size:0;"><img src="https://europcar.com.br/logo-email.png" width="150" height="35" alt="Europcar" style="display:block;width:150px;height:35px;border:0;outline:none;text-decoration:none;"></td>
@@ -34,7 +59,7 @@
 
 <!-- STATUS BANNER -->
 <tr>
-  <td style="background-color:#1d4ed8;padding:18px 28px;font-family:Arial,Helvetica,sans-serif;text-align:center;">
+  <td class="banner-pad" style="background-color:#1d4ed8;padding:18px 28px;font-family:Arial,Helvetica,sans-serif;text-align:center;">
     <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:18px;color:#ffffff;font-weight:bold;">&#x270F;&#xFE0F; Sua reserva foi alterada</p>
     <p style="margin:6px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#d6e2ff;">Os dados da sua reserva foram atualizados. Apresente este e-mail na retirada do veículo.</p>
   </td>
@@ -51,35 +76,35 @@
 <!-- CARD RESUMO -->
 <tr>
   <td class="px" style="padding:16px 28px 4px 28px;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #dfe4dd;border-radius:10px;overflow:hidden;background-color:#f7f9f6;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #dfe4dd;border-radius:10px;overflow:hidden;background-color:#f7f9f6;box-sizing:border-box;">
       <!-- Número reserva -->
       <tr>
-        <td colspan="2" style="padding:16px 20px;border-bottom:1px solid #dfe4dd;font-family:Arial,Helvetica,sans-serif;text-align:center;background-color:#f0faf2;">
+        <td colspan="2" class="card-pad" style="padding:16px 20px;border-bottom:1px solid #dfe4dd;font-family:Arial,Helvetica,sans-serif;text-align:center;background-color:#f0faf2;">
           <p style="margin:0 0 4px 0;font-size:11px;letter-spacing:1.2px;color:#6d7a70;font-weight:bold;">NÚMERO DA RESERVA</p>
-          <p style="margin:0;font-size:28px;line-height:34px;color:#008d36;font-weight:900;letter-spacing:3px;">{{NUMERO_RESERVA}}</p>
+          <p class="res-number" style="margin:0;font-size:28px;line-height:34px;color:#008d36;font-weight:900;letter-spacing:3px;word-break:break-all;">{{NUMERO_RESERVA}}</p>
         </td>
       </tr>
       <!-- Retirada | Devolução -->
       <tr>
-        <td class="col" width="272" valign="top" style="width:272px;padding:16px 20px;border-bottom:1px solid #dfe4dd;border-right:1px solid #dfe4dd;font-family:Arial,Helvetica,sans-serif;">
+        <td class="col col-divider-r" width="50%" valign="top" style="width:50%;padding:16px 20px;border-bottom:1px solid #dfe4dd;border-right:1px solid #dfe4dd;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;">
           <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:1.2px;color:#008d36;font-weight:bold;">RETIRADA</p>
           <p style="margin:0 0 4px 0;font-size:15px;color:#1f2421;font-weight:bold;">{{DATA_RETIRADA}} &middot; {{HORARIO_RETIRADA}}</p>
           <p style="margin:0;font-size:13px;color:#1f2421;font-weight:bold;">{{NOME_LOJA_RETIRADA}} <span style="font-weight:normal;color:#8a948c;">({{CODIGO_LOJA_RETIRADA}})</span></p>{{#ENDERECO_LOJA_RETIRADA}}<p style="margin:3px 0 0 0;font-size:12px;line-height:18px;color:#6d7a70;">&#x1F4CD; {{ENDERECO_LOJA_RETIRADA}}</p>{{/ENDERECO_LOJA_RETIRADA}}{{#TELEFONE_LOJA_RETIRADA}}<p style="margin:2px 0 0 0;font-size:12px;line-height:18px;color:#6d7a70;">Tel.: {{TELEFONE_LOJA_RETIRADA}}</p>{{/TELEFONE_LOJA_RETIRADA}}
         </td>
-        <td class="col" width="272" valign="top" style="width:272px;padding:16px 20px;border-bottom:1px solid #dfe4dd;font-family:Arial,Helvetica,sans-serif;">
+        <td class="col" width="50%" valign="top" style="width:50%;padding:16px 20px;border-bottom:1px solid #dfe4dd;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;">
           <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:1.2px;color:#008d36;font-weight:bold;">DEVOLUÇÃO</p>
           <p style="margin:0 0 4px 0;font-size:15px;color:#1f2421;font-weight:bold;">{{DATA_DEVOLUCAO}} &middot; {{HORARIO_DEVOLUCAO}}</p>
-          <p style="margin:0;font-size:13px;color:#1f2421;font-weight:bold;">{{NOME_LOJA_DEVOLUCAO}} <span style="font-weight:normal;color:#8a948c;">({{CODIGO_LOJA_DEVOLUCAO}})</span></p>{{#ENDERECO_LOJA_DEVOLUCAO}}<p style="margin:3px 0 0 0;font-size:12px;line-height:18px;color:#6d7a70;">&#x1F4CD; {{ENDERECO_LOJA_DEVOLUCAO}}</p>{{/ENDERECO_LOJA_DEVOLUCAO}}{{#TELEFONE_LOJA_DEVOLUCAO}}<p style="margin:2px 0 0 0;font-size:12px;line-height:18px;color:#6d7a70;">Tel.: {{TELEFONE_LOJA_DEVOLUCAO}}</p>{{/TELEFONE_LOJA_DEVOLUCAO}}
+          <p style="margin:0;font-size:13px;color:#1f2421;font-weight:bold;">{{NOME_LOJA_DEVOLUCAO}} <span style="font-weight:normal;color:#8a948c;">({{CODIGO_LOJA_DEVOLUCAO}})</span></p>{{#ENDERECO_LOJA_DEVOLUCAO}}<p style="margin:3px 0 0 0;font-size:12px;line-height:18px;color:#6d7a70;">&#x1F4CD; {{ENDERECO_LOJA_DEVOLUCAO}}</p>{{/ENDERECO_LOJA_DEVOLUCAO}}{{#TELEFONE_LOJA_DEVOLUCAO}}<p style="margin:2px 0 0 0;font-size:12px;line-height:18px;color:#3d463f;">Tel.: {{TELEFONE_LOJA_DEVOLUCAO}}</p>{{/TELEFONE_LOJA_DEVOLUCAO}}
         </td>
       </tr>
       <!-- Veículo | Valor -->
       <tr>
-        <td class="col" width="272" valign="top" style="width:272px;padding:16px 20px;font-family:Arial,Helvetica,sans-serif;">
+        <td class="col col-divider-r" width="50%" valign="top" style="width:50%;padding:16px 20px;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;">
           <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:1.2px;color:#6d7a70;font-weight:bold;">VEÍCULO</p>
           <p style="margin:0 0 4px 0;font-size:15px;color:#1f2421;font-weight:bold;">{{CARRO}}</p>
           <p style="margin:0;font-size:13px;color:#6d7a70;">{{CATEGORIA_CARRO}}</p>
         </td>
-        <td class="col" width="272" valign="top" bgcolor="#008d36" style="width:272px;padding:16px 20px;background-color:#008d36;font-family:Arial,Helvetica,sans-serif;">
+        <td class="col" width="50%" valign="top" bgcolor="#008d36" style="width:50%;padding:16px 20px;background-color:#008d36;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;">
           <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:1.2px;color:#b3dfc0;font-weight:bold;">VALOR TOTAL</p>
           <p class="money" style="margin:0;font-size:20px;color:#ffffff;font-weight:bold;">{{VALOR_LOCAL}}</p>
           {{#MOEDA_ESTRANGEIRA}}<p style="margin:4px 0 0 0;font-size:12px;color:#b3dfc0;">(&asymp; {{VALOR_BRL}})</p>{{/MOEDA_ESTRANGEIRA}}
@@ -95,20 +120,20 @@
     <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">Dados da reserva</p>
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #dfe4dd;">
       <tr>
-        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Condutor principal</td>
-        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{NOME}} {{SOBRENOME}}</td>
+        <td class="meta-label" width="180" valign="top" style="width:38%;padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Condutor principal</td>
+        <td class="meta-val" valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;word-break:break-word;">{{NOME}} {{SOBRENOME}}</td>
       </tr>
       <tr>
-        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Número da reserva</td>
-        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{NUMERO_RESERVA}}</td>
+        <td class="meta-label" width="180" valign="top" style="width:38%;padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Número da reserva</td>
+        <td class="meta-val" valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;word-break:break-word;">{{NUMERO_RESERVA}}</td>
       </tr>
       <tr>
-        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Forma de pagamento</td>
-        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{FORMA_PAGAMENTO}}</td>
+        <td class="meta-label" width="180" valign="top" style="width:38%;padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Forma de pagamento</td>
+        <td class="meta-val" valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;word-break:break-word;">{{FORMA_PAGAMENTO}}</td>
       </tr>
       <tr>
-        <td width="220" valign="top" style="padding:10px 12px 10px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Valor total</td>
-        <td valign="top" style="padding:10px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{VALOR_TOTAL}}</td>
+        <td class="meta-label" width="180" valign="top" style="width:38%;padding:10px 12px 10px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Valor total</td>
+        <td class="meta-val" valign="top" style="padding:10px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;word-break:break-word;">{{VALOR_TOTAL}}</td>
       </tr>
     </table>
   </td>
@@ -120,18 +145,18 @@
     <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">Informações do aluguel</p>
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       <tr>
-        <td class="col" width="272" valign="top" style="width:272px;padding:0 10px 0 0;">
+        <td class="col col-spacer-1" width="50%" valign="top" style="width:50%;padding:0 6px 0 0;box-sizing:border-box;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f7f9f6;border:1px solid #dfe4dd;border-radius:8px;">
-            <tr><td style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;">
+            <tr><td class="card-pad" style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;">
               <p style="margin:0 0 8px 0;font-size:11px;letter-spacing:1.2px;color:#008d36;font-weight:bold;">LEVANTAMENTO</p>
               <p style="margin:0 0 4px 0;font-size:14px;color:#1f2421;font-weight:bold;">{{DATA_RETIRADA}} &agrave;s {{HORARIO_RETIRADA}}</p>
               <p style="margin:0;font-size:13px;color:#1f2421;font-weight:bold;">{{NOME_LOJA_RETIRADA}} <span style="font-weight:normal;color:#8a948c;">({{CODIGO_LOJA_RETIRADA}})</span></p>{{#ENDERECO_LOJA_RETIRADA}}<p style="margin:3px 0 0 0;font-size:12px;line-height:18px;color:#3d463f;">&#x1F4CD; {{ENDERECO_LOJA_RETIRADA}}</p>{{/ENDERECO_LOJA_RETIRADA}}{{#TELEFONE_LOJA_RETIRADA}}<p style="margin:2px 0 0 0;font-size:12px;line-height:18px;color:#3d463f;">Tel.: {{TELEFONE_LOJA_RETIRADA}}</p>{{/TELEFONE_LOJA_RETIRADA}}
             </td></tr>
           </table>
         </td>
-        <td class="col" width="272" valign="top" style="width:272px;padding:0;">
+        <td class="col col-spacer-2" width="50%" valign="top" style="width:50%;padding:0 0 0 6px;box-sizing:border-box;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f7f9f6;border:1px solid #dfe4dd;border-radius:8px;">
-            <tr><td style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;">
+            <tr><td class="card-pad" style="padding:16px 18px;font-family:Arial,Helvetica,sans-serif;">
               <p style="margin:0 0 8px 0;font-size:11px;letter-spacing:1.2px;color:#008d36;font-weight:bold;">DEVOLUÇÃO</p>
               <p style="margin:0 0 4px 0;font-size:14px;color:#1f2421;font-weight:bold;">{{DATA_DEVOLUCAO}} &agrave;s {{HORARIO_DEVOLUCAO}}</p>
               <p style="margin:0;font-size:13px;color:#1f2421;font-weight:bold;">{{NOME_LOJA_DEVOLUCAO}} <span style="font-weight:normal;color:#8a948c;">({{CODIGO_LOJA_DEVOLUCAO}})</span></p>{{#ENDERECO_LOJA_DEVOLUCAO}}<p style="margin:3px 0 0 0;font-size:12px;line-height:18px;color:#3d463f;">&#x1F4CD; {{ENDERECO_LOJA_DEVOLUCAO}}</p>{{/ENDERECO_LOJA_DEVOLUCAO}}{{#TELEFONE_LOJA_DEVOLUCAO}}<p style="margin:2px 0 0 0;font-size:12px;line-height:18px;color:#3d463f;">Tel.: {{TELEFONE_LOJA_DEVOLUCAO}}</p>{{/TELEFONE_LOJA_DEVOLUCAO}}
@@ -149,12 +174,12 @@
     <p style="margin:0 0 12px 0;font-size:13px;letter-spacing:1px;color:#008d36;font-weight:bold;text-transform:uppercase;">Veículo</p>
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #dfe4dd;">
       <tr>
-        <td width="220" valign="top" style="padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Descrição / Exemplo</td>
-        <td valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{CARRO}}</td>
+        <td class="meta-label" width="180" valign="top" style="width:38%;padding:10px 12px 10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Descrição / Exemplo</td>
+        <td class="meta-val" valign="top" style="padding:10px 0;border-bottom:1px solid #ecefea;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;word-break:break-word;">{{CARRO}}</td>
       </tr>
       <tr>
-        <td width="220" valign="top" style="padding:10px 12px 10px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Categoria (ACRISS)</td>
-        <td valign="top" style="padding:10px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;">{{CATEGORIA_CARRO}}</td>
+        <td class="meta-label" width="180" valign="top" style="width:38%;padding:10px 12px 10px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6d7a70;">Categoria (ACRISS)</td>
+        <td class="meta-val" valign="top" style="padding:10px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1f2421;font-weight:bold;word-break:break-word;">{{CATEGORIA_CARRO}}</td>
       </tr>
     </table>
   </td>
@@ -268,6 +293,10 @@
 </tr>
 
 </table>
+<!--[if (gte mso 9)|(IE)]>
+</td></tr>
+</table>
+<![endif]-->
 </td></tr>
 </table>
 </body>

@@ -102,31 +102,48 @@ export async function sendBookingConfirmation(data: BookingConfirmationData): Pr
   const html = `
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
-  <div style="max-width:600px;margin:32px auto;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.08);">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
+<style>
+* { box-sizing: border-box; }
+@media only screen and (max-width: 620px) {
+  .body-wrap { margin: 12px auto !important; width: 100% !important; border-radius: 8px !important; }
+  .content-pad { padding: 18px 14px !important; }
+  .res-num-hero { font-size: 26px !important; letter-spacing: 2px !important; }
+  .hdr-pad { padding: 20px 14px !important; }
+  .hero-pad { padding: 16px 14px !important; }
+  .detail-label { width: 38% !important; font-size: 12px !important; padding: 10px 6px 10px 0 !important; }
+  .detail-val { width: 62% !important; font-size: 13px !important; padding: 10px 0 !important; }
+}
+</style>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;">
+  <div class="body-wrap" style="width:100%;max-width:600px;margin:24px auto;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.08);box-sizing:border-box;">
 
     <!-- Header -->
-    <div style="background:#008d36;padding:28px 32px;text-align:center;border-bottom:5px solid #FFD800;">
+    <div class="hdr-pad" style="background:#008d36;padding:26px 28px;text-align:center;border-bottom:5px solid #FFD800;">
       <div style="line-height:0;font-size:0;"><img src="https://europcar.com.br/logo-email.png" width="150" height="35" alt="Europcar" style="display:inline-block;width:150px;height:35px;border:0;outline:none;text-decoration:none;"></div>
       <div style="color:rgba(255,255,255,0.7);font-size:13px;margin-top:4px;">europcar.com.br</div>
     </div>
 
     <!-- Hero -->
-    <div style="background:${statusColor};padding:20px 32px;text-align:center;">
+    <div class="hero-pad" style="background:${statusColor};padding:20px 28px;text-align:center;">
       <h1 style="color:#fff;margin:0;font-size:22px;font-weight:900;">${title}</h1>
       <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px;">${subtitle}</p>
     </div>
 
     <!-- Body -->
-    <div style="padding:32px;">
+    <div class="content-pad" style="padding:28px 28px;">
 
       <p style="color:#374151;font-size:15px;margin-top:0;">Olá, <strong>${customerName}</strong>!</p>
 
       <!-- Reservation Number -->
-      <div style="background:#f9fafb;border:2px solid ${statusColor};border-radius:10px;padding:20px;text-align:center;margin:20px 0;">
+      <div style="background:#f9fafb;border:2px solid ${statusColor};border-radius:10px;padding:18px;text-align:center;margin:18px 0;">
         <div style="font-size:11px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Número da Reserva</div>
-        <div style="font-size:36px;font-weight:900;color:${statusColor};letter-spacing:3px;">${resNumber}</div>
+        <div class="res-num-hero" style="font-size:34px;font-weight:900;color:${statusColor};letter-spacing:3px;word-break:break-all;">${resNumber}</div>
         <div style="display:inline-block;margin-top:8px;background:${statusColor};color:#fff;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px;">${statusLabel}</div>
       </div>
 
@@ -134,33 +151,33 @@ export async function sendBookingConfirmation(data: BookingConfirmationData): Pr
       <table style="width:100%;border-collapse:collapse;margin:20px 0;">
         <tbody>
           <tr style="border-bottom:1px solid #f3f4f6;">
-            <td style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;width:140px;">Veículo</td>
-            <td style="padding:12px 0;color:#111827;font-size:13px;font-weight:bold;">${carName}</td>
+            <td class="detail-label" style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;width:130px;">Veículo</td>
+            <td class="detail-val" style="padding:12px 0;color:#111827;font-size:13px;font-weight:bold;word-break:break-word;">${carName}</td>
           </tr>
           <tr style="border-bottom:1px solid #f3f4f6;">
-            <td style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;vertical-align:top;">Retirada</td>
-            <td style="padding:12px 0;color:#111827;font-size:13px;">
+            <td class="detail-label" style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;vertical-align:top;width:130px;">Retirada</td>
+            <td class="detail-val" style="padding:12px 0;color:#111827;font-size:13px;word-break:break-word;">
               <strong>${pickupStationName || pickupStation}</strong>${pickupStation && pickupStation !== pickupStationName ? ` <span style="color:#6b7280;font-weight:normal;">(${pickupStation})</span>` : ''} · ${formatXRSDate(pickupDate)}
               ${pickupStationAddress ? `<div style="margin-top:4px;color:#4b5563;font-size:12px;line-height:1.4;">📍 ${pickupStationAddress}</div>` : ''}
               ${pickupStationPhone ? `<div style="margin-top:2px;color:#6b7280;font-size:11px;">Tel: ${pickupStationPhone}</div>` : ''}
             </td>
           </tr>
           <tr style="border-bottom:1px solid #f3f4f6;">
-            <td style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;vertical-align:top;">Devolução</td>
-            <td style="padding:12px 0;color:#111827;font-size:13px;">
+            <td class="detail-label" style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;vertical-align:top;width:130px;">Devolução</td>
+            <td class="detail-val" style="padding:12px 0;color:#111827;font-size:13px;word-break:break-word;">
               <strong>${returnStationName || returnStation}</strong>${returnStation && returnStation !== returnStationName ? ` <span style="color:#6b7280;font-weight:normal;">(${returnStation})</span>` : ''} · ${formatXRSDate(returnDate)}
               ${returnStationAddress ? `<div style="margin-top:4px;color:#4b5563;font-size:12px;line-height:1.4;">📍 ${returnStationAddress}</div>` : ''}
               ${returnStationPhone ? `<div style="margin-top:2px;color:#6b7280;font-size:11px;">Tel: ${returnStationPhone}</div>` : ''}
             </td>
           </tr>
           <tr style="border-bottom:1px solid #f3f4f6;">
-            <td style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;">Pagamento</td>
-            <td style="padding:12px 0;color:#111827;font-size:13px;">${paymentLabel(paymentMethod)}</td>
+            <td class="detail-label" style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;width:130px;">Pagamento</td>
+            <td class="detail-val" style="padding:12px 0;color:#111827;font-size:13px;word-break:break-word;">${paymentLabel(paymentMethod)}</td>
           </tr>
           ${totalBRL && totalBRL > 0 ? `
           <tr>
-            <td style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;">Total</td>
-            <td style="padding:12px 0;color:#008d36;font-size:15px;font-weight:900;">R$ ${totalBRL.toFixed(2).replace('.', ',')}</td>
+            <td class="detail-label" style="padding:12px 0;color:#6b7280;font-size:13px;font-weight:700;width:130px;">Total</td>
+            <td class="detail-val" style="padding:12px 0;color:#008d36;font-size:15px;font-weight:900;">R$ ${totalBRL.toFixed(2).replace('.', ',')}</td>
           </tr>
           ` : ''}
         </tbody>
@@ -220,7 +237,7 @@ export async function sendBookingConfirmation(data: BookingConfirmationData): Pr
     </div>
 
     <!-- Footer -->
-    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 32px;text-align:center;">
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 24px;text-align:center;">
       <p style="color:#9ca3af;font-size:12px;margin:0;">
         © 2025 Europcar Brasil · Todos os direitos reservados<br/>
         Este é um e-mail automático, por favor não responda.

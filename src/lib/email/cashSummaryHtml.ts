@@ -59,18 +59,18 @@ function itemsHtml(items: CashSummaryItem[], borderColor: string): string {
       : '-';
     const valColor = i.isIncluded ? '#008d36' : '#1f2421';
     const valTd = i.value
-      ? `<td align="right" valign="top" style="${FONT}padding:3px 0;font-size:12px;line-height:18px;color:${valColor};font-weight:bold;white-space:nowrap;">${esc(i.value)}</td>`
+      ? `<td align="right" valign="top" style="${FONT}padding:3px 0;font-size:12px;line-height:18px;color:${valColor};font-weight:bold;text-align:right;"><span style="white-space:nowrap;">${esc(i.value)}</span></td>`
       : '';
     const colSpan = i.value ? '' : ' colspan="2"';
     return `
           <tr>
-            <td${colSpan} valign="top" style="${FONT}padding:3px 8px 3px 0;font-size:12px;line-height:18px;color:#3d463f;">${bullet}&nbsp;${esc(i.label)}</td>
+            <td${colSpan} valign="top" style="${FONT}padding:3px 8px 3px 0;font-size:12px;line-height:18px;color:#3d463f;word-break:break-word;">${bullet}&nbsp;${esc(i.label)}</td>
             ${valTd}
           </tr>`;
   }).join('');
   return `
       <tr><td colspan="2" style="padding:10px 0 0 0;border-top:1px solid ${borderColor};">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${rows}
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:100%;">${rows}
         </table>
       </td></tr>`;
 }
@@ -81,16 +81,16 @@ function blockHtml(
   colors: { border: string; title: string; bg: string; inner: string; mainColor: string; subColor: string },
 ): string {
   return `
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 12px 0;border:2px solid ${colors.border};border-radius:10px;background-color:${colors.bg};">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:100%;box-sizing:border-box;margin:0 0 12px 0;border:2px solid ${colors.border};border-radius:10px;background-color:${colors.bg};">
   <tr><td style="padding:14px 16px;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
       <tr>
-        <td valign="top" style="${FONT}padding:0 0 8px 0;font-size:12px;letter-spacing:1px;color:${colors.title};font-weight:900;text-transform:uppercase;">${icon}&nbsp;${esc(b.title)}</td>
-        <td align="right" valign="top" style="${FONT}padding:0 0 8px 0;white-space:nowrap;">
-          <span style="font-size:17px;color:${colors.mainColor};font-weight:900;">${esc(b.main)}</span>${b.sub ? `<br><span style="font-size:12px;color:${colors.subColor};font-weight:bold;">${esc(b.sub)}</span>` : ''}
+        <td valign="top" style="${FONT}padding:0 8px 8px 0;font-size:12px;letter-spacing:1px;color:${colors.title};font-weight:900;text-transform:uppercase;word-break:break-word;">${icon}&nbsp;${esc(b.title)}</td>
+        <td align="right" valign="top" style="${FONT}padding:0 0 8px 0;text-align:right;">
+          <span style="font-size:17px;color:${colors.mainColor};font-weight:900;white-space:nowrap;">${esc(b.main)}</span>${b.sub ? `<br><span style="font-size:12px;color:${colors.subColor};font-weight:bold;white-space:nowrap;">${esc(b.sub)}</span>` : ''}
         </td>
       </tr>${itemsHtml(b.items, colors.inner)}${b.note ? `
-      <tr><td colspan="2" style="${FONT}padding:10px 0 0 0;border-top:1px solid ${colors.inner};font-size:12px;line-height:18px;color:${colors.title};">${esc(b.note)}</td></tr>` : ''}
+      <tr><td colspan="2" style="${FONT}padding:10px 0 0 0;border-top:1px solid ${colors.inner};font-size:12px;line-height:18px;color:${colors.title};word-break:break-word;">${esc(b.note)}</td></tr>` : ''}
     </table>
   </td></tr>
 </table>`;
@@ -137,23 +137,23 @@ export function renderCashSummaryHtml(m: CashSummaryModel, cfg?: EmailSummaryCon
       })
     : '';
   const included = m.included.length > 0 ? `
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 12px 0;border:1px solid #dfe4dd;border-radius:10px;background-color:#f7f9f6;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:100%;box-sizing:border-box;margin:0 0 12px 0;border:1px solid #dfe4dd;border-radius:10px;background-color:#f7f9f6;">
   <tr><td style="${FONT}padding:14px 16px;">
     <p style="margin:0 0 8px 0;font-size:12px;letter-spacing:1px;color:#1f2421;font-weight:900;text-transform:uppercase;">&#x2705;&nbsp;Incluso</p>
-    <p style="margin:0;font-size:12px;line-height:19px;color:#3d463f;">${m.included.map((t) => `<span style="color:#008d36;font-weight:bold;">&#x2713;</span>&nbsp;${esc(t)}`).join('<br>')}</p>
+    <p style="margin:0;font-size:12px;line-height:19px;color:#3d463f;word-break:break-word;">${m.included.map((t) => `<span style="color:#008d36;font-weight:bold;">&#x2713;</span>&nbsp;${esc(t)}`).join('<br>')}</p>
   </td></tr>
 </table>` : '';
   const total = showTotal ? `
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0;border:2px solid #fcd34d;border-radius:10px;background-color:#fffbeb;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:100%;box-sizing:border-box;margin:0;border:2px solid #fcd34d;border-radius:10px;background-color:#fffbeb;">
   <tr><td style="padding:14px 16px;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">
       <tr>
-        <td valign="top" style="${FONT}font-size:12px;letter-spacing:1px;color:#451a03;font-weight:900;text-transform:uppercase;">&#x1F7E2;&nbsp;${esc(totalBlock.title)}</td>
-        <td align="right" valign="top" style="${FONT}white-space:nowrap;">
-          <span style="font-size:19px;color:#451a03;font-weight:900;">${esc(totalBlock.main)}</span>${totalBlock.sub ? `<br><span style="font-size:12px;color:#92400e;font-weight:bold;">${esc(totalBlock.sub)}</span>` : ''}
+        <td valign="top" style="${FONT}padding:0 8px 0 0;font-size:12px;letter-spacing:1px;color:#451a03;font-weight:900;text-transform:uppercase;word-break:break-word;">&#x1F7E2;&nbsp;${esc(totalBlock.title)}</td>
+        <td align="right" valign="top" style="${FONT}text-align:right;">
+          <span style="font-size:19px;color:#451a03;font-weight:900;white-space:nowrap;">${esc(totalBlock.main)}</span>${totalBlock.sub ? `<br><span style="font-size:12px;color:#92400e;font-weight:bold;white-space:nowrap;">${esc(totalBlock.sub)}</span>` : ''}
         </td>
       </tr>
-      <tr><td colspan="2" style="${FONT}padding:10px 0 0 0;border-top:1px solid #fde68a;font-size:12px;line-height:18px;color:#451a03;">${esc(totalBlock.note)}</td></tr>
+      <tr><td colspan="2" style="${FONT}padding:10px 0 0 0;border-top:1px solid #fde68a;font-size:12px;line-height:18px;color:#451a03;word-break:break-word;">${esc(totalBlock.note)}</td></tr>
     </table>
   </td></tr>
 </table>` : '';
