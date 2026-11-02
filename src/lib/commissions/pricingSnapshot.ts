@@ -48,6 +48,18 @@ export async function readEtoMarkupPercent(): Promise<number> {
 }
 
 /**
+ * Markup (%) efetivamente aplicado ao preço da reserva. O site calcula um markup por veículo
+ * (reduzido quando o markup do painel estouraria o desconto mínimo sobre o POA) e o envia em
+ * booking.etoMarginPercent. Aqui nunca aceitamos valor acima do configurado no painel.
+ */
+export async function resolveEffectiveMarkupPercent(bookingData: any): Promise<number> {
+  const configured = await readEtoMarkupPercent();
+  const fromBooking = Number(bookingData?.etoMarginPercent);
+  if (Number.isFinite(fromBooking) && fromBooking >= 0) return Math.min(fromBooking, configured);
+  return configured;
+}
+
+/**
  * Monta o snapshot a partir da cotação do XRS (nó `quote` do bookReservation).
  * Retorna null se a cotação não trouxe valor.
  */

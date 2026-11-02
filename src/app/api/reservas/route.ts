@@ -10,7 +10,7 @@ import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 import { getReservationErrorMessage } from '@/lib/cms/reservationErrors';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { registerFailedTransaction } from '@/lib/rejectionService';
-import { buildPricingSnapshot, readEtoMarkupPercent, isEtoContract, type PricingSnapshot } from '@/lib/commissions/pricingSnapshot';
+import { buildPricingSnapshot, readEtoMarkupPercent, resolveEffectiveMarkupPercent, isEtoContract, type PricingSnapshot } from '@/lib/commissions/pricingSnapshot';
 import { resolveBookedPaymentSplit } from '@/lib/europcar/paymentSplitBooking';
 import type { PaymentSplit } from '@/lib/europcar/paymentSplit';
 
@@ -699,7 +699,7 @@ export async function POST(request: Request) {
 
             // Registra o NET capturado da API e o markup vigente (não pode impedir a reserva)
             try {
-              const markupPct = isEtoContract(contractID) ? await readEtoMarkupPercent() : 0;
+              const markupPct = isEtoContract(contractID) ? await resolveEffectiveMarkupPercent(bookingData) : 0;
               pricingSnapshot = buildPricingSnapshot({ quoteNode, contractID, markupPercent: markupPct });
             } catch (snapErr: any) {
               console.warn(`[reservas] Falha ao registrar NET/markup de ${resNumber}:`, snapErr?.message);

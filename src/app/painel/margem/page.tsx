@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { computeEtoPricing, DEFAULT_ETO_MIN_DISCOUNT_PERCENT } from "@/lib/pricing/etoPricing";
 
 export default function MargemPage() {
   const [margin, setMargin] = useState(0);
   const [savedMargin, setSavedMargin] = useState(0);
+  const [minDiscount, setMinDiscount] = useState(DEFAULT_ETO_MIN_DISCOUNT_PERCENT);
+  const [savedMinDiscount, setSavedMinDiscount] = useState(DEFAULT_ETO_MIN_DISCOUNT_PERCENT);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
@@ -16,6 +19,10 @@ export default function MargemPage() {
         if (typeof d.percent !== "number") { setToast("⚠️ Não foi possível ler a margem salva. Recarregue antes de salvar."); return; }
         setMargin(d.percent);
         setSavedMargin(d.percent);
+        if (typeof d.minDiscountPercent === "number") {
+          setMinDiscount(d.minDiscountPercent);
+          setSavedMinDiscount(d.minDiscountPercent);
+        }
       })
       .catch(() => setToast("⚠️ Não foi possível ler a margem salva. Recarregue antes de salvar."))
       .finally(() => setLoading(false));
@@ -27,11 +34,12 @@ export default function MargemPage() {
       const res = await fetch("/api/admin/margin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ percent: margin }),
+        body: JSON.stringify({ percent: margin, minDiscountPercent: minDiscount }),
       });
       const data = await res.json();
       if (data.success) {
-        setSavedMargin(data.percent);
+        if (typeof data.percent === "number") setSavedMargin(data.percent);
+        if (typeof data.minDiscountPercent === "number") setSavedMinDiscount(data.minDiscountPercent);
         setToast("✅ Margem salva com sucesso!");
         setTimeout(() => setToast(""), 3000);
       } else {
@@ -46,15 +54,17 @@ export default function MargemPage() {
     }
   };
 
-  const hasChanges = margin !== savedMargin;
+  const hasChanges = margin !== savedMargin || minDiscount !== savedMinDiscount;
 
-  // Example prices for preview
+  // Example prices for preview (mesma regra aplicada no site)
   const exampleEUR = 88.26;
   const exampleBRL = 531.26;
   const examplePOA = exampleBRL; // POA = same as public
-  const exampleETO = exampleBRL * 0.75; // ETO = ~25% discount
-  const exampleETOWithMargin = exampleETO * (1 + margin / 100);
+  const exampleETO = exampleBRL * 0.90; // NET da ETO (exemplo: 10% abaixo do público)
+  const pricing = computeEtoPricing({ etoNet: exampleETO, poaTotal: examplePOA, markupPercent: margin, minDiscountPercent: minDiscount });
+  const exampleETOWithMargin = pricing.price;
   const profitPerRental = exampleETOWithMargin - exampleETO;
+  const shownDiscount = Math.round(pricing.discountPercent);
 
   if (loading) {
     return (
@@ -148,6 +158,34 @@ export default function MargemPage() {
               <span className="text-xs text-gray-500">Margem atual salva:</span>
               <span className="text-sm font-black text-[#e67e00]">{savedMargin}%</span>
             </div>
+
+            {/* Regra automática: desconto mínimo do cartão vs balcão */}
+            <div className="mt-8 pt-6 border-t border-gray-800">
+              <label className="block text-sm font-bold text-gray-300 mb-1">
+                Desconto mínimo do cartão sobre o balcão (%)
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                O preço "Pagar Agora" nunca ultrapassa o preço POA menos esse percentual. Se a margem acima estourar o limite,
+                o sistema reduz a margem automaticamente (nunca abaixo do custo NET).
+              </p>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="95"
+                    step="0.5"
+                    value={minDiscount}
+                    onChange={(e) => setMinDiscount(Math.max(0, Math.min(95, parseFloat(e.target.value) || 0)))}
+                    className="w-28 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-2xl font-black text-white text-center outline-none focus:border-[#FFD100] transition-colors"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">%</span>
+                </div>
+                <span className="text-xs text-gray-500">
+                  Salvo: <span className="font-black text-[#FFD100]">{savedMinDiscount}%</span> · 0% desativa a regra
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Right: Preview */}
@@ -164,14 +202,24 @@ export default function MargemPage() {
 
               {/* ETO price */}
               <div className="border-2 border-[#e67e00] rounded-lg p-3 bg-[#e67e00]/5 relative">
-                <span className="absolute -top-2 right-2 text-[9px] bg-[#e67e00] text-white px-2 py-0.5 rounded-full font-black">
-                  -{Math.round((1 - exampleETOWithMargin / examplePOA) * 100)}%
+                <span className={`absolute -top-2 right-2 text-[9px] px-2 py-0.5 rounded-full font-black ${pricing.metMinDiscount ? "bg-[#FFD100] text-black" : "bg-gray-600 text-white"}`}>
+                  {pricing.metMinDiscount ? `${shownDiscount}% MAIS BARATO` : "ISENTO DE IOF"}
                 </span>
                 <div className="text-[10px] text-[#e67e00] font-bold uppercase">Tarifa ETO + Margem</div>
                 <div className="text-lg font-black text-white">R$ {exampleETOWithMargin.toFixed(2).replace(".", ",")}</div>
                 <div className="text-[10px] text-gray-500">
                   Base ETO: R$ {exampleETO.toFixed(2).replace(".", ",")}
-                  <span className="text-[#e67e00] ml-1">+ {margin}% = R$ {(exampleETOWithMargin - exampleETO).toFixed(2).replace(".", ",")}</span>
+                  <span className="text-[#e67e00] ml-1">+ {pricing.effectiveMarkupPercent.toFixed(2).replace(".", ",")}% = R$ {(exampleETOWithMargin - exampleETO).toFixed(2).replace(".", ",")}</span>
+                  {pricing.capped && (
+                    <span className="block text-[#FFD100] mt-1">
+                      ⚡ Margem de {margin}% reduzida automaticamente para respeitar o desconto mínimo de {minDiscount}%.
+                    </span>
+                  )}
+                  {!pricing.metMinDiscount && (
+                    <span className="block text-red-400 mt-1">
+                      ⚠️ Mesmo no custo NET o desconto fica abaixo de {minDiscount}% — vendido no NET (sem lucro).
+                    </span>
+                  )}
                 </div>
               </div>
 
