@@ -2,7 +2,7 @@ import { callXRS, DEFAULT_POA_CID, DEFAULT_POA_IATA, getDynamicXRSContractConfig
 import { buildReservationPaymentAttrs, buildCreateVoucherXml, CID_TO_BA } from '@/lib/europcar/paymentMapping';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { parsePayerList } from '@/lib/europcar/parsePayerList';
-import { buildPricingSnapshot, readEtoMarkupPercent, resolveEffectiveMarkupPercent, isEtoContract, type PricingSnapshot } from '@/lib/commissions/pricingSnapshot';
+import { buildPricingSnapshot, readEtoMarkupPercent, isEtoContract, type PricingSnapshot } from '@/lib/commissions/pricingSnapshot';
 import { resolveBookedPaymentSplit } from '@/lib/europcar/paymentSplitBooking';
 
 export interface BookXRSParams {
@@ -204,7 +204,7 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
       // Não substitui um NET já registrado e nunca impede a reserva.
       try {
         if (resNumber && !(customerData?.pricingSnapshot?.netBRL > 0)) {
-          const markupPct = isEtoContract(contractID) ? await resolveEffectiveMarkupPercent(bookingData) : 0;
+          const markupPct = isEtoContract(contractID) ? await readEtoMarkupPercent() : 0;
           pricingSnapshot = buildPricingSnapshot({ quoteNode, contractID, markupPercent: markupPct });
           if (pricingSnapshot && customerData) customerData.pricingSnapshot = pricingSnapshot;
         }

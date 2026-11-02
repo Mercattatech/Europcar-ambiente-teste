@@ -25,7 +25,6 @@ import {
 import { isValidXRSDate, isValidXRSTime } from '@/lib/europcar/validate';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
 import { calculateRentalDays, isBrazilStationOrCountry } from '@/lib/europcar/rentalDuration';
-import { computeEtoPricing, normalizeMinDiscountPercent, ETO_MIN_DISCOUNT_KEY } from '@/lib/pricing/etoPricing';
 
 export type EstadoCategoria = 'disponivel' | 'sob_requisicao' | 'ausente';
 
@@ -77,15 +76,14 @@ export function normalizeTime(value: string | undefined, fallback = '1000'): str
 const fmtDateBR = (d: string) => `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}`;
 const fmtTimeBR = (t: string) => `${t.slice(0, 2)}:${t.slice(2, 4)}`;
 
-async function readMarkupPercent(): Promise<{ percent: number; minDiscountPercent: number; failed: boolean }> {
+async function readMarkupPercent(): Promise<{ percent: number; failed: boolean }> {
   try {
     const cfg = await prisma.contentBlock.findUnique({ where: { key: 'eto_margin_percent' } });
-    const minCfg = await prisma.contentBlock.findUnique({ where: { key: ETO_MIN_DISCOUNT_KEY } });
     const p = parseFloat(cfg?.value_ptBR || '0');
-    return { percent: isNaN(p) || p < 0 ? 0 : p, minDiscountPercent: normalizeMinDiscountPercent(minCfg?.value_ptBR), failed: false };
+    return { percent: isNaN(p) || p < 0 ? 0 : p, failed: false };
   } catch {
     // mesmo comportamento de /api/admin/margin quando o banco está fora (markup 0), mas sinalizado
-    return { percent: 0, minDiscountPercent: normalizeMinDiscountPercent(undefined), failed: true };
+    return { percent: 0, failed: true };
   }
 }
 
@@ -329,14 +327,7 @@ export async function consultarDisponibilidade(p: DisponibilidadeParams) {
         return { tarifa: t.key, descricao: t.descricao, estado: 'ausente' as EstadoCategoria };
       }
       const estado: EstadoCategoria = row.statusCode === 'R' || marked ? 'sob_requisicao' : 'disponivel';
-      // Markup ETO efetivo: o do painel, limitado pelo desconto mínimo sobre o POA (piso no NET).
-      // A franquia zero usa o mesmo multiplicador da ETO padrão, igual ao site.
-      const poaRow = results['POA']?.get(code);
-      const etoStdRow = results['ETO']?.get(code);
-      const etoPricing = poaRow && etoStdRow && poaRow.totalBRL > 0 && etoStdRow.totalBRL > 0
-        ? computeEtoPricing({ etoNet: etoStdRow.totalBRL, poaTotal: poaRow.totalBRL, markupPercent: markup, minDiscountPercent: markupCfg.minDiscountPercent })
-        : null;
-      const mult = t.markup ? (etoPricing ? etoPricing.multiplier : 1 + markup / 100) : 1;
+      const mult = t.markup ? 1 + markup / 100 : 1;
       const totalLocal = round2(row.totalLocal * mult);
       const totalBRL = round2(row.totalBRL * mult);
       return {
@@ -348,7 +339,7 @@ export async function consultarDisponibilidade(p: DisponibilidadeParams) {
         total: totalLocal,
         precoPorDiaBRL: round2(totalBRL / diarias),
         totalBRL,
-        ...(t.markup ? { markupAplicadoPercent: round2((mult - 1) * 100) } : {}),
+        ...(t.markup ? { markupAplicadoPercent: markup } : {}),
         ...(t.markup && p.incluirPrecoLiquido ? { totalBRLLiquidoSemMarkup: round2(row.totalBRL), totalLiquidoSemMarkup: round2(row.totalLocal) } : {}),
       };
     });
