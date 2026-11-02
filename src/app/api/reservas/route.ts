@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma';
 import { callXRS, DEFAULT_POA_CID, DEFAULT_POA_IATA, getDynamicXRSContractConfig, getXRSErrors } from '@/lib/europcar/xrsClient';
 import { ensureGuestAccountAndWelcome } from '@/lib/guestAccount';
 import { consultarBin, guessBrandByFirstDigit, mapBrandToCardIssuer, zeroAuthCard, voidCieloPayment } from '@/lib/cielo/cieloClient';
-import { buildReservationPaymentAttrs, buildCreateVoucherXml, CID_TO_BA } from '@/lib/europcar/paymentMapping';
+import { buildReservationPaymentAttrs, buildCreateVoucherXml, CID_TO_BA, validateContractPaymentConsistency } from '@/lib/europcar/paymentMapping';
 import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 import { getReservationErrorMessage } from '@/lib/cms/reservationErrors';
 import { escapeXml } from '@/lib/europcar/xmlEscape';
@@ -27,6 +27,18 @@ export async function POST(request: Request) {
       const { bookingData, customerData, paymentData, voucherData, xrsEquipment, xrsInsurances, couponData } = await request.json();
       customerEmail = customerData?.email || '';
       customerName = customerData?.nome || '';
+
+      // Trava de coerência: balcão (pagamento no destino) com contrato/tarifa ETO viraria
+      // voucher no GreenWay. Recusa antes de qualquer cobrança ou chamada ao XRS.
+      const consistencyError = validateContractPaymentConsistency({
+        method: paymentData?.method,
+        contractID: bookingData?.contractID || bookingData?.car?.contractID,
+        tariffType: bookingData?.tariffType,
+      });
+      if (consistencyError) {
+        console.error(`[reservas] ⛔ Combinação inconsistente bloqueada: method=${paymentData?.method} contractID=${bookingData?.contractID} tariffType=${bookingData?.tariffType}`);
+        return NextResponse.json({ error: consistencyError }, { status: 400 });
+      }
 
       const forwardedFor = request.headers.get("x-forwarded-for");
       const ip = forwardedFor ? forwardedFor.split(',')[0] : 'Desconhecido';

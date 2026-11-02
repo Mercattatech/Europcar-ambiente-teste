@@ -45,6 +45,29 @@ export interface PaymentAttrsContext {
   iataNumber?: string;
 }
 
+/** Contratos ETO (Pagar Agora): exigem pagamento online e geram VCH no GreenWay. */
+export const ETO_CIDS = ['56935466', '56935495'];
+
+/**
+ * Valida a coerência entre tarifa/contrato e forma de pagamento.
+ * Retorna a mensagem de erro ou null quando está tudo certo.
+ *
+ * Balcão (pagamento no destino) com contrato/tarifa ETO resultaria em uma reserva
+ * tratada como voucher no GreenWay — nunca deve chegar ao XRS.
+ */
+export function validateContractPaymentConsistency(params: {
+  method?: string;
+  contractID?: string;
+  tariffType?: string;
+}): string | null {
+  const { method, contractID, tariffType } = params;
+  const isEtoTariff = (!!contractID && ETO_CIDS.includes(contractID)) || tariffType === 'ETO';
+  if (method === 'BALCAO' && isEtoTariff) {
+    return 'Tarifa "Pagar Agora" (ETO) não permite pagamento no balcão. Volte, escolha a tarifa "Pagar no balcão" e refaça a reserva.';
+  }
+  return null;
+}
+
 /** Escapa caracteres especiais XML para atributos ou nós */
 function escapeXml(value: unknown): string {
   if (value === null || value === undefined) return '';
