@@ -1664,6 +1664,16 @@ function VehiclesContent() {
     return { min: Math.min(...prices), max: Math.max(...prices) };
   }, [filteredCars]);
 
+  /** Limpa todas as proteções/extras escolhidos — o cliente recomeça a escolha ao voltar ou trocar de tarifa. */
+  const resetProtectionSelections = () => {
+    setSelectedExtrasMap({});
+    setSelectedProtectionPackage('none');
+    setZeroExcessUpgrade(false);
+    setProtectionsSkipped(false);
+    setSelectedEquipmentMap({});
+    setQuoteTotals(null);
+  };
+
   const handleSelectCar = (car: any) => {
     // Só aplica overrides de imagem do banco para pesquisas BRASILEIRAS.
     // Para pesquisas internacionais, o componente CarImage usa o CDN da Europcar
@@ -1674,7 +1684,7 @@ function VehiclesContent() {
       ...car,
       imageUrl: isBrazilianSearch ? (carImageOverrides[car.carCategoryCode] || car.imageUrl) : car.imageUrl
     });
-    setZeroExcessUpgrade(false);       // reset upgrade when changing car
+    resetProtectionSelections();       // reset protections/extras/upgrade when changing car or tariff
     setEquipmentPrices({});            // reset equipment prices for new station/car
     setXrsEquipment([]);               // reset dynamic equipment list for new station
     setStep3FetchedCarCategory(null);  // reset fetch tracker
@@ -2447,7 +2457,7 @@ function VehiclesContent() {
               {/* Step 3 Header bar */}
               <div className="border-b border-gray-200 p-4 md:p-6">
                 <div className="flex items-center gap-2 mb-2">
-                  <button onClick={() => { setCurrentStep(2); setEquipmentPrices({}); setXrsEquipment([]); setQuoteInsurances([]); setQuoteMileage(null); setQuoteTotals(null); setSelectedEquipmentMap({}); }} className="text-[#008d36] font-bold hover:underline text-sm">← Voltar</button>
+                  <button onClick={() => { resetProtectionSelections(); setCurrentStep(2); setEquipmentPrices({}); setXrsEquipment([]); setQuoteInsurances([]); setQuoteMileage(null); setQuoteTotals(null); setSelectedEquipmentMap({}); }} className="text-[#008d36] font-bold hover:underline text-sm">← Voltar</button>
                 </div>
                 <h2 className="text-lg md:text-2xl font-black text-gray-900 mb-3">{t('extras.title')}</h2>
                 <div className="flex items-center justify-between gap-3">
@@ -2554,6 +2564,7 @@ function VehiclesContent() {
                   </p>
                   <button
                     onClick={() => {
+                      resetProtectionSelections();
                       setCurrentStep(2);
                       setStep3Error(null);
                       setEquipmentPrices({});
