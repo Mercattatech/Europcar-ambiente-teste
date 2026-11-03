@@ -327,6 +327,8 @@ function VehiclesContent() {
 
   // Extras
   const [dbExtras, setDbExtras] = useState<any[]>([]);
+  // Chave global do painel (/painel/extras): quando false, a seção correspondente some de TODAS as buscas
+  const [extrasSearchCfg, setExtrasSearchCfg] = useState<{ protections: boolean; extras: boolean }>({ protections: true, extras: true });
   const [selectedExtrasMap, setSelectedExtrasMap] = useState<Record<string, number>>({});
   const [selectedProtectionPackage, setSelectedProtectionPackage] = useState<'none' | 'basic' | 'medium' | 'premium'>('none');
   const [expandedPackages, setExpandedPackages] = useState<Set<string>>(new Set());
@@ -816,6 +818,15 @@ function VehiclesContent() {
     load(0);
     return () => { cancelled = true; };
   }, []);
+
+  // Lê a chave Proteções/Extras do painel sempre que o cliente chega à etapa 3 (sem cache)
+  useEffect(() => {
+    if (currentStep !== 3) return;
+    fetch('/api/admin/extras-search', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => setExtrasSearchCfg({ protections: d?.protections !== false, extras: d?.extras !== false }))
+      .catch(() => {});
+  }, [currentStep]);
 
   // Load extras when advancing to step 3
   useEffect(() => {
@@ -2693,6 +2704,9 @@ function VehiclesContent() {
                 </div>
               ) : (
                 <>
+                  {/* Proteções (franquia zero + seguros da XRS): controladas pela chave do painel /painel/extras */}
+                  {extrasSearchCfg.protections && (
+                  <>
                   {/* 🛡️ Zero Excess Upsell — only for ETO tariff */}
                   {selectedTariffType === 'ETO' && (() => {
                     const code = selectedCar?.carCategoryCode;
@@ -3040,6 +3054,8 @@ function VehiclesContent() {
                       </div>
                     );
                   })()}
+                  </>
+                  )}
 
                   {/* 🚗 Quilometragem Incluída */}
                   {quoteMileage && (
@@ -3069,7 +3085,8 @@ function VehiclesContent() {
                     </>
                   )}
 
-                  {/* 🧳 Extras disponíveis (XRS API) */}
+                  {/* 🧳 Extras disponíveis (XRS API) — controlados pela chave do painel /painel/extras */}
+                  {extrasSearchCfg.extras && (
                   <div className="mt-10">
                     <h3 className="font-black text-xl text-gray-900 mb-6">{t('extras.availableExtras')}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -3225,6 +3242,7 @@ function VehiclesContent() {
                       })}
                     </div>
                   </div>
+                  )}
 
 
                 </>

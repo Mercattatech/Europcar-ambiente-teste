@@ -18,12 +18,39 @@ export default function PainelExtras() {
 
   const showToast = (msg: string, t: "success" | "error" = "success") => { setToast({ message: msg, type: t }); setTimeout(() => setToast(null), 3000); };
 
+  // Chave global: quando desativada, a seção some de TODAS as buscas do site
+  const [searchCfg, setSearchCfg] = useState<{ protections: boolean; extras: boolean } | null>(null);
+  const [savingCfg, setSavingCfg] = useState<"protections" | "extras" | null>(null);
+
+  const fetchSearchCfg = async () => {
+    try { const r = await fetch("/api/admin/extras-search", { cache: "no-store" }); if (r.ok) setSearchCfg(await r.json()); }
+    catch (e) { console.error(e); }
+  };
+
+  const handleToggleSearch = async (field: "protections" | "extras") => {
+    if (!searchCfg || savingCfg) return;
+    const next = !searchCfg[field];
+    const previous = searchCfg;
+    setSearchCfg({ ...searchCfg, [field]: next });
+    setSavingCfg(field);
+    try {
+      const r = await fetch("/api/admin/extras-search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [field]: next }) });
+      if (!r.ok) throw new Error("save failed");
+      const d = await r.json();
+      setSearchCfg({ protections: d.protections, extras: d.extras });
+      showToast(`${field === "protections" ? "Proteções" : "Extras"} ${next ? "ativados" : "desativados"} nas buscas do site`);
+    } catch (e) {
+      setSearchCfg(previous);
+      showToast("Erro ao salvar. Tente novamente.", "error");
+    } finally { setSavingCfg(null); }
+  };
+
   const fetchExtras = async () => {
     try { const res = await fetch("/api/admin/extras"); if (res.ok) setExtras(await res.json()); }
     catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchExtras(); }, []);
+  useEffect(() => { fetchExtras(); fetchSearchCfg(); }, []);
 
   const handleOpenNew = () => { setEditingId(null); setName(""); setDescription(""); setPricePerDay(""); setType("ADDON"); setActive(true); setImageUrl(""); setShowModal(true); };
 
@@ -54,6 +81,49 @@ export default function PainelExtras() {
           <p className="text-gray-400 text-sm mt-1">Gerencie acessórios e proteções disponíveis para reservas</p>
         </div>
         <button onClick={handleOpenNew} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-bold text-sm transition-colors">+ Novo Item</button>
+      </div>
+
+      {/* ═══ CHAVE GLOBAL: PROTEÇÕES E EXTRAS NAS BUSCAS ═══ */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+        <h2 className="text-sm font-black text-white uppercase tracking-wider">Exibição nas buscas do site</h2>
+        <p className="text-xs text-gray-400 mt-1 mb-4">
+          Quando <strong className="text-green-400">ativo</strong>, aparece em qualquer busca do site. Quando <strong className="text-red-400">inativo</strong>, não aparece em nenhuma busca. A mudança vale imediatamente para novos clientes.
+        </p>
+        {!searchCfg ? (
+          <div className="text-xs text-gray-500">Carregando configuração...</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {([
+              { field: "protections" as const, title: "Proteções", desc: "Seguros da Europcar e proteção Franquia Zero na etapa de extras." },
+              { field: "extras" as const, title: "Extras", desc: "Acessórios e equipamentos (cadeirinha, GPS, pedágio etc.)." },
+            ]).map(({ field, title, desc }) => {
+              const on = searchCfg[field];
+              return (
+                <div key={field} className="flex items-center justify-between gap-4 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white">{title}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${on ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>{on ? "Ativo" : "Inativo"}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{desc}</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={on}
+                    aria-label={`${on ? "Desativar" : "Ativar"} ${title} nas buscas`}
+                    id={`toggle-search-${field}`}
+                    disabled={savingCfg !== null}
+                    onClick={() => handleToggleSearch(field)}
+                    className={`relative shrink-0 w-12 h-7 rounded-full transition-colors disabled:opacity-60 ${on ? "bg-green-600" : "bg-gray-600"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {loading ? (
