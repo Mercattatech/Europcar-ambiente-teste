@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { PROTECTION_CATALOG, EXTRA_CATALOG } from "@/lib/extrasSearchCatalog";
+
+type SearchCfg = { protections: boolean; extras: boolean; disabledProtections: string[]; disabledExtras: string[] };
 
 export default function PainelExtras() {
   const [extras, setExtras] = useState<any[]>([]);
@@ -19,30 +22,51 @@ export default function PainelExtras() {
   const showToast = (msg: string, t: "success" | "error" = "success") => { setToast({ message: msg, type: t }); setTimeout(() => setToast(null), 3000); };
 
   // Chave global: quando desativada, a seção some de TODAS as buscas do site
-  const [searchCfg, setSearchCfg] = useState<{ protections: boolean; extras: boolean } | null>(null);
-  const [savingCfg, setSavingCfg] = useState<"protections" | "extras" | null>(null);
+  const [searchCfg, setSearchCfg] = useState<SearchCfg | null>(null);
+  const [savingCfg, setSavingCfg] = useState<string | null>(null);
+
+  const normalizeCfg = (d: any): SearchCfg => ({
+    protections: d?.protections !== false,
+    extras: d?.extras !== false,
+    disabledProtections: Array.isArray(d?.disabledProtections) ? d.disabledProtections : [],
+    disabledExtras: Array.isArray(d?.disabledExtras) ? d.disabledExtras : [],
+  });
 
   const fetchSearchCfg = async () => {
-    try { const r = await fetch("/api/admin/extras-search", { cache: "no-store" }); if (r.ok) setSearchCfg(await r.json()); }
+    try { const r = await fetch("/api/admin/extras-search", { cache: "no-store" }); if (r.ok) setSearchCfg(normalizeCfg(await r.json())); }
     catch (e) { console.error(e); }
   };
 
-  const handleToggleSearch = async (field: "protections" | "extras") => {
+  const saveCfg = async (next: SearchCfg, payload: Record<string, unknown>, savingKey: string, okMessage: string) => {
     if (!searchCfg || savingCfg) return;
-    const next = !searchCfg[field];
     const previous = searchCfg;
-    setSearchCfg({ ...searchCfg, [field]: next });
-    setSavingCfg(field);
+    setSearchCfg(next);
+    setSavingCfg(savingKey);
     try {
-      const r = await fetch("/api/admin/extras-search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [field]: next }) });
+      const r = await fetch("/api/admin/extras-search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!r.ok) throw new Error("save failed");
-      const d = await r.json();
-      setSearchCfg({ protections: d.protections, extras: d.extras });
-      showToast(`${field === "protections" ? "Proteções" : "Extras"} ${next ? "ativados" : "desativados"} nas buscas do site`);
+      setSearchCfg(normalizeCfg(await r.json()));
+      showToast(okMessage);
     } catch (e) {
       setSearchCfg(previous);
       showToast("Erro ao salvar. Tente novamente.", "error");
     } finally { setSavingCfg(null); }
+  };
+
+  const handleToggleSearch = (field: "protections" | "extras") => {
+    if (!searchCfg) return;
+    const nextValue = !searchCfg[field];
+    saveCfg({ ...searchCfg, [field]: nextValue }, { [field]: nextValue }, field, `${field === "protections" ? "Proteções" : "Extras"} ${nextValue ? "ativados" : "desativados"} nas buscas do site`);
+  };
+
+  // Liga/desliga um item individual (um item pode agrupar vários códigos XRS equivalentes)
+  const handleToggleItem = (kind: "protections" | "extras", codes: string[], name: string) => {
+    if (!searchCfg) return;
+    const listKey = kind === "protections" ? "disabledProtections" : "disabledExtras";
+    const current = searchCfg[listKey];
+    const isOff = codes.every((c) => current.includes(c));
+    const nextList = isOff ? current.filter((c) => !codes.includes(c)) : Array.from(new Set([...current, ...codes]));
+    saveCfg({ ...searchCfg, [listKey]: nextList }, { [listKey]: nextList }, `${kind}:${codes[0]}`, `${name} ${isOff ? "ativado" : "desativado"} nas buscas do site`);
   };
 
   const fetchExtras = async () => {
@@ -124,6 +148,57 @@ export default function PainelExtras() {
             })}
           </div>
         )}
+
+        {/* Itens individuais */}
+        {searchCfg && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
+            {([
+              { kind: "protections" as const, title: "Proteções (item a item)", globalOn: searchCfg.protections, items: PROTECTION_CATALOG.map((p) => ({ key: p.code, name: p.name, description: p.description, codes: [p.code] })) },
+              { kind: "extras" as const, title: "Extras (item a item)", globalOn: searchCfg.extras, items: EXTRA_CATALOG.map((x) => ({ key: x.codes[0], name: x.name, description: x.description, codes: x.codes })) },
+            ]).map(({ kind, title, globalOn, items }) => {
+              const disabledList = kind === "protections" ? searchCfg.disabledProtections : searchCfg.disabledExtras;
+              const offCount = items.filter((i) => i.codes.every((c) => disabledList.includes(c))).length;
+              return (
+                <div key={kind} className="bg-gray-800/30 border border-gray-700 rounded-lg overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between gap-2">
+                    <span className="text-xs font-black text-white uppercase tracking-wider">{title}</span>
+                    <span className="text-[10px] text-gray-400">{items.length - offCount} ativos · {offCount} inativos</span>
+                  </div>
+                  {!globalOn && <div className="px-4 py-2 text-[11px] text-red-400 bg-red-500/10 border-b border-gray-700">A chave geral está inativa: nada desta lista aparece nas buscas.</div>}
+                  <ul className={`divide-y divide-gray-800 max-h-96 overflow-y-auto ${globalOn ? "" : "opacity-50"}`}>
+                    {items.map((item) => {
+                      const on = !item.codes.every((c) => disabledList.includes(c));
+                      return (
+                        <li key={item.key} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-sm font-bold ${on ? "text-white" : "text-gray-500 line-through"}`}>{item.name}</span>
+                              <span className="text-[9px] font-black tracking-widest bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded">{item.codes.join(" / ")}</span>
+                            </div>
+                            <p className="text-[11px] text-gray-500 truncate">{item.description}</p>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={on}
+                            aria-label={`${on ? "Desativar" : "Ativar"} ${item.name} nas buscas`}
+                            id={`toggle-item-${kind}-${item.codes[0]}`}
+                            disabled={savingCfg !== null}
+                            onClick={() => handleToggleItem(kind, item.codes, item.name)}
+                            className={`relative shrink-0 w-10 h-6 rounded-full transition-colors disabled:opacity-60 ${on ? "bg-green-600" : "bg-gray-600"}`}
+                          >
+                            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-4" : "translate-x-0"}`} />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {searchCfg && <p className="text-[11px] text-gray-500 mt-3">Itens que a XRS devolver e que não estiverem nas listas acima continuam aparecendo normalmente.</p>}
       </div>
 
       {loading ? (

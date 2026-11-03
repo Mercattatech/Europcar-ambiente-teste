@@ -328,7 +328,7 @@ function VehiclesContent() {
   // Extras
   const [dbExtras, setDbExtras] = useState<any[]>([]);
   // Chave global do painel (/painel/extras): quando false, a seção correspondente some de TODAS as buscas
-  const [extrasSearchCfg, setExtrasSearchCfg] = useState<{ protections: boolean; extras: boolean }>({ protections: true, extras: true });
+  const [extrasSearchCfg, setExtrasSearchCfg] = useState<{ protections: boolean; extras: boolean; disabledProtections: string[]; disabledExtras: string[] }>({ protections: true, extras: true, disabledProtections: [], disabledExtras: [] });
   const [selectedExtrasMap, setSelectedExtrasMap] = useState<Record<string, number>>({});
   const [selectedProtectionPackage, setSelectedProtectionPackage] = useState<'none' | 'basic' | 'medium' | 'premium'>('none');
   const [expandedPackages, setExpandedPackages] = useState<Set<string>>(new Set());
@@ -824,7 +824,12 @@ function VehiclesContent() {
     if (currentStep !== 3) return;
     fetch('/api/admin/extras-search', { cache: 'no-store' })
       .then(r => r.json())
-      .then(d => setExtrasSearchCfg({ protections: d?.protections !== false, extras: d?.extras !== false }))
+      .then(d => setExtrasSearchCfg({
+        protections: d?.protections !== false,
+        extras: d?.extras !== false,
+        disabledProtections: Array.isArray(d?.disabledProtections) ? d.disabledProtections.map((c: string) => String(c).toUpperCase()) : [],
+        disabledExtras: Array.isArray(d?.disabledExtras) ? d.disabledExtras.map((c: string) => String(c).toUpperCase()) : [],
+      }))
       .catch(() => {});
   }, [currentStep]);
 
@@ -2712,6 +2717,7 @@ function VehiclesContent() {
                     const code = selectedCar?.carCategoryCode;
                     const etoZeroCar = etoZeroCars.find(e => e.carCategoryCode === code);
                     if (!etoZeroCar) return null;
+                    if (extrasSearchCfg.disabledProtections.includes('ZERO_EXCESS')) return null;
                     // selectedCar.totalRateEstimate already has etoMargin applied (set when user clicked "Pagar Agora")
                     // so we must apply the same margin to the Zero Excess price to get a consistent upgrade delta
                     const marginMultiplier = 1 + (etoMargin / 100);
@@ -2781,7 +2787,7 @@ function VehiclesContent() {
                       <div className="w-4 h-4 border-2 border-[#008d36] border-t-transparent rounded-full animate-spin" />
                       <p>{t('extras.loadingProtections')}</p>
                     </div>
-                  ) : quoteInsurances.filter((ins: any) => ins.type !== 'M' && ins.code !== 'SL').length > 0 ? (() => {
+                  ) : quoteInsurances.filter((ins: any) => ins.type !== 'M' && ins.code !== 'SL' && !extrasSearchCfg.disabledProtections.includes(String(ins.code).toUpperCase())).length > 0 ? (() => {
                     // Insurance name and description maps (Portuguese)
                     const insNamesPT: Record<string, string> = {
                       WWI: 'Proteção de para-brisas, vidros, faróis e pneus',
@@ -2889,7 +2895,7 @@ function VehiclesContent() {
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                           {quoteInsurances
-                            .filter((ins: any) => ins.type !== 'M' && ins.code !== 'SL')
+                            .filter((ins: any) => ins.type !== 'M' && ins.code !== 'SL' && !extrasSearchCfg.disabledProtections.includes(String(ins.code).toUpperCase()))
                             .map((ins: any) => {
                               const insId = ins.code;
                               const sel = selectedExtrasMap[insId] > 0;
@@ -3090,7 +3096,7 @@ function VehiclesContent() {
                   <div className="mt-10">
                     <h3 className="font-black text-xl text-gray-900 mb-6">{t('extras.availableExtras')}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                      {xrsEquipment.slice().sort((a: any, b: any) => {
+                      {xrsEquipment.filter((eq: any) => !extrasSearchCfg.disabledExtras.includes(String(eq.code).toUpperCase())).sort((a: any, b: any) => {
                         const epA = equipmentPrices[a.code];
                         const fbA = parseFloat(a.priceFromList) || 0;
                         const hasPriceA = (epA && (epA.price > 0 || epA.priceBRL > 0 || epA.totalBRL > 0)) || fbA > 0;
