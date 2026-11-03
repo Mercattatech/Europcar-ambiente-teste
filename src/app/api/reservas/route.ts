@@ -646,24 +646,8 @@ export async function POST(request: Request) {
             onRequestItems = [raw.$ || raw];
           }
 
-          // Auto-aprendizado: salva automaticamente categorias de veículo on-request no banco
-          // para que o badge LIMITED apareça automaticamente nas próximas pesquisas
-          const vcItems = onRequestItems.filter((i: any) => (i.type || '').toUpperCase() === 'VC');
-          for (const item of vcItems) {
-            const carCode = (item.code || '').toUpperCase();
-            if (carCode) {
-              try {
-                await prisma.carCategoryOverride.upsert({
-                  where: { carCode },
-                  update: { onRequest: true },
-                  create: { carCode, friendlyName: item.description || carCode, onRequest: true },
-                });
-                console.log(`[reservas] Auto-marcado on-request: ${carCode}`);
-              } catch (e) {
-                console.warn(`[reservas] Falha ao auto-marcar ${carCode}:`, e);
-              }
-            }
-          }
+          // O status on-request (badge LIMITED) NÃO é persistido no banco: a busca de veículos
+          // consulta a XRS a cada pesquisa e usa apenas o statusCode retornado.
         }
 
         // ── Extrai cotação real e avisos (ex: rateIDNotApplied) do bookReservation ──

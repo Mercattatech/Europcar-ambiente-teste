@@ -166,8 +166,6 @@ function VehiclesContent() {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   // On-request modal
   const [onRequestModal, setOnRequestModal] = useState<{ car: any; tariff: 'POA' | 'ETO' } | null>(null);
-  // Set of carCodes marked as on-request in admin
-  const [onRequestCarCodes, setOnRequestCarCodes] = useState<Set<string>>(new Set());
 
   // URL params
   const pickupStation = searchParams.get("pickup") || "";
@@ -230,9 +228,7 @@ function VehiclesContent() {
         if (Array.isArray(data)) {
           const nameMap = data.reduce((acc: any, item: any) => ({ ...acc, [item.carCode]: item.friendlyName }), {});
           setCarCategoryOverrides(nameMap);
-          // Extract on-request codes
-          const onReqSet = new Set<string>(data.filter((item: any) => item.onRequest).map((item: any) => item.carCode as string));
-          setOnRequestCarCodes(onReqSet);
+          // On-request (LIMITED) NÃO vem do painel: é determinado 100% pelo statusCode da XRS.
         }
       })
       .catch(console.error);
@@ -1714,9 +1710,12 @@ function VehiclesContent() {
     } catch {}
   };
 
-  /** Returns true if a car is marked as on-request (from admin config or XRS statusCode) */
+  /**
+   * Returns true SOMENTE se a XRS devolveu statusCode 'R' (On Request) para esta oferta
+   * (estação, datas e tarifa pesquisadas). Não usa nenhuma regra/flag do painel.
+   */
   const isCarOnRequest = (car: any): boolean =>
-    car.statusCode === 'R' || onRequestCarCodes.has(car.carCategoryCode?.toUpperCase() || '');
+    String(car?.statusCode ?? '').trim().toUpperCase() === 'R';
 
   /** Intercepts car selection — shows on-request popup when car is on-request */
   const handleSelectCarWithOnRequestCheck = (car: any, tariff: 'POA' | 'ETO') => {

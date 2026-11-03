@@ -10,7 +10,7 @@
  *
  * Estado por categoria:
  *   - disponivel      → tarifa retornada (statusCode ≠ R/U)
- *   - sob_requisicao  → XRS statusCode R, ou categoria marcada "on request" no painel
+ *   - sob_requisicao  → XRS statusCode R
  *   - ausente         → estação não opera a categoria, XRS não devolveu tarifa ou statusCode U
  */
 import prisma from '@/lib/prisma';
@@ -87,15 +87,15 @@ async function readMarkupPercent(): Promise<{ percent: number; failed: boolean }
   }
 }
 
-async function readOnRequestOverrides(): Promise<{ onRequest: Set<string>; names: Record<string, string> }> {
+// Apenas os nomes amigáveis vêm do painel. O status "sob requisição" vem 100% da XRS (statusCode R).
+async function readCategoryNames(): Promise<{ names: Record<string, string> }> {
   try {
     const rows = await prisma.carCategoryOverride.findMany();
     return {
-      onRequest: new Set(rows.filter((r) => r.onRequest).map((r) => r.carCode.toUpperCase())),
       names: Object.fromEntries(rows.map((r) => [r.carCode.toUpperCase(), r.friendlyName])),
     };
   } catch {
-    return { onRequest: new Set(), names: {} };
+    return { names: {} };
   }
 }
 
@@ -270,7 +270,7 @@ export async function consultarDisponibilidade(p: DisponibilidadeParams) {
   // Só consulta tarifa das categorias que a estação opera (igual ao site); as demais são "ausente"
   const toQuote = wanted.filter((c) => stationCodes.has(c));
 
-  const [markupCfg, overrides] = await Promise.all([readMarkupPercent(), readOnRequestOverrides()]);
+  const [markupCfg, overrides] = await Promise.all([readMarkupPercent(), readCategoryNames()]);
   const markup = markupCfg.percent;
   if (markupCfg.failed && !isBrazil) {
     avisos.push('Não foi possível ler o markup (eto_margin_percent) do painel — preços ETO exibidos SEM markup (equivalem ao NET).');
@@ -320,13 +320,13 @@ export async function consultarDisponibilidade(p: DisponibilidadeParams) {
       return { codigo: code, nome, estado: 'ausente' as EstadoCategoria, motivo: 'Categoria não operada por esta loja no período/trecho informado.', tarifas: [] as any[] };
     }
 
-    const marked = overrides.onRequest.has(code);
     const tarifas = activeTariffs.map((t) => {
       const row = results[t.key]?.get(code);
       if (!row || row.statusCode === 'U' || row.totalBRL <= 0) {
         return { tarifa: t.key, descricao: t.descricao, estado: 'ausente' as EstadoCategoria };
       }
-      const estado: EstadoCategoria = row.statusCode === 'R' || marked ? 'sob_requisicao' : 'disponivel';
+      // 100% XRS: só é sob requisição se a Europcar devolveu statusCode R para esta tarifa
+      const estado: EstadoCategoria = row.statusCode === 'R' ? 'sob_requisicao' : 'disponivel';
       const mult = t.markup ? 1 + markup / 100 : 1;
       const totalLocal = round2(row.totalLocal * mult);
       const totalBRL = round2(row.totalBRL * mult);

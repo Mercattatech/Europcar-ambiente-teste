@@ -19,7 +19,6 @@ export default function PainelFrotaPage() {
   const [catLoading, setCatLoading] = useState(true);
   const [catCarCode, setCatCarCode] = useState("");
   const [catFriendlyName, setCatFriendlyName] = useState("");
-  const [catOnRequest, setCatOnRequest] = useState(false);
   const [catSaving, setCatSaving] = useState(false);
   const [syncingCategories, setSyncingCategories] = useState(false);
   const [catMessage, setCatMessage] = useState<{ type: string; text: string } | null>(null);
@@ -62,8 +61,8 @@ export default function PainelFrotaPage() {
     if (!catCarCode.trim()) return;
     setCatSaving(true); setCatMessage(null);
     try {
-      const r = await fetch("/api/cars/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ carCode: catCarCode.trim().toUpperCase(), friendlyName: catFriendlyName.trim() || catCarCode.trim().toUpperCase(), onRequest: catOnRequest }) });
-      if (r.ok) { setCatMessage({ type: "success", text: `Categoria ${catCarCode.toUpperCase()} salva!` }); setCatCarCode(""); setCatFriendlyName(""); setCatOnRequest(false); await fetchCategories(); }
+      const r = await fetch("/api/cars/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ carCode: catCarCode.trim().toUpperCase(), friendlyName: catFriendlyName.trim() || catCarCode.trim().toUpperCase() }) });
+      if (r.ok) { setCatMessage({ type: "success", text: `Categoria ${catCarCode.toUpperCase()} salva!` }); setCatCarCode(""); setCatFriendlyName(""); await fetchCategories(); }
       else { const err = await r.json(); setCatMessage({ type: "error", text: err.error || "Erro ao salvar" }); }
     } catch { setCatMessage({ type: "error", text: "Erro de conexão" }); }
     finally { setCatSaving(false); }
@@ -72,10 +71,6 @@ export default function PainelFrotaPage() {
   const handleDeleteCategory = async (code: string) => {
     if (!confirm(`Remover ${code}?`)) return;
     try { await fetch(`/api/cars/categories?carCode=${code}`, { method: "DELETE" }); await fetchCategories(); } catch {}
-  };
-
-  const handleToggleOnRequest = async (cat: CarCategoryOverride) => {
-    try { await fetch("/api/cars/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ carCode: cat.carCode, friendlyName: cat.friendlyName, onRequest: !cat.onRequest }) }); await fetchCategories(); } catch {}
   };
 
   const handleSync = async () => {
@@ -114,15 +109,15 @@ export default function PainelFrotaPage() {
   return (
     <div className="max-w-4xl space-y-10">
 
-      {/* ═══ ON-REQUEST ═══ */}
+      {/* ═══ CATEGORIAS ═══ */}
       <section>
         <div className="flex items-center justify-between mb-1">
-          <h1 className="text-2xl font-black text-white">Veículos Sob Consulta (LIMITED)</h1>
+          <h1 className="text-2xl font-black text-white">Categorias de Veículos</h1>
           <button
             onClick={handleSyncCategories}
             disabled={syncingCategories}
             className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 shadow-sm"
-            title="Consulta a API XRS Europcar para descobrir novos códigos ACRISS, nomes de modelos e marcar on-request"
+            title="Consulta a API XRS Europcar para descobrir novos códigos ACRISS e nomes de modelos"
           >
             {syncingCategories ? (
               <>
@@ -136,7 +131,7 @@ export default function PainelFrotaPage() {
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-gray-400 mb-4 gap-2">
           <p>
-            Marque os códigos ACRISS que são <strong className="text-white">on-request</strong>. Eles mostrarão a badge <span className="bg-black text-white text-[9px] font-black px-2 py-0.5 rounded-full">LIMITED</span> e um popup de aviso ao cliente antes de reservar.
+            Cadastre o nome amigável por código ACRISS. O aviso <span className="bg-black text-white text-[9px] font-black px-2 py-0.5 rounded-full">LIMITED</span> (on-request) é definido automaticamente pela resposta da XRS a cada busca e não é configurável aqui.
           </p>
           <span className="shrink-0 text-emerald-400 font-semibold bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-1 rounded inline-flex items-center gap-1.5" title="Rotina automática diária agendada via cron">
             <span>⏰</span> Auto: todos os dias às 00:00h
@@ -156,10 +151,6 @@ export default function PainelFrotaPage() {
               <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome amigável</label>
               <input value={catFriendlyName} onChange={e => setCatFriendlyName(e.target.value)} placeholder="Ex: BMW X5 / Minivan Premium" className="w-full bg-gray-900 border border-gray-600 text-white rounded px-3 py-2 text-sm outline-none focus:border-[#008d36]" />
             </div>
-            <label className="flex items-center gap-2 cursor-pointer mb-0.5 whitespace-nowrap">
-              <input type="checkbox" checked={catOnRequest} onChange={e => setCatOnRequest(e.target.checked)} className="w-4 h-4 accent-black" />
-              <span className="text-sm font-bold text-white">On-Request (LIMITED)</span>
-            </label>
             <button type="submit" disabled={catSaving || !catCarCode.trim()} className="bg-[#008d36] hover:bg-[#007a2d] disabled:opacity-50 text-white font-bold px-5 py-2 rounded text-sm transition-colors shrink-0">
               {catSaving ? "Salvando..." : "Salvar"}
             </button>
@@ -179,12 +170,8 @@ export default function PainelFrotaPage() {
                   <div className="flex items-center gap-3">
                     <span className="font-black text-white text-sm bg-gray-900 px-2 py-0.5 rounded border border-gray-600">{cat.carCode}</span>
                     <span className="text-gray-300 text-sm">{cat.friendlyName}</span>
-                    {cat.onRequest && <span className="bg-black text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase">LIMITED</span>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => handleToggleOnRequest(cat)} className={`text-xs font-bold px-3 py-1 rounded-full transition-colors ${cat.onRequest ? 'bg-black text-white hover:bg-gray-800' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
-                      {cat.onRequest ? '✓ On-Request' : 'Marcar On-Request'}
-                    </button>
                     <button onClick={() => handleDeleteCategory(cat.carCode)} className="text-red-500 hover:text-red-400 text-xs px-2">🗑️</button>
                   </div>
                 </div>
