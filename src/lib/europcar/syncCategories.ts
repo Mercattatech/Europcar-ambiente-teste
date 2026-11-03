@@ -139,7 +139,7 @@ export async function syncCategoriesFromXRS(): Promise<SyncCategoryResult> {
             const code = (attrs.carCategoryCode || '').toString().trim().toUpperCase();
             if (!code) continue;
 
-            const statusCode = (attrs.statusCode || '').toString().trim().toUpperCase();
+            const statusCode = (attrs.carCategoryStatusCode || attrs.statusCode || '').toString().trim().toUpperCase();
             const sample = (attrs.carCategorySample || attrs.carCategoryName || '').trim();
 
             if (categoriesMap.has(code)) {

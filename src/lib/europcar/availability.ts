@@ -206,7 +206,8 @@ async function fetchRates(ctx: Ctx, codes: string[], cid: string): Promise<{ row
         if (!code) continue;
         rows.set(code, {
           code,
-          statusCode: String(a.statusCode || '').toUpperCase(),
+          // A XRS informa F/R em carCategoryStatusCode; statusCode não vem preenchido no getMultipleRates
+          statusCode: String(a.carCategoryStatusCode || a.statusCode || '').toUpperCase(),
           currency: String(a.currency || 'BRL').toUpperCase(),
           totalLocal: num(a.totalRateEstimate),
           totalBRL: num(a.totalRateEstimateInBookingCurrency) || num(a.totalRateEstimate),

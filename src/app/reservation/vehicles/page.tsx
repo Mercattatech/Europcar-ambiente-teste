@@ -706,8 +706,8 @@ function VehiclesContent() {
               specs 
             });
             // DEBUG: log statusCode para identificar veículos on-request
-            if (attrs.statusCode) {
-              console.log(`[DEBUG on-request] Car ${attrs.carCategoryCode} statusCode=${attrs.statusCode}`);
+            if (attrs.carCategoryStatusCode || attrs.statusCode) {
+              console.log(`[DEBUG on-request] Car ${attrs.carCategoryCode} carCategoryStatusCode=${attrs.carCategoryStatusCode}`);
             }
           }
         }
@@ -1711,11 +1711,13 @@ function VehiclesContent() {
   };
 
   /**
-   * Returns true SOMENTE se a XRS devolveu statusCode 'R' (On Request) para esta oferta
+   * Returns true SOMENTE se a XRS devolveu status 'R' (On Request) para esta oferta
    * (estação, datas e tarifa pesquisadas). Não usa nenhuma regra/flag do painel.
+   * A XRS informa o status em `carCategoryStatusCode` (F = free sell, R = on request);
+   * o atributo `statusCode` não vem preenchido no getMultipleRates.
    */
   const isCarOnRequest = (car: any): boolean =>
-    String(car?.statusCode ?? '').trim().toUpperCase() === 'R';
+    String(car?.carCategoryStatusCode ?? car?.statusCode ?? '').trim().toUpperCase() === 'R';
 
   /** Intercepts car selection — shows on-request popup when car is on-request */
   const handleSelectCarWithOnRequestCheck = (car: any, tariff: 'POA' | 'ETO') => {
