@@ -5,6 +5,8 @@ import { useState, useEffect } from "react";
 export default function MargemPage() {
   const [margin, setMargin] = useState(0);
   const [savedMargin, setSavedMargin] = useState(0);
+  const [zeroMargin, setZeroMargin] = useState(0);
+  const [savedZeroMargin, setSavedZeroMargin] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
@@ -16,6 +18,9 @@ export default function MargemPage() {
         if (typeof d.percent !== "number") { setToast("⚠️ Não foi possível ler a margem salva. Recarregue antes de salvar."); return; }
         setMargin(d.percent);
         setSavedMargin(d.percent);
+        const z = typeof d.zeroExcessPercent === "number" ? d.zeroExcessPercent : d.percent;
+        setZeroMargin(z);
+        setSavedZeroMargin(z);
       })
       .catch(() => setToast("⚠️ Não foi possível ler a margem salva. Recarregue antes de salvar."))
       .finally(() => setLoading(false));
@@ -27,11 +32,12 @@ export default function MargemPage() {
       const res = await fetch("/api/admin/margin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ percent: margin }),
+        body: JSON.stringify({ percent: margin, zeroExcessPercent: zeroMargin }),
       });
       const data = await res.json();
       if (data.success) {
         setSavedMargin(data.percent);
+        setSavedZeroMargin(data.zeroExcessPercent);
         setToast("✅ Margem salva com sucesso!");
         setTimeout(() => setToast(""), 3000);
       } else {
@@ -46,7 +52,7 @@ export default function MargemPage() {
     }
   };
 
-  const hasChanges = margin !== savedMargin;
+  const hasChanges = margin !== savedMargin || zeroMargin !== savedZeroMargin;
 
   // Example prices for preview
   const exampleEUR = 88.26;
@@ -187,6 +193,38 @@ export default function MargemPage() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Markup da Proteção Premium (ETO Zero Excess — CID 56935495) */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 mb-6">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-0.5 rounded">CID 56935495</span>
+          <h2 className="text-lg font-black text-white">Markup da Proteção Premium (Franquia Zero)</h2>
+        </div>
+        <p className="text-xs text-gray-400 mb-4">
+          Percentual aplicado sobre a tarifa do CID Zero Excess quando o cliente adiciona a Proteção Premium. Substitui a margem ETO geral nessa tarifa e define o valor do upgrade exibido.
+        </p>
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.5"
+              value={zeroMargin}
+              onChange={(e) => setZeroMargin(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+              className="w-28 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-2xl font-black text-white text-center outline-none focus:border-[#e67e00] transition-colors"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">%</span>
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={saving || !hasChanges}
+            className={`px-8 py-3 rounded-lg font-bold text-sm transition-all ${hasChanges ? "bg-[#e67e00] hover:bg-[#cc6f00] text-white shadow-lg shadow-[#e67e00]/25" : "bg-gray-800 text-gray-600 cursor-not-allowed"}`}
+          >
+            {saving ? "Salvando..." : "Salvar"}
+          </button>
         </div>
       </div>
 

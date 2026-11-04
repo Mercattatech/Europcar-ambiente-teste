@@ -37,8 +37,14 @@ export function isEtoContract(contractID: any): boolean {
 }
 
 /** Markup (%) configurado no painel (/painel/margem). 0 se o banco estiver indisponível. */
-export async function readEtoMarkupPercent(): Promise<number> {
+export async function readEtoMarkupPercent(contractID?: any): Promise<number> {
   try {
+    // Proteção Premium (ETO Zero Excess, CID 56935495) tem markup próprio; sem valor salvo usa o geral.
+    if (contractID && String(contractID) === String(ETO_CID_INTERNACIONAL)) {
+      const z = await prisma.contentBlock.findUnique({ where: { key: 'eto_zero_excess_margin_percent' } });
+      const zp = z?.value_ptBR ? parseFloat(z.value_ptBR) : NaN;
+      if (!isNaN(zp) && zp >= 0) return zp;
+    }
     const cfg = await prisma.contentBlock.findUnique({ where: { key: 'eto_margin_percent' } });
     const p = parseFloat(cfg?.value_ptBR || '0');
     return isNaN(p) || p < 0 ? 0 : p;

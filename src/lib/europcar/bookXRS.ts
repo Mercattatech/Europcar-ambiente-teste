@@ -204,7 +204,7 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
       // Não substitui um NET já registrado e nunca impede a reserva.
       try {
         if (resNumber && !(customerData?.pricingSnapshot?.netBRL > 0)) {
-          const markupPct = isEtoContract(contractID) ? await readEtoMarkupPercent() : 0;
+          const markupPct = isEtoContract(contractID) ? await readEtoMarkupPercent(contractID) : 0;
           pricingSnapshot = buildPricingSnapshot({ quoteNode, contractID, markupPercent: markupPct });
           if (pricingSnapshot && customerData) customerData.pricingSnapshot = pricingSnapshot;
         }

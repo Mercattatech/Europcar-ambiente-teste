@@ -4,6 +4,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 
 const MARGIN_KEY = 'eto_margin_percent';
+// Markup próprio da Proteção Premium (ETO Zero Excess, CID 56935495). Sem valor salvo => usa a margem ETO geral.
+const ZERO_MARGIN_KEY = 'eto_zero_excess_margin_percent';
 const ADMIN_EMAILS = ["grupomercatta@gmail.com", "matheus@grupomercatta.com.br", "matheusconti@gmail.com", "matheus@grupomercatta.com", "admin@mercatta.com.br"];
 
 async function checkAdmin() {
@@ -23,7 +25,11 @@ export async function GET() {
   try {
     const config = await prisma.contentBlock.findUnique({ where: { key: MARGIN_KEY } });
     const percent = parseFloat(config?.value_ptBR || '0');
-    return NextResponse.json({ percent: isNaN(percent) ? 0 : percent }, { headers: NO_STORE });
+    const basePercent = isNaN(percent) ? 0 : percent;
+    const zeroCfg = await prisma.contentBlock.findUnique({ where: { key: ZERO_MARGIN_KEY } });
+    const zeroParsed = zeroCfg?.value_ptBR ? parseFloat(zeroCfg.value_ptBR) : NaN;
+    const zeroExcessPercent = isNaN(zeroParsed) || zeroParsed < 0 ? basePercent : zeroParsed;
+    return NextResponse.json({ percent: basePercent, zeroExcessPercent }, { headers: NO_STORE });
   } catch (error: any) {
     // Banco indisponível: NÃO devolver 0% (o checkout cobraria sem markup). O front trava o "Pagar agora".
     console.error('[margin] DB error, margem indisponível:', error.message);
@@ -38,16 +44,27 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { percent } = await request.json();
-    const value = Math.max(0, Math.min(100, parseFloat(percent) || 0));
+    const { percent, zeroExcessPercent } = await request.json();
+    let value: number | undefined;
+    if (percent !== undefined) {
+      value = Math.max(0, Math.min(100, parseFloat(percent) || 0));
+      await prisma.contentBlock.upsert({
+        where: { key: MARGIN_KEY },
+        update: { value_ptBR: String(value) },
+        create: { key: MARGIN_KEY, value_ptBR: String(value) },
+      });
+    }
+    let zeroValue: number | undefined;
+    if (zeroExcessPercent !== undefined) {
+      zeroValue = Math.max(0, Math.min(100, parseFloat(zeroExcessPercent) || 0));
+      await prisma.contentBlock.upsert({
+        where: { key: ZERO_MARGIN_KEY },
+        update: { value_ptBR: String(zeroValue) },
+        create: { key: ZERO_MARGIN_KEY, value_ptBR: String(zeroValue) },
+      });
+    }
 
-    await prisma.contentBlock.upsert({
-      where: { key: MARGIN_KEY },
-      update: { value_ptBR: String(value) },
-      create: { key: MARGIN_KEY, value_ptBR: String(value) },
-    });
-
-    return NextResponse.json({ success: true, percent: value });
+    return NextResponse.json({ success: true, percent: value, zeroExcessPercent: zeroValue });
   } catch (error: any) {
     console.error('[margin] Error:', error);
     return NextResponse.json({ error: 'Erro ao salvar margem' }, { status: 500 });

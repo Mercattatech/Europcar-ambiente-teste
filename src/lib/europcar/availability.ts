@@ -76,14 +76,18 @@ export function normalizeTime(value: string | undefined, fallback = '1000'): str
 const fmtDateBR = (d: string) => `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}`;
 const fmtTimeBR = (t: string) => `${t.slice(0, 2)}:${t.slice(2, 4)}`;
 
-async function readMarkupPercent(): Promise<{ percent: number; failed: boolean }> {
+async function readMarkupPercent(): Promise<{ percent: number; zeroExcessPercent: number; failed: boolean }> {
   try {
     const cfg = await prisma.contentBlock.findUnique({ where: { key: 'eto_margin_percent' } });
     const p = parseFloat(cfg?.value_ptBR || '0');
-    return { percent: isNaN(p) || p < 0 ? 0 : p, failed: false };
+    const percent = isNaN(p) || p < 0 ? 0 : p;
+    // Proteção Premium (CID 56935495): markup próprio; sem valor salvo usa o geral
+    const z = await prisma.contentBlock.findUnique({ where: { key: 'eto_zero_excess_margin_percent' } });
+    const zp = z?.value_ptBR ? parseFloat(z.value_ptBR) : NaN;
+    return { percent, zeroExcessPercent: isNaN(zp) || zp < 0 ? percent : zp, failed: false };
   } catch {
     // mesmo comportamento de /api/admin/margin quando o banco está fora (markup 0), mas sinalizado
-    return { percent: 0, failed: true };
+    return { percent: 0, zeroExcessPercent: 0, failed: true };
   }
 }
 
@@ -328,7 +332,8 @@ export async function consultarDisponibilidade(p: DisponibilidadeParams) {
       }
       // 100% XRS: só é sob requisição se a Europcar devolveu statusCode R para esta tarifa
       const estado: EstadoCategoria = row.statusCode === 'R' ? 'sob_requisicao' : 'disponivel';
-      const mult = t.markup ? 1 + markup / 100 : 1;
+      const tMarkup = t.cid === ETO_CID_INTERNACIONAL ? markupCfg.zeroExcessPercent : markup;
+      const mult = t.markup ? 1 + tMarkup / 100 : 1;
       const totalLocal = round2(row.totalLocal * mult);
       const totalBRL = round2(row.totalBRL * mult);
       return {
@@ -340,7 +345,7 @@ export async function consultarDisponibilidade(p: DisponibilidadeParams) {
         total: totalLocal,
         precoPorDiaBRL: round2(totalBRL / diarias),
         totalBRL,
-        ...(t.markup ? { markupAplicadoPercent: markup } : {}),
+        ...(t.markup ? { markupAplicadoPercent: tMarkup } : {}),
         ...(t.markup && p.incluirPrecoLiquido ? { totalBRLLiquidoSemMarkup: round2(row.totalBRL), totalLiquidoSemMarkup: round2(row.totalLocal) } : {}),
       };
     });

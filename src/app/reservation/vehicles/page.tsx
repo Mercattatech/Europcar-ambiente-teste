@@ -316,6 +316,8 @@ function VehiclesContent() {
 
   // ETO margin from admin panel
   const [etoMargin, setEtoMargin] = useState(0);
+  // Markup próprio da Proteção Premium (CID Zero Excess); painel /painel/margem
+  const [zeroExcessMargin, setZeroExcessMargin] = useState(0);
   // false até a margem ser lida com sucesso; sem ela não oferecemos "Pagar agora" (evita vender ETO sem markup)
   const [etoMarginReady, setEtoMarginReady] = useState(false);
 
@@ -810,7 +812,7 @@ function VehiclesContent() {
         const r = await fetch('/api/admin/margin', { cache: 'no-store' });
         const d = await r.json();
         if (!r.ok || typeof d?.percent !== 'number') throw new Error('margin unavailable');
-        if (!cancelled) { setEtoMargin(d.percent); setEtoMarginReady(true); }
+        if (!cancelled) { setEtoMargin(d.percent); setZeroExcessMargin(typeof d?.zeroExcessPercent === 'number' ? d.zeroExcessPercent : d.percent); setEtoMarginReady(true); }
       } catch {
         if (!cancelled && attempt < 4) setTimeout(() => load(attempt + 1), 1500 * (attempt + 1));
       }
@@ -2506,7 +2508,7 @@ function VehiclesContent() {
                         ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
                         : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID);
                       const enrichedCar = { ...selectedCar, ...quoteTotals, duration: bookingDurationDays };
-                      const payload = { car: enrichedCar, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupStationName: stationName || pickupStation, returnStationName: (isOneWay ? returnStationName : stationName) || returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, selectedProtectionPackage, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit, etoMarginPercent: etoMargin, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
+                      const payload = { car: enrichedCar, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupStationName: stationName || pickupStation, returnStationName: (isOneWay ? returnStationName : stationName) || returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, selectedProtectionPackage, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit, etoMarginPercent: zeroExcessUpgrade ? zeroExcessMargin : etoMargin, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
                       sessionStorage.setItem("europcar_booking", JSON.stringify(payload));
                       try {
                         const sessionId = sessionStorage.getItem("europcar_journey_session");
@@ -2621,7 +2623,7 @@ function VehiclesContent() {
                       const cidForTariff = selectedTariffType === 'ETO'
                         ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
                         : (zeroExcessUpgrade ? '56935495' : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID));
-                      const payload = { car: { ...selectedCar, duration: bookingDurationDays }, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload2, xrsInsurances: xrsInsurancesPayload2, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupStationName: stationName || pickupStation, returnStationName: (isOneWay ? returnStationName : stationName) || returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, selectedProtectionPackage, driverCountry, driverCountryName, stationCountry, quoteMileage, etoMarginPercent: etoMargin, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
+                      const payload = { car: { ...selectedCar, duration: bookingDurationDays }, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload2, xrsInsurances: xrsInsurancesPayload2, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupStationName: stationName || pickupStation, returnStationName: (isOneWay ? returnStationName : stationName) || returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, selectedProtectionPackage, driverCountry, driverCountryName, stationCountry, quoteMileage, etoMarginPercent: zeroExcessUpgrade ? zeroExcessMargin : etoMargin, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
                       sessionStorage.setItem("europcar_booking", JSON.stringify(payload));
                       // Journey tracking — Step 3: Extras selected (ETO path)
                       try {
@@ -2720,7 +2722,7 @@ function VehiclesContent() {
                     if (extrasSearchCfg.disabledProtections.includes('ZERO_EXCESS')) return null;
                     // selectedCar.totalRateEstimate already has etoMargin applied (set when user clicked "Pagar Agora")
                     // so we must apply the same margin to the Zero Excess price to get a consistent upgrade delta
-                    const marginMultiplier = 1 + (etoMargin / 100);
+                    const marginMultiplier = 1 + (zeroExcessMargin / 100);
                     const currentTotal = parseFloat(selectedCar?.totalRateEstimate || 0);
                     const zeroTotal_raw = parseFloat(etoZeroCar.totalRateEstimate || 0);
                     const zeroTotal = zeroTotal_raw * marginMultiplier;
