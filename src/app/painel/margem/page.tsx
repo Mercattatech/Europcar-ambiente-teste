@@ -76,6 +76,10 @@ export default function MargemPage() {
   const exampleZeroWithMarginBRL = exampleZeroBRL * (1 + zeroMargin / 100);
   const exampleZeroProfitBRL = exampleZeroWithMarginBRL - exampleZeroBRL;
 
+  // Escala dinâmica para a barra de Proteção Premium (permite quanto % o usuário quiser)
+  const sliderZeroMax = Math.max(100, Math.ceil((zeroMargin || 0) / 50) * 50);
+  const zeroFillPct = sliderZeroMax > 0 ? Math.min(100, Math.max(0, (zeroMargin / sliderZeroMax) * 100)) : 0;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -124,7 +128,7 @@ export default function MargemPage() {
                 max="50"
                 step="0.5"
                 value={margin}
-                onChange={(e) => setMargin(parseFloat(e.target.value))}
+                onChange={(e) => setMargin(parseFloat(e.target.value) || 0)}
                 className="w-full h-3 rounded-full appearance-none cursor-pointer"
                 style={{
                   background: `linear-gradient(to right, #e67e00 0%, #e67e00 ${margin * 2}%, #374151 ${margin * 2}%, #374151 100%)`,
@@ -146,11 +150,10 @@ export default function MargemPage() {
                 <input
                   type="number"
                   min="0"
-                  max="100"
                   step="0.5"
                   value={margin}
-                  onChange={(e) => setMargin(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
-                  className="w-28 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-2xl font-black text-white text-center outline-none focus:border-[#e67e00] transition-colors"
+                  onChange={(e) => setMargin(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className="w-32 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-2xl font-black text-white text-center outline-none focus:border-[#e67e00] transition-colors"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">%</span>
               </div>
@@ -228,7 +231,7 @@ export default function MargemPage() {
             type="button"
             onClick={() => {
               if (zeroMargin === 0) {
-                setZeroMargin(savedZeroMargin > 0 ? savedZeroMargin : 15);
+                setZeroMargin(savedZeroMargin > 0 ? savedZeroMargin : 25);
               } else {
                 setZeroMargin(0);
               }
@@ -248,59 +251,90 @@ export default function MargemPage() {
           </button>
         </div>
 
-        <p className="text-xs text-gray-400 mb-6">
-          O valor da franquia premium é obtido em tempo real da Europcar XRS. Defina abaixo o markup aplicado sobre a proteção ou ative a opção <strong>Deixar valor NET</strong> para repassar a franquia zero a preço de custo (sem acréscimo).
+        <p className="text-xs text-gray-400 mb-4">
+          O valor da franquia premium é obtido em tempo real da Europcar XRS. Você pode definir <strong>livremente a porcentagem de markup que desejar</strong> (ex.: 15%, 50%, 100%, 200%) ou ativar <strong>Deixar valor NET</strong> para repassar a franquia zero a preço de custo XRS.
         </p>
 
+        {/* Atalhos rápidos de markup */}
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          <span className="text-[11px] text-gray-500 font-bold uppercase mr-1">Atalhos rápidos:</span>
+          {[
+            { label: "0% (NET)", val: 0 },
+            { label: "15%", val: 15 },
+            { label: "25%", val: 25 },
+            { label: "50%", val: 50 },
+            { label: "75%", val: 75 },
+            { label: "100%", val: 100 },
+            { label: "150%", val: 150 },
+            { label: "200%", val: 200 },
+          ].map((preset) => (
+            <button
+              key={preset.val}
+              type="button"
+              onClick={() => setZeroMargin(preset.val)}
+              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all border cursor-pointer ${
+                zeroMargin === preset.val
+                  ? "bg-[#e67e00] text-white border-[#e67e00] shadow-sm"
+                  : "bg-gray-800/80 text-gray-400 border-gray-700 hover:text-white hover:border-gray-600"
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-start gap-8 flex-col lg:flex-row">
-          {/* Left: Slider idêntico ao de cima */}
+          {/* Left: Slider com escala dinâmica */}
           <div className="flex-1 w-full">
             <div className="flex items-center justify-between mb-4">
               <label className="block text-sm font-bold text-gray-300">
                 Margem sobre a Proteção Premium (%)
               </label>
-              {zeroMargin === 0 && (
+              {zeroMargin === 0 ? (
                 <span className="text-[11px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded">
                   Modo NET (Custo XRS)
+                </span>
+              ) : (
+                <span className="text-[11px] font-bold text-[#e67e00] bg-[#e67e00]/10 border border-[#e67e00]/30 px-2 py-0.5 rounded">
+                  + {zeroMargin}% sobre a franquia
                 </span>
               )}
             </div>
 
-            {/* Slider */}
+            {/* Slider dinâmico que se adapta a qualquer valor */}
             <div className="mb-6">
               <input
                 type="range"
                 min="0"
-                max="50"
+                max={sliderZeroMax}
                 step="0.5"
                 value={zeroMargin}
-                onChange={(e) => setZeroMargin(parseFloat(e.target.value))}
+                onChange={(e) => setZeroMargin(parseFloat(e.target.value) || 0)}
                 className="w-full h-3 rounded-full appearance-none cursor-pointer"
                 style={{
-                  background: `linear-gradient(to right, #e67e00 0%, #e67e00 ${zeroMargin * 2}%, #374151 ${zeroMargin * 2}%, #374151 100%)`,
+                  background: `linear-gradient(to right, #e67e00 0%, #e67e00 ${zeroFillPct}%, #374151 ${zeroFillPct}%, #374151 100%)`,
                 }}
               />
               <div className="flex justify-between text-[10px] text-gray-500 font-bold mt-1">
                 <span>0% (NET)</span>
-                <span>10%</span>
-                <span>20%</span>
-                <span>30%</span>
-                <span>40%</span>
-                <span>50%</span>
+                <span>{Math.round(sliderZeroMax * 0.25)}%</span>
+                <span>{Math.round(sliderZeroMax * 0.5)}%</span>
+                <span>{Math.round(sliderZeroMax * 0.75)}%</span>
+                <span>{sliderZeroMax}%</span>
               </div>
             </div>
 
-            {/* Numeric input */}
+            {/* Numeric input sem limitação superior de 100% */}
             <div className="flex items-center gap-4">
               <div className="relative">
                 <input
                   type="number"
                   min="0"
-                  max="100"
                   step="0.5"
                   value={zeroMargin}
-                  onChange={(e) => setZeroMargin(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
-                  className="w-28 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-2xl font-black text-white text-center outline-none focus:border-[#e67e00] transition-colors"
+                  onChange={(e) => setZeroMargin(Math.max(0, parseFloat(e.target.value) || 0))}
+                  placeholder="0"
+                  className="w-32 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-2xl font-black text-white text-center outline-none focus:border-[#e67e00] transition-colors"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">%</span>
               </div>
@@ -390,7 +424,7 @@ export default function MargemPage() {
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
           <div className="text-2xl mb-2">🛡️</div>
           <h3 className="font-bold text-white text-sm mb-1">Proteção Premium</h3>
-          <p className="text-xs text-gray-400">Isenção total de franquia. Pode ser repassada a preço de custo (NET) ou com markup customizado.</p>
+          <p className="text-xs text-gray-400">Isenção total de franquia. Pode ser repassada a preço de custo (NET) ou com qualquer % de markup desejado.</p>
         </div>
       </div>
     </div>

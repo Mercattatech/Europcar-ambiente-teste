@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     const { percent, zeroExcessPercent } = await request.json();
     let value: number | undefined;
     if (percent !== undefined) {
-      value = Math.max(0, Math.min(100, parseFloat(percent) || 0));
+      value = Math.max(0, parseFloat(percent) || 0);
       await prisma.contentBlock.upsert({
         where: { key: MARGIN_KEY },
         update: { value_ptBR: String(value) },
@@ -56,7 +56,8 @@ export async function POST(request: Request) {
     }
     let zeroValue: number | undefined;
     if (zeroExcessPercent !== undefined) {
-      zeroValue = Math.max(0, Math.min(100, parseFloat(zeroExcessPercent) || 0));
+      // Sem limitação de 100% — usuário pode colocar quanto % quiser da tarifa premium
+      zeroValue = Math.max(0, parseFloat(zeroExcessPercent) || 0);
       await prisma.contentBlock.upsert({
         where: { key: ZERO_MARGIN_KEY },
         update: { value_ptBR: String(zeroValue) },
