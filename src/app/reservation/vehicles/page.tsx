@@ -2720,19 +2720,26 @@ function VehiclesContent() {
                     const etoZeroCar = etoZeroCars.find(e => e.carCategoryCode === code);
                     if (!etoZeroCar) return null;
                     if (extrasSearchCfg.disabledProtections.includes('ZERO_EXCESS')) return null;
-                    // selectedCar.totalRateEstimate already has etoMargin applied (set when user clicked "Pagar Agora")
-                    // so we must apply the same margin to the Zero Excess price to get a consistent upgrade delta
-                    const marginMultiplier = 1 + (zeroExcessMargin / 100);
-                    const currentTotal = parseFloat(selectedCar?.totalRateEstimate || 0);
+                    const originalEtoCar = etoCars.find(e => e.carCategoryCode === code);
                     const zeroTotal_raw = parseFloat(etoZeroCar.totalRateEstimate || 0);
-                    const zeroTotal = zeroTotal_raw * marginMultiplier;
-                    const upgradeCost = zeroTotal - currentTotal;
-                    const currency = selectedCar?.currency || 'EUR';
-                    const currentBRL = parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || 0);
+                    const baseTotal_raw = originalEtoCar ? parseFloat(originalEtoCar.totalRateEstimate || 0) : (parseFloat(selectedCar?.totalRateEstimate || 0) / (1 + (etoMargin || 0) / 100));
+                    const rawUpgradeCost = Math.max(0, zeroTotal_raw - baseTotal_raw);
+
                     const zeroBRL_raw = parseFloat(etoZeroCar.totalRateEstimateInBookingCurrency || 0);
-                    const zeroBRL = zeroBRL_raw * marginMultiplier;
-                    const upgradeBRL = zeroBRL - currentBRL;
-                    if (upgradeCost <= 0) return null;
+                    const baseBRL_raw = originalEtoCar ? parseFloat(originalEtoCar.totalRateEstimateInBookingCurrency || 0) : (parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || 0) / (1 + (etoMargin || 0) / 100));
+                    const rawUpgradeBRL = Math.max(0, zeroBRL_raw - baseBRL_raw);
+
+                    // Markup da franquia premium (definido no painel). Se zeroExcessMargin === 0 ("Valor NET"), repassa o custo exato da XRS
+                    const protectionMultiplier = 1 + ((zeroExcessMargin || 0) / 100);
+                    const upgradeCost = rawUpgradeCost * protectionMultiplier;
+                    const upgradeBRL = rawUpgradeBRL * protectionMultiplier;
+
+                    const currency = selectedCar?.currency || 'EUR';
+                    const currentTotal = parseFloat(selectedCar?.totalRateEstimate || 0);
+                    const currentBRL = parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || 0);
+                    const zeroTotal = currentTotal + upgradeCost;
+                    const zeroBRL = currentBRL + upgradeBRL;
+                    if (rawUpgradeCost <= 0) return null;
                     return (
                       <div className={`border-2 rounded-xl p-4 md:p-6 mb-8 transition-all ${zeroExcessUpgrade ? 'border-[#008d36] bg-green-50 shadow-lg shadow-green-100' : 'border-[#e67e00] bg-gradient-to-r from-orange-50 to-amber-50 hover:shadow-md'}`}>
                         <div className="flex flex-col md:flex-row items-start gap-3 md:gap-5">
