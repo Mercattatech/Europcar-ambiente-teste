@@ -192,11 +192,13 @@ export default function HeroSearchForm() {
   // Date Picker Custom Popover
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Data mínima: +1 dia (estações validadas em 28/05/2026 — CallerCode 1132581 confirmado)
+  // Data mínima: hoje (permite reservas para o mesmo dia)
   const minPickupDate = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().split("T")[0];
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
   })();
 
   // Fetch stations on type
@@ -365,6 +367,16 @@ export default function HeroSearchForm() {
     if (minPickupDate && pickupDate < minPickupDate) {
       alert(`A data mínima de retirada é ${minPickupDate}. Por favor selecione uma data válida.`);
       return;
+    }
+
+    // Validação para retiradas no mesmo dia: horário não pode ser no passado
+    if (pickupDate === minPickupDate) {
+      const now = new Date();
+      const currentHM = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      if (pickupTime < currentHM) {
+        alert("Para retiradas no mesmo dia, selecione um horário posterior ao horário atual.");
+        return;
+      }
     }
 
     const fmt = (d: string) => d.replace(/-/g, "");
