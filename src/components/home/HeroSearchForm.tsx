@@ -192,14 +192,48 @@ export default function HeroSearchForm() {
   // Date Picker Custom Popover
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Data mínima: hoje (permite reservas para o mesmo dia)
-  const minPickupDate = (() => {
+  // Data de hoje calculada em tempo real (garante que ontem nunca fique selecionável)
+  const getLocalToday = () => {
     const now = new Date();
     const y = now.getFullYear();
     const m = String(now.getMonth() + 1).padStart(2, "0");
     const d = String(now.getDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
-  })();
+  };
+
+  const [minPickupDate, setMinPickupDate] = useState<string>(getLocalToday);
+
+  // Atualiza a data mínima no carregamento e ao focar a aba (evita cache de dia anterior)
+  useEffect(() => {
+    const syncToday = () => {
+      const today = getLocalToday();
+      setMinPickupDate(today);
+      setPickupDate(prev => (prev && prev < today ? today : prev));
+    };
+    syncToday();
+    window.addEventListener("focus", syncToday);
+    const interval = setInterval(syncToday, 60000); // Checa a cada minuto
+    return () => {
+      window.removeEventListener("focus", syncToday);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Se a retirada for hoje e o horário padrão já passou, avança para horário futuro seguro
+  useEffect(() => {
+    if (pickupDate && pickupDate === minPickupDate) {
+      const now = new Date();
+      const currentHM = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      if (pickupTime <= currentHM) {
+        now.setHours(now.getHours() + 2);
+        const h = Math.min(23, now.getHours()).toString().padStart(2, "0");
+        const m = (Math.ceil(now.getMinutes() / 15) * 15 % 60).toString().padStart(2, "0");
+        const safeSlot = `${h}:${m}`;
+        const found = TIMES.find(t => t >= safeSlot && t > currentHM) || TIMES[TIMES.length - 1];
+        setPickupTime(found);
+      }
+    }
+  }, [pickupDate, minPickupDate]);
 
   // Fetch stations on type
   useEffect(() => {
@@ -635,11 +669,16 @@ export default function HeroSearchForm() {
                 value={pickupTime}
                 onChange={(e) => setPickupTime(e.target.value)}
               >
-                {TIMES.map((tm) => (
-                  <option key={tm} value={tm}>
-                    {tm}
-                  </option>
-                ))}
+                {TIMES.map((tm) => {
+                  const now = new Date();
+                  const currentHM = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+                  const isPast = pickupDate === minPickupDate && tm <= currentHM;
+                  return (
+                    <option key={tm} value={tm} disabled={isPast} className={isPast ? "text-gray-300 bg-gray-50" : ""}>
+                      {tm}{isPast ? " (passou)" : ""}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>

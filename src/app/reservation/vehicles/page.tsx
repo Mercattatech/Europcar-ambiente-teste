@@ -775,7 +775,18 @@ function VehiclesContent() {
       }
 
       if (poaRates.length === 0) {
-        setError("Sem tarifas disponíveis para o período selecionado. Tente outras datas.");
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, "0");
+        const d = String(now.getDate()).padStart(2, "0");
+        const todayFormatted = `${y}${m}${d}`;
+        const isTodaySearch = pickupDate === todayFormatted;
+
+        if (isTodaySearch) {
+          setError("Sem tarifas disponíveis para retirada hoje neste horário. Devido ao fuso horário local da agência ou tempo de preparação da frota (lead time), tente um horário mais tarde ou uma data a partir de amanhã.");
+        } else {
+          setError("Sem tarifas disponíveis para o período selecionado. Tente outras datas.");
+        }
         setLoading(false);
         return;
       }
