@@ -166,6 +166,61 @@ function VehiclesContent() {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   // On-request modal
   const [onRequestModal, setOnRequestModal] = useState<{ car: any; tariff: 'POA' | 'ETO' } | null>(null);
+  // Modal amigável quando tarifas não estão disponíveis (fuso horário, lead time ou falta de frota)
+  const [unavailableModal, setUnavailableModal] = useState<{
+    isOpen: boolean;
+    isToday: boolean;
+    stationName: string;
+  } | null>(null);
+
+  const getSafeTimeToday = () => {
+    const now = new Date();
+    const isBR = stationCountry === 'BR' || !stationCountry || pickupStation.toUpperCase().startsWith('BR');
+    now.setHours(now.getHours() + (isBR ? 2 : 4));
+    const h = Math.min(22, Math.max(9, now.getHours()));
+    return `${String(h).padStart(2, '0')}00`;
+  };
+
+  const handleAdjustTimeToday = (customTime?: string) => {
+    setUnavailableModal(null);
+    const newTime = customTime || getSafeTimeToday();
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("time", newTime);
+    if (params.get("date") === params.get("returnDate")) {
+      const retH = Math.min(23, parseInt(newTime.slice(0, 2), 10) + 4);
+      params.set("returnTime", `${String(retH).padStart(2, "0")}00`);
+    }
+    window.location.href = `/reservation/vehicles?${params.toString()}`;
+  };
+
+  const handleAdvanceToTomorrow = () => {
+    setUnavailableModal(null);
+    const params = new URLSearchParams(searchParams.toString());
+    if (pickupDate && pickupDate.length === 8) {
+      const y = parseInt(pickupDate.slice(0, 4), 10);
+      const m = parseInt(pickupDate.slice(4, 6), 10) - 1;
+      const d = parseInt(pickupDate.slice(6, 8), 10);
+      const nextDay = new Date(y, m, d + 1);
+      const nextDayStr = `${nextDay.getFullYear()}${String(nextDay.getMonth() + 1).padStart(2, "0")}${String(nextDay.getDate()).padStart(2, "0")}`;
+      params.set("date", nextDayStr);
+
+      if (returnDate && returnDate.length === 8) {
+        const ry = parseInt(returnDate.slice(0, 4), 10);
+        const rm = parseInt(returnDate.slice(4, 6), 10) - 1;
+        const rd = parseInt(returnDate.slice(6, 8), 10);
+        const nextReturn = new Date(ry, rm, rd + 1);
+        const nextReturnStr = `${nextReturn.getFullYear()}${String(nextReturn.getMonth() + 1).padStart(2, "0")}${String(nextReturn.getDate()).padStart(2, "0")}`;
+        params.set("returnDate", nextReturnStr);
+      } else {
+        params.set("returnDate", nextDayStr);
+      }
+    }
+    params.set("time", "1000");
+    if (params.get("date") === params.get("returnDate")) {
+      params.set("returnTime", "1400");
+    }
+    window.location.href = `/reservation/vehicles?${params.toString()}`;
+  };
 
   // URL params
   const pickupStation = searchParams.get("pickup") || "";
@@ -781,6 +836,12 @@ function VehiclesContent() {
         const d = String(now.getDate()).padStart(2, "0");
         const todayFormatted = `${y}${m}${d}`;
         const isTodaySearch = pickupDate === todayFormatted;
+
+        setUnavailableModal({
+          isOpen: true,
+          isToday: isTodaySearch,
+          stationName: stationName || pickupStation,
+        });
 
         if (isTodaySearch) {
           setError("Sem tarifas disponíveis para retirada hoje neste horário. Devido ao fuso horário local da agência ou tempo de preparação da frota (lead time), tente um horário mais tarde ou uma data a partir de amanhã.");
@@ -2073,11 +2134,29 @@ function VehiclesContent() {
 
               {/* Error */}
               {!loading && error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center shadow-sm my-4">
                   <div className="text-4xl mb-3">⚠️</div>
                   <p className="font-bold text-red-700 text-lg mb-1">{t('vehicles.loadError')}</p>
-                  <p className="text-red-600 text-sm mb-4">{error}</p>
-                  <button onClick={fetchCars} className="bg-[#008d36] text-white px-6 py-2 rounded font-bold text-sm hover:bg-[#007530]">{t('vehicles.tryAgain')}</button>
+                  <p className="text-red-600 text-sm mb-6 max-w-xl mx-auto leading-relaxed">{error}</p>
+                  <div className="flex flex-wrap gap-3 justify-center items-center">
+                    <button
+                      onClick={() => setUnavailableModal({
+                        isOpen: true,
+                        isToday: pickupDate === `${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2,'0')}${String(new Date().getDate()).padStart(2,'0')}`,
+                        stationName: stationName || pickupStation
+                      })}
+                      className="bg-[#008d36] hover:bg-[#007530] text-white px-6 py-3 rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer flex items-center gap-2"
+                    >
+                      <span>💡</span>
+                      <span>Ver opções de horários e datas disponíveis</span>
+                    </button>
+                    <button
+                      onClick={fetchCars}
+                      className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-3 rounded-xl font-bold text-sm transition-colors cursor-pointer"
+                    >
+                      {t('vehicles.tryAgain')}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -3333,6 +3412,97 @@ function VehiclesContent() {
           </div>
         </div>
       )}
+            {/* ═══ MODAL AMIGÁVEL DE INDISPONIBILIDADE DE TARIFAS / HORÁRIOS ═══ */}
+      {unavailableModal?.isOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 md:p-8 relative border border-gray-100">
+            {/* Botão fechar */}
+            <button
+              onClick={() => setUnavailableModal(null)}
+              className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors"
+            >
+              ✕
+            </button>
+
+            {/* Ícone */}
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-3xl mb-4 shadow-sm">
+              {unavailableModal.isToday ? "🕒" : "📅"}
+            </div>
+
+            {/* Título */}
+            <h3 className="text-xl font-black text-gray-900 mb-2">
+              {unavailableModal.isToday
+                ? "Horário de retirada indisponível para hoje"
+                : "Nenhum veículo disponível neste período"}
+            </h3>
+
+            {/* Explicação clara e amigável */}
+            <div className="text-sm text-gray-600 space-y-3 mb-6 leading-relaxed">
+              {unavailableModal.isToday ? (
+                <>
+                  <p>
+                    A agência <strong>{unavailableModal.stationName}</strong> não possui veículos disponíveis para retirada às <strong>{pickupTime ? `${pickupTime.slice(0, 2)}h${pickupTime.slice(2, 4)}` : ''}</strong> no mesmo dia.
+                  </p>
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3.5 text-xs text-blue-900 space-y-1.5">
+                    <p className="font-bold flex items-center gap-1.5 text-blue-950">
+                      💡 Por que isso aconteceu?
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-blue-800">
+                      <li><strong>Fuso horário local:</strong> Se a agência for no exterior (ex.: Europa), o horário de retirada selecionado pode já ter passado no destino.</li>
+                      <li><strong>Tempo de preparação (Lead time):</strong> As lojas necessitam de algumas horas de antecedência para higienizar e disponibilizar os veículos de forma segura.</li>
+                    </ul>
+                  </div>
+                  <p className="text-xs text-gray-500 font-medium">
+                    Escolha uma das soluções rápidas abaixo para carregar os veículos disponíveis agora mesmo:
+                  </p>
+                </>
+              ) : (
+                <p>
+                  A agência <strong>{unavailableModal.stationName}</strong> não retornou tarifas para as datas selecionadas. Isso pode ocorrer por falta temporária de frota no período ou caso a loja esteja fechada no horário escolhido.
+                </p>
+              )}
+            </div>
+
+            {/* Ações em 1 clique */}
+            <div className="flex flex-col gap-2.5">
+              {unavailableModal.isToday && (
+                <button
+                  onClick={() => handleAdjustTimeToday()}
+                  className="w-full bg-[#008d36] hover:bg-[#007530] text-white font-bold py-3.5 px-5 rounded-xl text-sm transition-all shadow-lg shadow-green-900/20 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>🚀</span>
+                  <span>Avançar horário para hoje mais tarde (às {getSafeTimeToday().slice(0, 2)}h00)</span>
+                </button>
+              )}
+
+              <button
+                onClick={handleAdvanceToTomorrow}
+                className="w-full bg-[#FFD100] hover:bg-[#F2C700] text-gray-950 font-black py-3.5 px-5 rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>📅</span>
+                <span>Buscar para amanhã ({(() => {
+                  if (pickupDate && pickupDate.length === 8) {
+                    const y = parseInt(pickupDate.slice(0, 4), 10);
+                    const m = parseInt(pickupDate.slice(4, 6), 10) - 1;
+                    const d = parseInt(pickupDate.slice(6, 8), 10);
+                    const nextDay = new Date(y, m, d + 1);
+                    return `${String(nextDay.getDate()).padStart(2, "0")}/${String(nextDay.getMonth() + 1).padStart(2, "0")}`;
+                  }
+                  return "dia seguinte";
+                })()})</span>
+              </button>
+
+              <Link
+                href="/"
+                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-5 rounded-xl text-xs text-center transition-colors block"
+              >
+                Modificar agência ou datas na página inicial
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ═══ ON-REQUEST VEHICLE MODAL ═══ */}
       {onRequestModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)' }}>
