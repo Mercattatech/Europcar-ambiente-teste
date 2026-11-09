@@ -45,6 +45,11 @@ export async function executeXRSBooking({ bookingData, customerData, paymentData
     carCategory,
     pickupDate,
     returnDate,
+    pickupTime: bookingData.pickupTime || '1000',
+    returnTime: bookingData.returnTime || '1000',
+    station: pickupStation,
+    country: bookingData.stationCountry || customerData.pais,
+    duration: bookingData.duration || bookingData.car?.duration,
     merchantOrderId: paymentData.merchantOrderId,
     iataNumber: isPoaBooking ? resolvedPoaIata : undefined,
   });
