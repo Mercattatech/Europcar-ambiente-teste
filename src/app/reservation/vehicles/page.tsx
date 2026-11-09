@@ -879,9 +879,20 @@ function VehiclesContent() {
   // Load ETO margin from admin panel
   useEffect(() => {
     let cancelled = false;
+    const sUpper = (pickupStation || '').toUpperCase();
+    const cUpper = (stationCountry || '').toUpperCase();
+    const PT_PREFIXES = ['LIS', 'OPO', 'FAO', 'FNC', 'PXO', 'PDL', 'HOR', 'SMA', 'TER'];
+    const IT_PREFIXES = ['FCO', 'CIA', 'MXP', 'LIN', 'BGY', 'VCE', 'TSF', 'BLQ', 'FLR', 'PSA', 'NAP', 'PMO', 'CTA', 'VRN', 'CAG'];
+    let detectedCountry = cUpper;
+    if (!detectedCountry) {
+      if (PT_PREFIXES.some(p => sUpper.startsWith(p))) detectedCountry = 'PT';
+      else if (IT_PREFIXES.some(p => sUpper.startsWith(p))) detectedCountry = 'IT';
+    }
+
     const load = async (attempt: number) => {
       try {
-        const r = await fetch('/api/admin/margin', { cache: 'no-store' });
+        const url = `/api/admin/margin${detectedCountry ? `?country=${encodeURIComponent(detectedCountry)}` : ''}`;
+        const r = await fetch(url, { cache: 'no-store' });
         const d = await r.json();
         if (!r.ok || typeof d?.percent !== 'number') throw new Error('margin unavailable');
         if (!cancelled) { setEtoMargin(d.percent); setZeroExcessMargin(typeof d?.zeroExcessPercent === 'number' ? d.zeroExcessPercent : d.percent); setEtoMarginReady(true); }
@@ -891,7 +902,7 @@ function VehiclesContent() {
     };
     load(0);
     return () => { cancelled = true; };
-  }, []);
+  }, [pickupStation, stationCountry]);
 
   // Lê a chave Proteções/Extras do painel sempre que o cliente chega à etapa 3 (sem cache)
   useEffect(() => {

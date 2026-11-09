@@ -4,8 +4,6 @@
 // reservas/route.ts (fluxo síncrono: CREDIT/BALCAO/VOUCHER) e bookXRS.ts
 // (fluxo assíncrono: PIX confirmado).
 
-import { calculateRentalDays } from './rentalDuration.ts';
-
 export const CID_TO_BA: Record<string, string> = {
   '56935466': '73675595',  // ETO Líquido (Excesso)
   '56935495': '73804373',  // ETO Internacional (Excesso Zero)
@@ -81,6 +79,42 @@ function escapeXml(value: unknown): string {
     .replace(/'/g, '&apos;');
 }
 
+const BRAZIL_PREFIXES = ['BR', 'GRU', 'CGH', 'GIG', 'SDU', 'BSB', 'CNF', 'POA', 'SSA', 'REC', 'FOR', 'CWB', 'FLN', 'VCP', 'NAT', 'MCZ', 'NVT', 'VIX', 'GYN', 'CGB', 'MAO', 'BEL', 'IGU', 'AJU', 'JPA', 'SLZ', 'THE'];
+
+function isBrazil(station?: string, country?: string): boolean {
+  if (country) {
+    const c = country.trim().toUpperCase();
+    if (c === 'BR' || c === 'BRA' || c === 'BRASIL' || c === 'BRAZIL') return true;
+  }
+  if (station) {
+    const s = station.trim().toUpperCase();
+    if (BRAZIL_PREFIXES.some(prefix => s.startsWith(prefix))) return true;
+  }
+  return false;
+}
+
+function parseDateTimeSafe(dateStr?: string, timeStr?: string): Date | null {
+  if (!dateStr || dateStr.length < 8) return null;
+  let year = 0, month = 0, day = 0;
+  if (dateStr.includes('-')) {
+    const parts = dateStr.split('-');
+    if (parts.length >= 3) {
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10) - 1;
+      day = parseInt(parts[2].slice(0, 2), 10);
+    }
+  } else {
+    year = parseInt(dateStr.slice(0, 4), 10);
+    month = parseInt(dateStr.slice(4, 6), 10) - 1;
+    day = parseInt(dateStr.slice(6, 8), 10);
+  }
+  if (isNaN(year) || isNaN(month) || isNaN(day) || year === 0) return null;
+  const cleanTime = (timeStr || '1000').replace(/\D/g, '').padStart(4, '0');
+  const hour = Math.min(23, Math.max(0, parseInt(cleanTime.slice(0, 2), 10) || 0));
+  const minute = Math.min(59, Math.max(0, parseInt(cleanTime.slice(2, 4), 10) || 0));
+  return new Date(Date.UTC(year, month, day, hour, minute, 0, 0));
+}
+
 function voucherDurationDays(
   pickupDate?: string,
   returnDate?: string,
@@ -91,17 +125,18 @@ function voucherDurationDays(
   country?: string
 ): number {
   if (typeof apiDuration === 'number' && apiDuration > 0) return apiDuration;
-  if (!pickupDate || !returnDate) return 0;
-
-  return calculateRentalDays({
-    pickupDate,
-    pickupTime,
-    returnDate,
-    returnTime,
-    station,
-    country,
-    apiDuration,
-  });
+  const dt1 = parseDateTimeSafe(pickupDate, pickupTime);
+  const dt2 = parseDateTimeSafe(returnDate, returnTime);
+  if (!dt1 || !dt2) return 0;
+  const diffMs = dt2.getTime() - dt1.getTime();
+  if (diffMs <= 0) return 0;
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const fullDays = Math.floor(diffMs / DAY_MS);
+  const remainingMs = diffMs % DAY_MS;
+  const toleranceMinutes = isBrazil(station, country) ? 59 : 29;
+  const toleranceMs = toleranceMinutes * 60 * 1000;
+  const extraDay = remainingMs > toleranceMs ? 1 : 0;
+  return Math.max(1, fullDays + extraDay);
 }
 
 /** Constrói o fragmento <meanOfPayment typeCode="VCH" .../> para o bookReservation inicial.

@@ -76,8 +76,18 @@ export function normalizeTime(value: string | undefined, fallback = '1000'): str
 const fmtDateBR = (d: string) => `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}`;
 const fmtTimeBR = (t: string) => `${t.slice(0, 2)}:${t.slice(2, 4)}`;
 
-async function readMarkupPercent(): Promise<{ percent: number; zeroExcessPercent: number; failed: boolean }> {
+async function readMarkupPercent(country?: string): Promise<{ percent: number; zeroExcessPercent: number; failed: boolean }> {
   try {
+    const c = (country || '').toUpperCase().trim();
+    if (c === 'PT' || c === 'IT') {
+      const cfgC = await prisma.contentBlock.findUnique({ where: { key: `eto_margin_percent_${c}` } });
+      const pC = cfgC?.value_ptBR ? parseFloat(cfgC.value_ptBR) : NaN;
+      const zC = await prisma.contentBlock.findUnique({ where: { key: `eto_zero_excess_margin_percent_${c}` } });
+      const zpC = zC?.value_ptBR ? parseFloat(zC.value_ptBR) : NaN;
+      if (!isNaN(pC) && pC >= 0) {
+        return { percent: pC, zeroExcessPercent: !isNaN(zpC) && zpC >= 0 ? zpC : pC, failed: false };
+      }
+    }
     const cfg = await prisma.contentBlock.findUnique({ where: { key: 'eto_margin_percent' } });
     const p = parseFloat(cfg?.value_ptBR || '0');
     const percent = isNaN(p) || p < 0 ? 0 : p;
@@ -275,7 +285,7 @@ export async function consultarDisponibilidade(p: DisponibilidadeParams) {
   // Só consulta tarifa das categorias que a estação opera (igual ao site); as demais são "ausente"
   const toQuote = wanted.filter((c) => stationCodes.has(c));
 
-  const [markupCfg, overrides] = await Promise.all([readMarkupPercent(), readCategoryNames()]);
+  const [markupCfg, overrides] = await Promise.all([readMarkupPercent(stationCountry), readCategoryNames()]);
   const markup = markupCfg.percent;
   if (markupCfg.failed && !isBrazil) {
     avisos.push('Não foi possível ler o markup (eto_margin_percent) do painel — preços ETO exibidos SEM markup (equivalem ao NET).');

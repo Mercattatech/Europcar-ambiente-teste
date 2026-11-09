@@ -27,7 +27,8 @@ async function readMarkupPercent(booking: any): Promise<number> {
   const fromBooking = Number(booking?.etoMarginPercent);
   if (Number.isFinite(fromBooking)) return fromBooking;
   try {
-    const r = await fetch("/api/admin/margin", { cache: "no-store" });
+    const country = booking?.stationCountry ? `?country=${encodeURIComponent(booking.stationCountry)}` : '';
+    const r = await fetch(`/api/admin/margin${country}`, { cache: "no-store" });
     const d = await r.json();
     if (r.ok && typeof d?.percent === "number") return d.percent;
   } catch { /* ignora */ }
