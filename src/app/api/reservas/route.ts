@@ -13,6 +13,7 @@ import { registerFailedTransaction } from '@/lib/rejectionService';
 import { buildPricingSnapshot, readEtoMarkupPercent, isEtoContract, type PricingSnapshot } from '@/lib/commissions/pricingSnapshot';
 import { resolveBookedPaymentSplit } from '@/lib/europcar/paymentSplitBooking';
 import type { PaymentSplit } from '@/lib/europcar/paymentSplit';
+import { getActor, validatePaymentLinkForSale, registerSellerSale } from '@/lib/sellers';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,9 +25,16 @@ export async function POST(request: Request) {
    let isSandboxMode = false;
    let cieloPaymentId: string | undefined;
    try {
-      const { bookingData, customerData, paymentData, voucherData, xrsEquipment, xrsInsurances, couponData } = await request.json();
+      const { bookingData, customerData, paymentData, voucherData, xrsEquipment, xrsInsurances, couponData, paymentLinkToken } = await request.json();
       customerEmail = customerData?.email || '';
       customerName = customerData?.nome || '';
+
+      // Link de pagamento de vendedor: valida ANTES de qualquer cobrança.
+      const { link: sellerLink, error: sellerLinkError } = await validatePaymentLinkForSale(paymentLinkToken);
+      if (sellerLinkError) {
+        return NextResponse.json({ error: sellerLinkError }, { status: 410 });
+      }
+      const sellerActor = sellerLink ? null : await getActor().catch(() => null);
 
       // Trava de coerência: balcão (pagamento no destino) com contrato/tarifa ETO viraria
       // voucher no GreenWay. Recusa antes de qualquer cobrança ou chamada ao XRS.
@@ -910,6 +918,12 @@ export async function POST(request: Request) {
                 ...(bookingData?.payerSplit && { payerSplit: bookingData.payerSplit }),
                 // Cupom de desconto aplicado
                 ...(couponData && { couponData }),
+                ...((sellerLink || sellerActor?.kind === 'VENDEDOR') && {
+                  sellerData: {
+                    sellerId: sellerLink ? sellerLink.sellerId : (sellerActor as any).id,
+                    paymentLinkToken: sellerLink ? sellerLink.token : undefined,
+                  },
+                }),
                 ...(pricingSnapshot && { pricingSnapshot }),
                 ...(paymentSplit && { paymentSplit }),
                 ...(xrsWarnings.length > 0 && { xrsWarnings }),
@@ -918,6 +932,8 @@ export async function POST(request: Request) {
         });
         finalResNumber = localRes.resNumber;
         finalMerchantOrderId = localRes.merchantOrderId;
+         // Vincula a venda ao vendedor (link do cliente ou venda direta do vendedor logado)
+         await registerSellerSale({ link: sellerLink, actor: sellerActor, resNumber: localRes.resNumber, merchantOrderId: localRes.merchantOrderId, paymentMethod: paymentData.method, amountInCents: paymentData.amountInCents || 0, bookingData, customerData });
       } catch (dbSaveErr: any) {
         // DB save failed — for BALCÃO, we still confirm with local ID
         // PIX/CREDIT would already have been charged, so log and continue

@@ -127,16 +127,62 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
-  role          String    @default("USER") // USER or ADMIN
+  role          String    @default("USER") // USER, ADMIN or VENDEDOR
   status        String    @default("ACTIVE") // ACTIVE or BLOCKED
   phone         String?
   city          String?
   cpf           String?
+  // Vendedor (role = VENDEDOR): regra de comissão padrão e dados de recebimento
+  commissionType  String?  // PERCENTAGE | FIXED
+  commissionValue Float?   // ex: 5 (5%) ou 50 (R$ 50)
+  pixKey          String?
+  sellerNotes     String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime? @default(now()) @updatedAt
   accounts       Account[]
   sessions       Session[]
   supportTickets SupportTicket[]
+  paymentLinks   PaymentLink[]
+}
+
+// Link de pagamento gerado por um vendedor para o cliente concluir a compra
+model PaymentLink {
+  id               String    @id @default(cuid())
+  token            String    @unique
+  sellerId         String
+  seller           User      @relation(fields: [sellerId], references: [id])
+
+  customerName     String
+  customerEmail    String
+  customerPhone    String?
+
+  bookingData      Json      // cotação congelada (mesmo objeto de europcar_booking)
+  customerData     Json      // dados do condutor pré-preenchidos
+  amountInCents    Int       // total estimado (BRL) no momento da geração
+
+  status           String    @default("PENDING") // PENDING | USED | CANCELLED
+  expiresAt        DateTime
+
+  // Comissão (valor sugerido calculado na venda; editável pelo admin)
+  commissionType   String?
+  commissionRate   Float?
+  commissionAmount Float?
+  commissionStatus String    @default("PENDING") // PENDING | APPROVED | PAID | CANCELLED
+  commissionNotes  String?
+  commissionPaidAt DateTime?
+
+  // Preenchidos quando o cliente conclui a reserva
+  resNumber        String?
+  merchantOrderId  String?
+  paymentMethod    String?
+  usedAt           DateTime?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([sellerId])
+  @@index([status])
+  @@index([merchantOrderId])
 }
 
 model VerificationToken {

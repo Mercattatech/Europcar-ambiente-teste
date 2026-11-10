@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import AdminLoginForm from "@/components/auth/AdminLoginForm";
@@ -17,6 +17,8 @@ const sidebarLinks = [
    { href: "/painel/jornada", label: "Jornada do Cliente", icon: "🗺️" },
    { href: "/painel/analytics", label: "Analytics & Insights", icon: "📊" },
    { href: "/painel/comissoes", label: "Comissões", icon: "💰" },
+   { href: "/painel/vendedores", label: "Vendedores", icon: "🧑‍💼" },
+   { href: "/painel/vendedores/vendas", label: "Vendas & Comissões Vendedores", icon: "🧾" },
    { href: "/painel/cupons", label: "Cupons & Parceiros", icon: "🎟️" },
    { href: "/painel/margem", label: "Margem ETO", icon: "💹" },
    { href: "/painel/promocoes", label: "Promoções", icon: "🏷️" },
@@ -40,6 +42,12 @@ const sidebarLinks = [
 ];
 
 
+// Menu restrito do perfil Vendedor
+const sellerLinks = [
+   { href: "/painel/vendedores/vendas", label: "Minhas Vendas", icon: "🧾" },
+   { href: "/", label: "Fazer uma venda", icon: "🚗" },
+];
+
 // Quick access items for mobile bottom tab bar
 const bottomTabItems = [
    { href: "/painel", label: "Home", icon: "📊" },
@@ -51,6 +59,8 @@ const bottomTabItems = [
 export default function PainelLayout({ children }: { children: React.ReactNode }) {
    const { data: session, status } = useSession();
    const pathname = usePathname();
+   const router = useRouter();
+   const [isSeller, setIsSeller] = useState(false);
    const [sidebarOpen, setSidebarOpen] = useState(true);
    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
    const [showLoginModal, setShowLoginModal] = useState(false);
@@ -78,8 +88,22 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
          setChecking(false);
          return;
       }
+      if ((session.user as any).role === "VENDEDOR") {
+         setIsSeller(true);
+         setAuthorized(true);
+         setChecking(false);
+         return;
+      }
       setChecking(false);
    }, [session, status]);
+
+   // Vendedor só acessa a própria área de vendas
+   useEffect(() => {
+      if (isSeller && pathname !== "/painel/vendedores/vendas") router.replace("/painel/vendedores/vendas");
+   }, [isSeller, pathname, router]);
+
+   const navLinks = isSeller ? sellerLinks : sidebarLinks;
+   const tabItems = isSeller ? sellerLinks : bottomTabItems;
 
    if (status === "loading" || checking) {
       return (
@@ -138,7 +162,7 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
             {/* Navigation */}
             <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
                {sidebarOpen && <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-3">Menu Principal</p>}
-               {sidebarLinks.map(link => {
+               {navLinks.map(link => {
                   const isActive = pathname === link.href;
                   return (
                      <Link
@@ -200,7 +224,7 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
                   {/* Nav Links */}
                   <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-2">Menu</p>
-                     {sidebarLinks.map(link => {
+                     {navLinks.map(link => {
                         const isActive = pathname === link.href;
                         return (
                            <Link
@@ -252,8 +276,8 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
                      </svg>
                   </button>
-                  <h1 className="text-white font-bold text-base md:text-lg">Painel Administrativo</h1>
-                  <span className="text-[10px] bg-green-600/20 text-green-400 px-2 py-0.5 rounded-full font-bold uppercase hidden sm:inline">Admin</span>
+                  <h1 className="text-white font-bold text-base md:text-lg">{isSeller ? "Painel do Vendedor" : "Painel Administrativo"}</h1>
+                  <span className="text-[10px] bg-green-600/20 text-green-400 px-2 py-0.5 rounded-full font-bold uppercase hidden sm:inline">{isSeller ? "Vendedor" : "Admin"}</span>
                </div>
                <div className="flex items-center gap-4">
                   <Link href="/" className="text-xs md:text-sm text-gray-400 hover:text-white transition-colors font-medium" target="_blank">
@@ -271,7 +295,7 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
          {/* Mobile Bottom Tab Bar */}
          <div className="fixed bottom-0 left-0 right-0 md:hidden bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 z-40 safe-bottom">
             <div className="flex items-center justify-around h-14">
-               {bottomTabItems.map(item => {
+               {tabItems.map(item => {
                   const isActive = pathname === item.href;
                   return (
                      <Link

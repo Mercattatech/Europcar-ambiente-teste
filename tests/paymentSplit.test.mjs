@@ -21,6 +21,7 @@ import {
   filterEmailHtmlByConfig,
 } from '../src/lib/email/emailSummaryConfig.ts';
 import { computeReservationMetrics } from '../src/lib/europcar/reservationMetrics.ts';
+import { calcCommission } from '../src/lib/sellerCommission.ts';
 import { buildCreateVoucherXml, buildReservationPaymentAttrs } from '../src/lib/europcar/paymentMapping.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -666,3 +667,12 @@ test('Responsividade e integridade do HTML dos e-mails — sem tags órfãs e ta
   assert.equal(fixedSubject, 'Enc.: Europcar - Sua reserva foi confirmada');
 });
 
+
+test('Comissão do vendedor — % sobre a venda, valor fixo e regra zerada', () => {
+  assert.equal(calcCommission('PERCENTAGE', 5, 1000), 50);
+  assert.equal(calcCommission('PERCENTAGE', 7.5, 488.9), 36.67);
+  assert.equal(calcCommission('FIXED', 40, 1000), 40);
+  assert.equal(calcCommission('PERCENTAGE', 0, 1000), 0);
+  assert.equal(calcCommission(null, null, 1000), 0);
+  assert.equal(calcCommission(undefined, 10, 200), 20); // sem tipo = percentual
+});

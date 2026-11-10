@@ -13,6 +13,14 @@ export default function CheckoutPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [booking, setBooking] = useState<any>(null);
+  // Vendedor: link de pagamento (cliente chegou por um link) / geração de link (vendedor logado)
+  const [paymentLinkToken, setPaymentLinkToken] = useState<string>("");
+  const [sellerLinkUrl, setSellerLinkUrl] = useState<string>("");
+  const [sellerLinkLoading, setSellerLinkLoading] = useState(false);
+  const [sellerLinkError, setSellerLinkError] = useState<string>("");
+  const [sellerLinkCopied, setSellerLinkCopied] = useState(false);
+  const sessionRole = (session?.user as any)?.role as string | undefined;
+  const isSellerSession = (sessionRole === "VENDEDOR" || sessionRole === "ADMIN") && !paymentLinkToken;
   const [carCategoryOverrides, setCarCategoryOverrides] = useState<Record<string, string>>({});
   const [pickupStationName, setPickupStationName] = useState<string>("");
   const [returnStationName, setReturnStationName] = useState<string>("");
@@ -172,6 +180,25 @@ export default function CheckoutPage() {
 
 
   useEffect(() => {
+    // Cliente que chegou por um link de vendedor: token + dados do condutor pré-preenchidos
+    const tk = sessionStorage.getItem("europcar_payment_link_token");
+    if (tk) {
+      setPaymentLinkToken(tk);
+      try {
+        const c = JSON.parse(sessionStorage.getItem("europcar_payment_link_customer") || "null");
+        if (c) {
+          if (c.nome) setNome(c.nome);
+          if (c.sobrenome) setSobrenome(c.sobrenome);
+          if (c.email) setEmail(c.email);
+          if (c.telefone) setTelefone(c.telefone);
+          if (c.cpf) setCpf(c.cpf);
+          if (c.flightNumber) setFlightNumber(c.flightNumber);
+          if (c.loyaltyProgramId) setLoyaltyProgramId(c.loyaltyProgramId);
+          if (c.loyaltyProgramName) setLoyaltyProgramName(c.loyaltyProgramName);
+          if (c.loyaltyId) setLoyaltyId(c.loyaltyId);
+        }
+      } catch { /* ignora */ }
+    }
     const data = sessionStorage.getItem("europcar_booking");
     if (data) {
       const parsed = JSON.parse(data);
@@ -556,7 +583,9 @@ export default function CheckoutPage() {
   const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
-    if (status === "authenticated" && session?.user?.email) {
+    const isLinkFlow = typeof window !== "undefined" && !!sessionStorage.getItem("europcar_payment_link_token");
+    const roleNow = (session?.user as any)?.role;
+    if (status === "authenticated" && session?.user?.email && !isLinkFlow && roleNow !== "VENDEDOR") {
       // Fetch full profile to get phone, city, cpf
       fetch("/api/auth/me")
         .then(r => r.json())
@@ -795,6 +824,7 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bookingData: booking,
+          paymentLinkToken: paymentLinkToken || undefined,
           customerData: { nome, sobrenome, email, telefone, cpf, loyaltyProgramId, loyaltyProgramName, loyaltyId, flightNumber,
             ...(pidAcknowledged ? { pidAcknowledged: true, pidAcknowledgedAt: new Date().toISOString() } : {}),
           },
@@ -830,6 +860,10 @@ export default function CheckoutPage() {
       });
       const json = await res.json();
       if (res.ok) {
+        if (paymentLinkToken) {
+          sessionStorage.removeItem("europcar_payment_link_token");
+          sessionStorage.removeItem("europcar_payment_link_customer");
+        }
         if (paymentMethod === "PIX" && json.pixData) {
           setPixQrCode(json.pixData.qrCodeString);
           setMerchantOrderId(json.merchantOrderId);
@@ -989,6 +1023,35 @@ export default function CheckoutPage() {
   // violaria a ordem de hooks entre renders (React error #310) porque nem sempre seria
   // alcançado. Atribuição de ref durante o render é segura e não tem essa restrição.
   submitReservationRef.current = submitReservation;
+
+  // Vendedor: congela a cotação e gera o link para o cliente pagar
+  const handleGenerateSellerLink = async () => {
+    setSellerLinkError("");
+    if (!booking) return;
+    if (!nome.trim() || !sobrenome.trim() || !validateEmail(email)) {
+      setSellerLinkError("Preencha nome, sobrenome e um e-mail válido do cliente antes de gerar o link.");
+      return;
+    }
+    setSellerLinkLoading(true);
+    try {
+      const res = await fetch("/api/vendedor/links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingData: booking,
+          amountInCents,
+          customerData: { nome, sobrenome, email, telefone, cpf, loyaltyProgramId, loyaltyProgramName, loyaltyId, flightNumber },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setSellerLinkError(json.error || "Não foi possível gerar o link."); return; }
+      setSellerLinkUrl(json.url);
+    } catch {
+      setSellerLinkError("Erro de conexão ao gerar o link. Tente novamente.");
+    } finally {
+      setSellerLinkLoading(false);
+    }
+  };
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1905,6 +1968,18 @@ export default function CheckoutPage() {
               )}
             </div>
 
+            {isSellerSession && (
+              <div className="rounded-lg border-2 border-dashed border-[#008d36] bg-green-50 p-4 space-y-3">
+                <p className="text-sm font-bold text-[#006b29]">🧑‍💼 Modo vendedor</p>
+                <p className="text-xs text-gray-600">Preencha os dados do cliente e gere um link para ele concluir o pagamento (PIX ou cartão). A venda será registrada no seu nome.</p>
+                {sellerLinkError && <p className="text-xs text-red-600 font-medium">{sellerLinkError}</p>}
+                <button type="button" onClick={handleGenerateSellerLink} disabled={sellerLinkLoading || splitLoading || etoNothingOnline}
+                  className="w-full md:w-auto bg-[#1f2421] hover:bg-black text-white font-bold py-3 px-6 rounded-lg text-sm disabled:opacity-50">
+                  {sellerLinkLoading ? "Gerando link..." : "🔗 Gerar link para enviar ao cliente"}
+                </button>
+              </div>
+            )}
+
             <div className="text-right">
               {etoNothingOnline && (
                 <p id="checkout-eto-nothing-online" className="mb-3 text-sm text-amber-900 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
@@ -1917,6 +1992,24 @@ export default function CheckoutPage() {
             </div>
           </form>
         </div>
+
+        {sellerLinkUrl && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4" onClick={() => setSellerLinkUrl("")}>
+            <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-black text-gray-900">✅ Link gerado!</h3>
+              <p className="text-sm text-gray-600">Envie ao cliente. Ele confere a reserva e paga por PIX ou cartão. O link vale por 24 horas e só pode ser usado uma vez.</p>
+              <input readOnly value={sellerLinkUrl} onFocus={(e) => e.currentTarget.select()} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-800 bg-gray-50" />
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(sellerLinkUrl); setSellerLinkCopied(true); setTimeout(() => setSellerLinkCopied(false), 2000); } catch { /* ignore */ } }}
+                  className="flex-1 bg-[#008d36] hover:bg-[#007a2d] text-white font-bold py-2.5 rounded-lg text-sm">{sellerLinkCopied ? "✓ Copiado!" : "Copiar link"}</button>
+                <a target="_blank" rel="noreferrer"
+                  href={`https://wa.me/${(telefone || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Olá, ${nome}! Aqui está o link oficial da Europcar Brasil para concluir o pagamento da sua reserva: ${sellerLinkUrl}`)}`}
+                  className="flex-1 text-center bg-[#25D366] hover:bg-[#1ebe5b] text-white font-bold py-2.5 rounded-lg text-sm">Enviar por WhatsApp</a>
+              </div>
+              <button type="button" onClick={() => setSellerLinkUrl("")} className="w-full text-sm text-gray-500 hover:text-gray-800 py-1">Fechar</button>
+            </div>
+          </div>
+        )}
 
         {/* Resumo */}
         <div className="w-full md:w-[380px] shrink-0">
