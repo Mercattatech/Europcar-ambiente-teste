@@ -52,7 +52,7 @@ export default function PainelUsuarios() {
       try {
          const res = await fetch("/api/admin/users");
          const data = await res.json();
-         setUsers(data);
+         setUsers(Array.isArray(data) ? data : []);
       } catch (e) {
          console.error(e);
       } finally {

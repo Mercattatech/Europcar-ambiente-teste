@@ -93,4 +93,4 @@ ENV PORT=3000 \
 
 # Roda migrate deploy ao iniciar (|| true = não falha se já aplicado ou se houver erro)
 # Usa caminho direto ao binário — evita tentativa de download do npx
-CMD ["sh", "-c", "node node_modules/.bin/prisma migrate deploy 2>&1 || true && node server.js"]
+CMD ["sh", "-c", "node node_modules/.bin/prisma migrate deploy 2>&1 || true; node node_modules/.bin/prisma db execute --schema prisma/schema.prisma --file prisma/migrations/20261110120000_add_sellers_payment_links/migration.sql 2>&1 || true; node server.js"]

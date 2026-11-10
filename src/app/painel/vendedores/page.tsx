@@ -49,7 +49,7 @@ export default function PainelVendedores() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
          });
-         const data = await res.json();
+         const data = await res.json().catch(() => ({} as any));
          if (!res.ok) { showToast(data.error || "Erro ao salvar", "error"); return; }
          showToast(isNew ? "Vendedor cadastrado!" : "Vendedor atualizado!");
          setEditing(null);

@@ -10,7 +10,7 @@ const sellerSelect = {
   commissionType: true, commissionValue: true, pixKey: true, sellerNotes: true, createdAt: true,
 } as const;
 
-export async function GET() {
+async function listSellers() {
   const actor = await getActor();
   if (actor?.kind !== 'ADMIN') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -34,7 +34,7 @@ export async function GET() {
   return NextResponse.json(result);
 }
 
-export async function POST(req: Request) {
+async function createSeller(req: Request) {
   const actor = await getActor();
   if (actor?.kind !== 'ADMIN') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -68,3 +68,21 @@ export async function POST(req: Request) {
   return NextResponse.json(seller);
 }
 
+
+export async function GET() {
+  try {
+    return await listSellers();
+  } catch (e: any) {
+    console.error('[vendedores] GET falhou:', e?.message);
+    return NextResponse.json({ error: 'Erro ao carregar vendedores (verifique se a migração do banco foi aplicada).' }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    return await createSeller(req);
+  } catch (e: any) {
+    console.error('[vendedores] POST falhou:', e?.message);
+    return NextResponse.json({ error: 'Erro ao cadastrar vendedor: ' + (e?.message || 'falha no banco de dados').slice(0, 200) }, { status: 500 });
+  }
+}
