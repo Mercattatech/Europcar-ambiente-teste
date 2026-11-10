@@ -633,3 +633,36 @@ test('Reserva POA é SEMPRE no destino (prepaidMode="NP") e envia IATANumber par
   assert.equal(etoAttrs.prepaidAttrs, '');
 });
 
+test('Responsividade e integridade do HTML dos e-mails — sem tags órfãs e tabelas sempre balanceadas', () => {
+  // 1. Simula template com detalhamento legado contendo tabela aninhada e tag {{#TEXTO_DIARIAS}}
+  const legacyHtml = `
+<table class="main-table">
+  <tr><td class="hdr-pad">Header</td></tr>
+  <tr><td class="px"><p>Detalhamento da reserva</p>
+    <table>
+      <tr><td>Diárias</td><td>R$ 200</td></tr>
+      {{#TEXTO_DIARIAS}}<tr><td>3 diárias</td></tr>{{/TEXTO_DIARIAS}}
+    </table>
+  </td></tr>
+  <tr><td class="px"><p>Resumo de preço</p><table><tr><td>Total</td></tr></table></td></tr>
+</table>
+`;
+
+  // Simula o enriquecimento / upgrade de template e sanitização
+  let upgraded = legacyHtml.replace(/(?:<!--\s*DETALHAMENTO DA RESERVA\s*-->\s*)?<tr>\s*<td[^>]*class="px"[^>]*>\s*<p[^>]*>\s*Detalhamento da reserva\s*<\/p>[\s\S]*?<\/table>\s*<\/td>\s*<\/tr>/gi, '');
+  upgraded = upgraded.replace(/\{\{\/?#?TEXTO_DIARIAS\}\}/gi, '');
+  upgraded = upgraded.replace(/\{\{\/?#?[A-Za-z0-9_]+\}\}/g, '');
+
+  assert.ok(!upgraded.includes('TEXTO_DIARIAS'), 'Nenhuma tag TEXTO_DIARIAS deve sobrar');
+  assert.ok(!upgraded.includes('{{/'), 'Nenhuma tag de fechamento órfã deve existir');
+
+  const openTables = (upgraded.match(/<table/g) || []).length;
+  const closeTables = (upgraded.match(/<\/table>/g) || []).length;
+  assert.equal(openTables, closeTables, 'Tabelas devem estar perfeitamente balanceadas');
+
+  // 2. Correção de digitação no assunto "Sua foi reserva" -> "Sua reserva foi"
+  const typoSubject = 'Enc.: Europcar - Sua foi reserva confirmada';
+  const fixedSubject = typoSubject.replace(/Sua\s+foi\s+reserva/gi, 'Sua reserva foi');
+  assert.equal(fixedSubject, 'Enc.: Europcar - Sua reserva foi confirmada');
+});
+

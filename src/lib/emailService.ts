@@ -297,8 +297,16 @@ export async function sendTransactionalEmail(to: string, trigger: string, dataVa
       text.replace(/\{\{#([^}]+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_m, rawKey: string, inner: string) =>
         normalizedVars[normalizeVarKey(rawKey)] ? inner : '');
 
-    const parsedHtml    = replaceVars(resolveConditionals(templateHtml));
-    const parsedSubject = replaceVars(resolveConditionals(template.subject));
+    let parsedHtml    = replaceVars(resolveConditionals(templateHtml));
+    // Limpeza final de segurança: remove quaisquer tags mustache residuais ou órfãs para garantir que nunca vazem no e-mail (ex: {{/TEXTO_DIARIAS}})
+    parsedHtml = parsedHtml.replace(/\{\{\/?#?[A-Za-z0-9_]+\}\}/g, '');
+
+    let parsedSubject = replaceVars(resolveConditionals(template.subject || 'Europcar - Sua reserva foi confirmada'));
+    // Corrige eventual inversão "Sua foi reserva" -> "Sua reserva foi" e limpa tags órfãs
+    parsedSubject = parsedSubject
+      .replace(/Sua\s+foi\s+reserva/gi, 'Sua reserva foi')
+      .replace(/\{\{\/?#?[A-Za-z0-9_]+\}\}/g, '')
+      .trim();
 
     const result = await sendEmail(fromEmail, to, parsedSubject, parsedHtml);
 

@@ -29,6 +29,14 @@ const TEMPLATE_FILES = {
   CANCELAMENTO: path.resolve(__dirname, '../docs/email-templates/CANCELAMENTO.html'),
 };
 
+const DEFAULT_SUBJECTS = {
+  RESERVA_SUCESSO: 'Europcar - Sua reserva foi confirmada',
+  RESERVA_CONFIRMADA: 'Europcar - Sua reserva foi confirmada',
+  RESERVA_SOB_SOLICITACAO: 'Europcar - Solicitação de reserva recebida',
+  RESERVA_ALTERADA: 'Europcar - Sua reserva foi alterada',
+  CANCELAMENTO: 'Europcar - Reserva cancelada',
+};
+
 async function main() {
   console.log('🔄 Iniciando atualização dos templates de e-mail no banco...');
 
@@ -85,6 +93,9 @@ async function main() {
     if (target) {
       target.html = htmlContent;
       target.updatedAt = new Date().toISOString();
+      if (!target.subject || /Sua\s+foi\s+reserva/i.test(target.subject)) {
+        target.subject = (target.subject || DEFAULT_SUBJECTS[key] || 'Europcar - Confirmação').replace(/Sua\s+foi\s+reserva/gi, 'Sua reserva foi');
+      }
       console.log(`✅ Template atualizado para [${key}]: ${target.name || target.id}`);
       updatedCount++;
     } else {
@@ -93,6 +104,7 @@ async function main() {
       templates.push({
         id: newId,
         name: key.replace(/_/g, ' '),
+        subject: DEFAULT_SUBJECTS[key] || 'Europcar - Confirmação',
         html: htmlContent,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -101,6 +113,13 @@ async function main() {
         triggers[key] = newId;
       }
       updatedCount++;
+    }
+  }
+
+  // Corrige qualquer assunto residual com erro de digitação
+  for (const t of templates) {
+    if (t.subject && /Sua\s+foi\s+reserva/i.test(t.subject)) {
+      t.subject = t.subject.replace(/Sua\s+foi\s+reserva/gi, 'Sua reserva foi');
     }
   }
 

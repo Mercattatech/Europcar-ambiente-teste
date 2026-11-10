@@ -355,11 +355,15 @@ export function upgradeTemplateWithCashSummary(html: string): string {
     // Cancelamento: "Valores da reserva cancelada"
     out = out.replace(/(Valores da reserva cancelada<\/p>\s*)<table[\s\S]*?<\/table>/, (_m, head) => `${head}${PLACEHOLDER}`);
   }
-  // Remove blocos redundantes de Detalhamento da reserva e Incluídos na reserva
-  out = out.replace(/<!--\s*DETALHAMENTO DA RESERVA\s*-->[\s\S]*?<\/tr>/gi, '');
-  out = out.replace(/<!--\s*(?:PROTEÇÕES E EXTRAS|INCLUÍDOS NA RESERVA)\s*-->[\s\S]*?<\/tr>/gi, '');
-  out = out.replace(/<tr>\s*<td[^>]*class="px"[^>]*>\s*<p[^>]*>\s*Detalhamento da reserva\s*<\/p>[\s\S]*?<\/tr>/gi, '');
-  out = out.replace(/<tr>\s*<td[^>]*class="px"[^>]*>\s*<p[^>]*>\s*Incluídos na reserva\s*<\/p>[\s\S]*?<\/tr>/gi, '');
+  // Remove blocos redundantes de Detalhamento da reserva e Incluídos na reserva com fechamento seguro de tabela
+  out = out.replace(/(?:<!--\s*DETALHAMENTO DA RESERVA\s*-->\s*)?<tr>\s*<td[^>]*class="px"[^>]*>\s*<p[^>]*>\s*Detalhamento da reserva\s*<\/p>[\s\S]*?<\/table>\s*<\/td>\s*<\/tr>/gi, '');
+  out = out.replace(/(?:<!--\s*(?:PROTEÇÕES E EXTRAS|INCLUÍDOS NA RESERVA)\s*-->\s*)?<tr>\s*<td[^>]*class="px"[^>]*>\s*<p[^>]*>\s*Incluídos na reserva\s*<\/p>[\s\S]*?<\/table>\s*<\/td>\s*<\/tr>/gi, '');
+  // Caso não tenha tabela aninhada
+  out = out.replace(/(?:<!--\s*DETALHAMENTO DA RESERVA\s*-->\s*)?<tr>\s*<td[^>]*class="px"[^>]*>\s*<p[^>]*>\s*Detalhamento da reserva\s*<\/p>(?:(?!<\/td>)[\s\S])*?<\/td>\s*<\/tr>/gi, '');
+  out = out.replace(/(?:<!--\s*(?:PROTEÇÕES E EXTRAS|INCLUÍDOS NA RESERVA)\s*-->\s*)?<tr>\s*<td[^>]*class="px"[^>]*>\s*<p[^>]*>\s*Incluídos na reserva\s*<\/p>(?:(?!<\/td>)[\s\S])*?<\/td>\s*<\/tr>/gi, '');
   out = out.replace(/\{\{#MOEDA_ESTRANGEIRA\}\}[\s\S]*?\{\{\/MOEDA_ESTRANGEIRA\}\}/gi, '');
+  // Limpa quaisquer tags órfãs de diárias remanescentes
+  out = out.replace(/\{\{\/?#?TEXTO_DIARIAS\}\}/gi, '');
+  out = out.replace(/\{\{\/?#?QTD_DIARIAS\}\}/gi, '');
   return out;
 }

@@ -187,7 +187,7 @@ export function filterEmailHtmlByConfig(html: string, cfg: EmailSummaryConfig): 
 
   // 1. Bloco Franquia inteiro
   if (!cfg.sections.franchiseBlock) {
-    out = out.replace(/(?:<!--\s*FRANQUIA[\s\S]*?-->\s*)?<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?Franquia,\s*caução\s*e\s*cobranças[\s\S]*?<\/tr>/gi, "");
+    out = out.replace(/(?:<!--\s*FRANQUIA[\s\S]*?-->\s*)?<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?Franquia,\s*caução\s*e\s*cobranças[\s\S]*?<\/table>\s*<\/td>\s*<\/tr>/gi, "");
   } else {
     // Sub-itens do bloco Franquia
     if (!cfg.sections.franchiseList) {
@@ -209,26 +209,26 @@ export function filterEmailHtmlByConfig(html: string, cfg: EmailSummaryConfig): 
 
   // 2. Alerta Documentos
   if (!cfg.sections.documentAlert) {
-    out = out.replace(/(?:<!--\s*ALERTA\s*DOCUMENTOS\s*-->\s*)?<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?Na retirada apresente este e-mail[\s\S]*?<\/tr>/gi, "");
+    out = out.replace(/(?:<!--\s*ALERTA\s*DOCUMENTOS\s*-->\s*)?<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?Na retirada apresente este e-mail[\s\S]*?<\/table>\s*<\/td>\s*<\/tr>/gi, "");
   }
 
   // 3. Seções numeradas (01, 02, 03, 04)
   if (!cfg.sections.section01) {
-    out = out.replace(/<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?01\s+Sua reserva[\s\S]*?<\/tr>/gi, "");
+    out = out.replace(/<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?01\s+Sua reserva[\s\S]*?<\/table>\s*<\/td>\s*<\/tr>/gi, "");
   }
   if (!cfg.sections.section02) {
-    out = out.replace(/<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?02\s+Horário e comparecimento[\s\S]*?<\/tr>/gi, "");
+    out = out.replace(/<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?02\s+Horário e comparecimento[\s\S]*?<\/td>\s*<\/tr>/gi, "");
   }
   if (!cfg.sections.section03) {
-    out = out.replace(/<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?03\s+Checklist[\s\S]*?<\/tr>/gi, "");
+    out = out.replace(/<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?03\s+Checklist[\s\S]*?<\/td>\s*<\/tr>\s*(?=<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?04\s+Regras)/gi, "");
   }
   if (!cfg.sections.section04) {
-    out = out.replace(/<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?04\s+Regras aplicáveis[\s\S]*?<\/tr>/gi, "");
+    out = out.replace(/<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?04\s+Regras aplicáveis[\s\S]*?<\/td>\s*<\/tr>\s*(?=(?:<!--\s*SUPORTE\s*-->\s*)?<tr>)/gi, "");
   }
 
   // 4. Suporte
   if (!cfg.sections.supportLink) {
-    out = out.replace(/(?:<!--\s*SUPORTE\s*-->\s*)?<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?Dúvidas\?\s*Acesse[\s\S]*?<\/tr>/gi, "");
+    out = out.replace(/(?:<!--\s*SUPORTE\s*-->\s*)?<tr>\s*<td[^>]*class="px"[^>]*>[\s\S]*?Dúvidas\?\s*Acesse[\s\S]*?<\/td>\s*<\/tr>/gi, "");
   }
 
   return out;

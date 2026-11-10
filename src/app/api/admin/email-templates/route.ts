@@ -37,10 +37,16 @@ export async function POST(request: Request) {
     const { templates, triggers } = body;
 
     if (templates) {
+      const sanitized = Array.isArray(templates)
+        ? templates.map((t: any) => ({
+            ...t,
+            subject: typeof t.subject === 'string' ? t.subject.replace(/Sua\s+foi\s+reserva/gi, 'Sua reserva foi') : t.subject,
+          }))
+        : templates;
       await prisma.contentBlock.upsert({
         where: { key: 'EMAIL_TEMPLATES' },
-        update: { value_ptBR: JSON.stringify(templates) },
-        create: { key: 'EMAIL_TEMPLATES', value_ptBR: JSON.stringify(templates) }
+        update: { value_ptBR: JSON.stringify(sanitized) },
+        create: { key: 'EMAIL_TEMPLATES', value_ptBR: JSON.stringify(sanitized) }
       });
     }
 
