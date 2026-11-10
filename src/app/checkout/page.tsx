@@ -1045,7 +1045,7 @@ export default function CheckoutPage() {
       });
       const json = await res.json();
       if (!res.ok) { setSellerLinkError(json.error || "Não foi possível gerar o link."); return; }
-      setSellerLinkUrl(json.url);
+      setSellerLinkUrl(`${window.location.origin}/pagar/${json.token}`);
     } catch {
       setSellerLinkError("Erro de conexão ao gerar o link. Tente novamente.");
     } finally {

@@ -41,7 +41,10 @@ export async function POST(req: Request) {
     },
   });
 
-  const origin = process.env.NEXTAUTH_URL?.replace(/\/$/, '') || new URL(req.url).origin;
+  // Domínio real acessado pelo vendedor (NEXTAUTH_URL pode apontar para o domínio interno do Coolify)
+  const fwdHost = req.headers.get('x-forwarded-host') || req.headers.get('host');
+  const fwdProto = req.headers.get('x-forwarded-proto') || 'https';
+  const origin = fwdHost ? `${fwdProto}://${fwdHost}` : new URL(req.url).origin;
   return NextResponse.json({
     token: link.token,
     url: `${origin}/pagar/${link.token}`,
