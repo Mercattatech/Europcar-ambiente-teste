@@ -232,7 +232,7 @@ export default function MargemPage() {
       {/* Card 1: Tarifa ETO (Carro) */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-7 mb-6 shadow-xl">
         <label className="block text-base font-bold text-white mb-4">
-          Margem de lucro (%) — Tarifa ETO (Carro) {activeTab === "PT" ? "• Portugal" : activeTab === "IT" ? "• Itália" : "• Geral"}
+          Margem de lucro (%) — Tarifa ETO (Carro)
         </label>
 
         {/* Slider */}
@@ -306,7 +306,7 @@ export default function MargemPage() {
           <div className="flex items-center gap-3">
             <span className="bg-blue-500/20 text-blue-400 text-xs font-bold px-2.5 py-1 rounded-md">CID 56935495</span>
             <h2 className="text-base font-black text-white">
-              Markup da Proteção Premium (Franquia Zero) {activeTab === "PT" ? "• Portugal" : activeTab === "IT" ? "• Itália" : "• Geral"}
+              Markup da Proteção Premium (Franquia Zero)
             </h2>
           </div>
 
@@ -369,20 +369,9 @@ export default function MargemPage() {
         </div>
 
         {/* Slider com escala dinâmica */}
-        <div className="flex items-center justify-between mb-4">
-          <label className="block text-sm font-bold text-gray-300">
-            Margem sobre a Proteção Premium (%)
-          </label>
-          {current.zeroMargin === 0 ? (
-            <span className="text-[11px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2.5 py-0.5 rounded">
-              Modo NET (Custo XRS)
-            </span>
-          ) : (
-            <span className="text-[11px] font-bold text-[#e67e00] bg-[#e67e00]/10 border border-[#e67e00]/30 px-2.5 py-0.5 rounded">
-              + {current.zeroMargin}% sobre a franquia
-            </span>
-          )}
-        </div>
+        <label className="block text-sm font-bold text-gray-300 mb-4">
+          Margem sobre a Proteção Premium (%)
+        </label>
 
         <div className="mb-6">
           <input
