@@ -5,45 +5,58 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import AdminLoginForm from "@/components/auth/AdminLoginForm";
+import SidebarNav, { type NavGroup, type NavItem } from "@/components/painel/SidebarNav";
 
 const ADMIN_EMAILS = ["grupomercatta@gmail.com", "matheus@grupomercatta.com.br", "matheusconti@gmail.com", "matheus@grupomercatta.com", "admin@mercatta.com.br"];
 
-const sidebarLinks = [
-   { href: "/painel", label: "Dashboard", icon: "📊" },
-   { href: "/painel/usuarios", label: "Gestão de Usuários", icon: "👥" },
-   { href: "/painel/agente-ia", label: "Agente de IA", icon: "🤖" },
-   { href: "/painel/reservas", label: "Reservas", icon: "📋" },
-   { href: "/painel/relatorios", label: "Relatórios", icon: "📑" },
-   { href: "/painel/jornada", label: "Jornada do Cliente", icon: "🗺️" },
-   { href: "/painel/analytics", label: "Analytics & Insights", icon: "📊" },
-   { href: "/painel/comissoes", label: "Comissões", icon: "💰" },
-   { href: "/painel/vendedores", label: "Vendedores", icon: "🧑‍💼" },
-   { href: "/painel/vendedores/vendas", label: "Vendas & Comissões Vendedores", icon: "🧾" },
-   { href: "/painel/cupons", label: "Cupons & Parceiros", icon: "🎟️" },
-   { href: "/painel/margem", label: "Margem ETO", icon: "💹" },
-   { href: "/painel/promocoes", label: "Promoções", icon: "🏷️" },
-   { href: "/painel/extras", label: "Extras & Proteções", icon: "🛡️" },
-   { href: "/painel/frota", label: "Fotos da Frota", icon: "🚗" },
-   { href: "/painel/fidelidade", label: "Programas Fidelidade", icon: "✈️" },
-   { href: "/painel/config", label: "Config Pagamento", icon: "💳" },
-   { href: "/painel/resumo-checkout", label: "Resumo do Checkout", icon: "🧾" },
-   { href: "/painel/resumo-email", label: "Resumo dos E-mails", icon: "📧" },
-   { href: "/painel/erros-reserva", label: "Erros de Reserva (CMS)", icon: "⚠️" },
-   { href: "/painel/conteudo-site", label: "Conteúdo do Site", icon: "🌐" },
-   { href: "/painel/termos", label: "Termos e Condições", icon: "📜" },
-   { href: "/painel/config-email", label: "E-mails Automáticos", icon: "✉️" },
-   { href: "/painel/whatsapp", label: "WhatsApp Automático", icon: "📲" },
-   { href: "/painel/tags", label: "Tags & Rastreamento", icon: "📈" },
-   { href: "/painel/manutencao", label: "Modo Manutenção", icon: "🚧" },
-   { href: "/painel/logs-xrs", label: "XRS Debugger", icon: "🔍" },
-   { href: "/painel/xrs-monitor", label: "Monitor XRS", icon: "🛰️" },
-   { href: "/painel/logs", label: "Logs Cielo", icon: "📄" },
-   { href: "/painel/chamados", label: "Chamados Dev", icon: "🎫" },
+const menuGroups: NavGroup[] = [
+   { id: "geral", label: "Visão Geral", icon: "📊", items: [
+      { href: "/painel", label: "Dashboard", icon: "📊" },
+      { href: "/painel/reservas", label: "Reservas", icon: "📋" },
+      { href: "/painel/relatorios", label: "Relatórios", icon: "📑" },
+      { href: "/painel/jornada", label: "Jornada do Cliente", icon: "🗺️" },
+      { href: "/painel/analytics", label: "Analytics & Insights", icon: "📈" },
+   ] },
+   { id: "comercial", label: "Comercial & Vendas", icon: "💼", items: [
+      { href: "/painel/vendedores", label: "Vendedores", icon: "🧑‍💼" },
+      { href: "/painel/vendedores/vendas", label: "Vendas & Comissões Vendedores", icon: "🧾" },
+      { href: "/painel/comissoes", label: "Comissões", icon: "💰" },
+      { href: "/painel/cupons", label: "Cupons & Parceiros", icon: "🎟️" },
+      { href: "/painel/margem", label: "Margem ETO", icon: "💹" },
+   ] },
+   { id: "produtos", label: "Produtos & Frota", icon: "🚗", items: [
+      { href: "/painel/promocoes", label: "Promoções", icon: "🏷️" },
+      { href: "/painel/extras", label: "Extras & Proteções", icon: "🛡️" },
+      { href: "/painel/frota", label: "Fotos da Frota", icon: "🚗" },
+      { href: "/painel/fidelidade", label: "Programas Fidelidade", icon: "✈️" },
+   ] },
+   { id: "comunicacao", label: "Comunicação & IA", icon: "💬", items: [
+      { href: "/painel/agente-ia", label: "Agente de IA", icon: "🤖" },
+      { href: "/painel/whatsapp", label: "WhatsApp Automático", icon: "📲" },
+      { href: "/painel/config-email", label: "E-mails Automáticos", icon: "✉️" },
+      { href: "/painel/resumo-email", label: "Resumo dos E-mails", icon: "📧" },
+   ] },
+   { id: "conteudo", label: "Conteúdo & Site", icon: "🌐", items: [
+      { href: "/painel/conteudo-site", label: "Conteúdo do Site", icon: "🌐" },
+      { href: "/painel/termos", label: "Termos e Condições", icon: "📜" },
+      { href: "/painel/resumo-checkout", label: "Resumo do Checkout", icon: "🧾" },
+      { href: "/painel/erros-reserva", label: "Erros de Reserva (CMS)", icon: "⚠️" },
+   ] },
+   { id: "sistema", label: "Sistema & Dev", icon: "⚙️", items: [
+      { href: "/painel/usuarios", label: "Gestão de Usuários", icon: "👥" },
+      { href: "/painel/config", label: "Config Pagamento", icon: "💳" },
+      { href: "/painel/tags", label: "Tags & Rastreamento", icon: "🏁" },
+      { href: "/painel/xrs-monitor", label: "Monitor XRS", icon: "🛰️" },
+      { href: "/painel/logs-xrs", label: "XRS Debugger", icon: "🔍" },
+      { href: "/painel/logs", label: "Logs Cielo", icon: "📄" },
+      { href: "/painel/chamados", label: "Chamados Dev", icon: "🎫" },
+      { href: "/painel/manutencao", label: "Modo Manutenção", icon: "🚧" },
+   ] },
 ];
 
 
 // Menu restrito do perfil Vendedor
-const sellerLinks = [
+const sellerLinks: NavItem[] = [
    { href: "/painel/vendedores/vendas", label: "Minhas Vendas", icon: "🧾" },
    { href: "/", label: "Fazer uma venda", icon: "🚗" },
 ];
@@ -102,7 +115,7 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
       if (isSeller && pathname !== "/painel/vendedores/vendas") router.replace("/painel/vendedores/vendas");
    }, [isSeller, pathname, router]);
 
-   const navLinks = isSeller ? sellerLinks : sidebarLinks;
+   const navGroups: NavGroup[] = isSeller ? [{ id: "vendedor", label: "Menu", icon: "🧾", items: sellerLinks }] : menuGroups;
    const tabItems = isSeller ? sellerLinks : bottomTabItems;
 
    if (status === "loading" || checking) {
@@ -161,24 +174,8 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
 
             {/* Navigation */}
             <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-               {sidebarOpen && <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-3">Menu Principal</p>}
-               {navLinks.map(link => {
-                  const isActive = pathname === link.href;
-                  return (
-                     <Link
-                        key={link.href}
-                        href={link.href}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                           isActive
-                              ? "bg-green-600/15 text-green-500 border border-green-600/30"
-                              : "text-gray-400 hover:text-white hover:bg-gray-800/80"
-                        }`}
-                     >
-                        <span className="text-lg shrink-0">{link.icon}</span>
-                        {sidebarOpen && <span>{link.label}</span>}
-                     </Link>
-                  );
-               })}
+               {sidebarOpen && isSeller && <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-3">Menu Principal</p>}
+                <SidebarNav groups={navGroups} pathname={pathname} collapsed={!sidebarOpen} flat={isSeller} />
             </nav>
 
             {/* User Info */}
@@ -223,24 +220,7 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
 
                   {/* Nav Links */}
                   <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-                     <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-3 mb-2">Menu</p>
-                     {navLinks.map(link => {
-                        const isActive = pathname === link.href;
-                        return (
-                           <Link
-                              key={link.href}
-                              href={link.href}
-                              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                                 isActive
-                                    ? "bg-green-600/15 text-green-400 border border-green-600/20"
-                                    : "text-gray-400 hover:text-white hover:bg-gray-800"
-                              }`}
-                           >
-                              <span className="text-base shrink-0">{link.icon}</span>
-                              <span className="text-[13px]">{link.label}</span>
-                           </Link>
-                        );
-                     })}
+                     <SidebarNav groups={navGroups} pathname={pathname} flat={isSeller} mobile />
                   </nav>
 
                   {/* User section */}
