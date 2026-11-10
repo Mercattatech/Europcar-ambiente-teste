@@ -26,7 +26,8 @@ export async function POST(req: Request) {
     
     if (!bypassEmails.includes(session.user.email)) {
        const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
-       if (!dbUser || dbUser.role?.toUpperCase() !== "ADMIN") {
+       const upperRole = dbUser?.role?.toUpperCase();
+       if (!dbUser || dbUser.status === "BLOCKED" || (upperRole !== "ADMIN" && upperRole !== "VENDEDOR_ADMIN")) {
           return new NextResponse("Unauthorized", { status: 403 });
        }
     }

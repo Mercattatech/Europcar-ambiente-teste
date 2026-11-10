@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
 import prisma from '@/lib/prisma';
@@ -25,8 +25,8 @@ export async function POST(request: Request) {
     if (!session?.user) {
       return NextResponse.json({ error: 'Nao autenticado.' }, { status: 401 });
     }
-    const userRole = (session.user as any).role;
-    if (userRole !== 'ADMIN' && userRole !== 'admin') {
+    const userRole = String((session.user as any).role || '').toUpperCase();
+    if (userRole !== 'ADMIN' && userRole !== 'VENDEDOR_ADMIN') {
       return NextResponse.json({ error: 'Acesso negado. Apenas administradores.' }, { status: 403 });
     }
 

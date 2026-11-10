@@ -2,6 +2,29 @@
 
 import { useState, useEffect } from "react";
 
+const ROLE_META: Record<string, { label: string; badgeClass: string; desc: string }> = {
+   USER: {
+      label: "Usuário Comum",
+      badgeClass: "bg-gray-700 text-gray-300",
+      desc: "Cliente comum do site (sem acesso ao painel administrativo; pode gerar link de pagamento sem comissão).",
+   },
+   VENDEDOR: {
+      label: "Apenas Vendedor",
+      badgeClass: "bg-emerald-500/20 text-emerald-400",
+      desc: "Atua como vendedor com comissão e tem acesso EXCLUSIVO ao seu painel de comissão (Minhas Vendas).",
+   },
+   VENDEDOR_ADMIN: {
+      label: "Vendedor + Admin",
+      badgeClass: "bg-amber-500/20 text-amber-400",
+      desc: "Atua como vendedor com comissão nas vendas e possui acesso TOTAL a todas as áreas do Painel Administrativo.",
+   },
+   ADMIN: {
+      label: "Administrador",
+      badgeClass: "bg-purple-500/20 text-purple-400",
+      desc: "Acesso total ao Painel Administrativo, sem vínculo de vendedor e sem geração de comissões.",
+   },
+};
+
 export default function PainelUsuarios() {
    const [users, setUsers] = useState<any[]>([]);
    const [loading, setLoading] = useState(true);
@@ -12,6 +35,10 @@ export default function PainelUsuarios() {
    const [newPassword, setNewPassword] = useState("");
    const [newName, setNewName] = useState("");
    const [newEmail, setNewEmail] = useState("");
+   const [editRole, setEditRole] = useState("USER");
+   const [editCommissionType, setEditCommissionType] = useState("PERCENTAGE");
+   const [editCommissionValue, setEditCommissionValue] = useState("5");
+   const [editPixKey, setEditPixKey] = useState("");
    const [syncReservations, setSyncReservations] = useState(true);
    const [saving, setSaving] = useState(false);
    
@@ -21,6 +48,9 @@ export default function PainelUsuarios() {
    const [createEmail, setCreateEmail] = useState("");
    const [createPassword, setCreatePassword] = useState("");
    const [createRole, setCreateRole] = useState("USER");
+   const [createCommissionType, setCreateCommissionType] = useState("PERCENTAGE");
+   const [createCommissionValue, setCreateCommissionValue] = useState("5");
+   const [createPixKey, setCreatePixKey] = useState("");
 
    const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
    const [historyUser, setHistoryUser] = useState<any>(null);
@@ -36,6 +66,10 @@ export default function PainelUsuarios() {
       setEditingUser(u);
       setNewName(u.name || "");
       setNewEmail(u.email || "");
+      setEditRole(u.role || "USER");
+      setEditCommissionType(u.commissionType || "PERCENTAGE");
+      setEditCommissionValue(String(u.commissionValue ?? 5));
+      setEditPixKey(u.pixKey || "");
       setNewPassword("");
       setSyncReservations(true);
    };
@@ -45,6 +79,10 @@ export default function PainelUsuarios() {
       setNewPassword("");
       setNewName("");
       setNewEmail("");
+      setEditRole("USER");
+      setEditCommissionType("PERCENTAGE");
+      setEditCommissionValue("5");
+      setEditPixKey("");
       setSyncReservations(true);
    };
 
@@ -102,10 +140,22 @@ export default function PainelUsuarios() {
       e.preventDefault();
       setSaving(true);
       try {
+         const isSeller = createRole === "VENDEDOR" || createRole === "VENDEDOR_ADMIN";
+         const payload: any = {
+            name: createName,
+            email: createEmail,
+            password: createPassword,
+            role: createRole,
+            ...(isSeller ? {
+               commissionType: createCommissionType,
+               commissionValue: Number(String(createCommissionValue).replace(",", ".")) || 0,
+               pixKey: createPixKey || null,
+            } : {}),
+         };
          const res = await fetch("/api/admin/users", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: createName, email: createEmail, password: createPassword, role: createRole }),
+            body: JSON.stringify(payload),
          });
          if (res.ok) {
             showToast("Usuário criado com sucesso!");
@@ -115,6 +165,9 @@ export default function PainelUsuarios() {
             setCreateEmail("");
             setCreatePassword("");
             setCreateRole("USER");
+            setCreateCommissionType("PERCENTAGE");
+            setCreateCommissionValue("5");
+            setCreatePixKey("");
          } else {
             const data = await res.json();
             showToast(data.error || "Erro ao criar", "error");
@@ -147,12 +200,6 @@ export default function PainelUsuarios() {
       const action = newStatus === "BLOCKED" ? "BLOQUEAR" : "DESBLOQUEAR";
       if (!confirm(`Deseja ${action} o usuário ${user.email}?`)) return;
       await handleUpdateUser(user.id, { status: newStatus });
-   };
-
-   const handleToggleRole = async (user: any) => {
-      const newRole = user.role === "ADMIN" ? "USER" : "ADMIN";
-      if (!confirm(`Deseja alterar o papel de ${user.email} para ${newRole}?`)) return;
-      await handleUpdateUser(user.id, { role: newRole });
    };
 
    const handleShowHistory = async (user: any) => {
@@ -228,8 +275,10 @@ export default function PainelUsuarios() {
                {/* Role Filter */}
                <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-green-600">
                   <option value="ALL">Todos os papéis</option>
-                  <option value="USER">Usuário</option>
-                  <option value="ADMIN">Admin</option>
+                  <option value="USER">Usuário Comum</option>
+                  <option value="VENDEDOR">Apenas Vendedor</option>
+                  <option value="VENDEDOR_ADMIN">Vendedor + Admin</option>
+                  <option value="ADMIN">Administrador</option>
                </select>
                {/* Status Filter */}
                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-green-600">
@@ -278,11 +327,14 @@ export default function PainelUsuarios() {
                               </div>
                            </td>
                            <td className="px-5 py-4">
-                              <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${
-                                 u.role === "ADMIN" ? "bg-purple-500/20 text-purple-400" : "bg-gray-700 text-gray-300"
-                              }`}>
-                                 {u.role || "USER"}
+                              <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${(ROLE_META[u.role || "USER"] || ROLE_META.USER).badgeClass}`}>
+                                 {(ROLE_META[u.role || "USER"] || ROLE_META.USER).label}
                               </span>
+                              {(u.role === "VENDEDOR" || u.role === "VENDEDOR_ADMIN") && (
+                                 <p className="text-[10px] text-gray-500 mt-1">
+                                    Comissão: {u.commissionType === "FIXED" ? `R$ ${Number(u.commissionValue || 0).toFixed(2).replace(".", ",")}` : `${u.commissionValue ?? 0}%`}
+                                 </p>
+                              )}
                            </td>
                            <td className="px-5 py-4">
                               <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded flex items-center gap-1 w-fit ${
@@ -303,13 +355,9 @@ export default function PainelUsuarios() {
                                  <button onClick={() => handleShowHistory(u)} className="p-1.5 rounded-lg bg-gray-800 hover:bg-blue-900/50 text-gray-400 hover:text-blue-400 transition-colors" title="Histórico de Compras">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                                  </button>
-                                 {/* Edit */}
-                                 <button onClick={() => openEditModal(u)} className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors" title="Editar">
+                                 {/* Edit / Link Seller */}
+                                 <button onClick={() => openEditModal(u)} className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors" title="Editar / Vincular como Vendedor">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                 </button>
-                                 {/* Toggle Role */}
-                                 <button onClick={() => handleToggleRole(u)} className={`p-1.5 rounded-lg transition-colors ${u.role === "ADMIN" ? "bg-purple-900/50 hover:bg-purple-800/50 text-purple-400" : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-purple-400"}`} title={u.role === "ADMIN" ? "Retirar Admin" : "Tornar Admin"}>
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
                                  </button>
                                  {/* Toggle Block */}
                                  <button onClick={() => handleToggleBlock(u)} className={`p-1.5 rounded-lg transition-colors ${(u.status || "ACTIVE") === "BLOCKED" ? "bg-yellow-900/50 hover:bg-yellow-800/50 text-yellow-400" : "bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-yellow-400"}`} title={(u.status || "ACTIVE") === "BLOCKED" ? "Desbloquear" : "Bloquear"}>
@@ -331,7 +379,7 @@ export default function PainelUsuarios() {
          {/* Create User Modal */}
          {showCreateModal && (
             <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-               <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg shadow-2xl">
+               <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto shadow-2xl">
                   <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
                      <h2 className="text-lg font-black text-white">Criar Novo Usuário</h2>
                      <button onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-white transition-colors">
@@ -355,10 +403,32 @@ export default function PainelUsuarios() {
                        <div>
                           <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Papel (Role)</label>
                           <select value={createRole} onChange={e => setCreateRole(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white outline-none focus:border-green-600">
-                             <option value="USER">Usuário Comum (USER)</option>
-                             <option value="ADMIN">Administrador (ADMIN)</option>
+                             <option value="USER">Usuário Comum</option>
+                             <option value="VENDEDOR">Apenas Vendedor</option>
+                             <option value="VENDEDOR_ADMIN">Vendedor + Administrador</option>
+                             <option value="ADMIN">Administrador</option>
                           </select>
+                          <p className="text-[10px] text-gray-500 mt-1">{(ROLE_META[createRole] || ROLE_META.USER).desc}</p>
                        </div>
+                       {(createRole === "VENDEDOR" || createRole === "VENDEDOR_ADMIN") && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg bg-emerald-950/30 border border-emerald-800/50">
+                             <div>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tipo de comissão</label>
+                                <select value={createCommissionType} onChange={e => setCreateCommissionType(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none">
+                                   <option value="PERCENTAGE">% sobre a venda</option>
+                                   <option value="FIXED">Valor fixo (R$)</option>
+                                </select>
+                             </div>
+                             <div>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{createCommissionType === "FIXED" ? "Valor (R$)" : "Percentual (%)"}</label>
+                                <input inputMode="decimal" value={createCommissionValue} onChange={e => setCreateCommissionValue(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none" />
+                             </div>
+                             <div className="sm:col-span-2">
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Chave PIX (comissão)</label>
+                                <input value={createPixKey} onChange={e => setCreatePixKey(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none" />
+                             </div>
+                          </div>
+                       )}
                     </div>
                     <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-800">
                        <button type="button" onClick={() => setShowCreateModal(false)} className="px-5 py-2.5 rounded-lg bg-gray-800 text-gray-300 font-bold text-sm hover:bg-gray-700 transition-colors">
@@ -376,7 +446,7 @@ export default function PainelUsuarios() {
          {/* Edit User Modal */}
          {editingUser && (
             <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-               <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg shadow-2xl">
+               <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto shadow-2xl">
                   <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
                      <h2 className="text-lg font-black text-white">Editar Usuário</h2>
                      <button onClick={closeEditModal} className="text-gray-500 hover:text-white transition-colors">
@@ -457,14 +527,39 @@ export default function PainelUsuarios() {
                         <p className="text-[10px] text-gray-500 mt-1">A senha será encriptada automaticamente.</p>
                      </div>
 
+                     {/* Perfil de acesso / vínculo de vendedor */}
+                     <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Perfil de acesso</label>
+                        <select value={editRole} onChange={e => setEditRole(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white outline-none focus:border-green-600">
+                           <option value="USER">Usuário Comum</option>
+                           <option value="VENDEDOR">Apenas Vendedor (só painel de comissão)</option>
+                           <option value="VENDEDOR_ADMIN">Vendedor + Administrador (acesso total)</option>
+                           <option value="ADMIN">Administrador (sem comissão)</option>
+                        </select>
+                        <p className="text-[10px] text-gray-500 mt-1">{(ROLE_META[editRole] || ROLE_META.USER).desc}</p>
+                     </div>
+                     {(editRole === "VENDEDOR" || editRole === "VENDEDOR_ADMIN") && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg bg-emerald-950/30 border border-emerald-800/50">
+                           <div>
+                              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tipo de comissão</label>
+                              <select value={editCommissionType} onChange={e => setEditCommissionType(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none">
+                                 <option value="PERCENTAGE">% sobre a venda</option>
+                                 <option value="FIXED">Valor fixo (R$)</option>
+                              </select>
+                           </div>
+                           <div>
+                              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{editCommissionType === "FIXED" ? "Valor (R$)" : "Percentual (%)"}</label>
+                              <input inputMode="decimal" value={editCommissionValue} onChange={e => setEditCommissionValue(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none" />
+                           </div>
+                           <div className="sm:col-span-2">
+                              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Chave PIX (comissão)</label>
+                              <input value={editPixKey} onChange={e => setEditPixKey(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white outline-none" />
+                           </div>
+                        </div>
+                     )}
+
                      {/* Quick Actions */}
                      <div className="flex gap-3">
-                        <button
-                           onClick={() => handleUpdateUser(editingUser.id, { role: editingUser.role === "ADMIN" ? "USER" : "ADMIN" })}
-                           className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-colors ${editingUser.role === "ADMIN" ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 border border-purple-600/30"}`}
-                        >
-                           {editingUser.role === "ADMIN" ? "Remover Admin" : "Tornar Admin"}
-                        </button>
                         <button
                            onClick={() => handleUpdateUser(editingUser.id, { status: (editingUser.status || "ACTIVE") === "ACTIVE" ? "BLOCKED" : "ACTIVE" })}
                            className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-colors ${(editingUser.status || "ACTIVE") === "BLOCKED" ? "bg-green-600/20 text-green-400 hover:bg-green-600/30 border border-green-600/30" : "bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-600/30"}`}
@@ -500,6 +595,13 @@ export default function PainelUsuarios() {
                            }
 
                            if (newPassword) updates.newPassword = newPassword;
+                           if (editRole !== (editingUser.role || "USER")) updates.role = editRole;
+                           if (editRole === "VENDEDOR" || editRole === "VENDEDOR_ADMIN") {
+                              const cv = Number(String(editCommissionValue).replace(",", ".")) || 0;
+                              if (editCommissionType !== (editingUser.commissionType || "PERCENTAGE")) updates.commissionType = editCommissionType;
+                              if (cv !== Number(editingUser.commissionValue ?? NaN)) updates.commissionValue = cv;
+                              if ((editPixKey || "") !== (editingUser.pixKey || "")) updates.pixKey = editPixKey;
+                           }
                            if (Object.keys(updates).length === 0) { showToast("Nenhuma alteração para salvar.", "error"); return; }
                            handleUpdateUser(editingUser.id, updates);
                         }}

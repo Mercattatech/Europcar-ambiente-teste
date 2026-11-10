@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
-import { getActor } from '@/lib/sellers';
+import { getActor, isSellerRole } from '@/lib/sellers';
 
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const actor = await getActor();
-  if (actor?.kind !== 'ADMIN') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!actor?.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const target = await prisma.user.findUnique({ where: { id: params.id } });
-  if (!target || target.role !== 'VENDEDOR') {
+  if (!target || !isSellerRole(target.role)) {
     return NextResponse.json({ error: 'Vendedor não encontrado' }, { status: 404 });
   }
   const b = await req.json();
@@ -20,6 +20,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (b.cpf !== undefined) data.cpf = b.cpf || null;
   if (b.pixKey !== undefined) data.pixKey = b.pixKey || null;
   if (b.sellerNotes !== undefined) data.sellerNotes = b.sellerNotes || null;
+  if (b.role === 'VENDEDOR' || b.role === 'VENDEDOR_ADMIN') data.role = b.role;
   if (b.status === 'ACTIVE' || b.status === 'BLOCKED') data.status = b.status;
   if (b.commissionType !== undefined) data.commissionType = b.commissionType === 'FIXED' ? 'FIXED' : 'PERCENTAGE';
   if (b.commissionValue !== undefined) data.commissionValue = Number(b.commissionValue) || 0;
@@ -36,4 +37,3 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   await prisma.user.update({ where: { id: target.id }, data });
   return NextResponse.json({ success: true });
 }
-

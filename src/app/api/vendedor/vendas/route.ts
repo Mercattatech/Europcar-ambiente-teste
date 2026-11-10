@@ -6,16 +6,22 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Vendas dos vendedores (links usados + vendas diretas) com comissão.
- * Admin vê todos (filtro opcional sellerId); vendedor vê apenas as próprias.
+ * Admin e Vendedor+Admin veem todos (filtro opcional sellerId); Apenas Vendedor vê exclusivamente as próprias vendas.
+ * Links compartilhados por usuários comuns (sellerId = null) nunca aparecem aqui.
  */
 export async function GET(req: Request) {
   const actor = await getActor();
-  if (!actor || !actor.id && actor.kind === 'VENDEDOR') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!actor || (!actor.isAdmin && (!actor.isSeller || !actor.id))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   const sp = new URL(req.url).searchParams;
-  const where: any = { status: 'USED' };
-  if (actor.kind === 'VENDEDOR') where.sellerId = actor.id;
-  else if (sp.get('sellerId')) where.sellerId = sp.get('sellerId');
+  const where: any = { status: 'USED', sellerId: { not: null } };
+  if (!actor.isAdmin) {
+    where.sellerId = actor.id;
+  } else if (sp.get('sellerId')) {
+    where.sellerId = sp.get('sellerId');
+  }
   if (sp.get('commissionStatus')) where.commissionStatus = sp.get('commissionStatus');
   const start = sp.get('startDate');
   const end = sp.get('endDate');
@@ -73,6 +79,5 @@ export async function GET(req: Request) {
     commissionPaid: soldRows.filter((r) => r.commissionStatus === 'PAID').reduce((a, r) => a + r.commissionAmount, 0),
   };
 
-  return NextResponse.json({ rows, totals, role: actor.kind });
+  return NextResponse.json({ rows, totals, role: actor.isAdmin ? 'ADMIN' : 'VENDEDOR' });
 }
-

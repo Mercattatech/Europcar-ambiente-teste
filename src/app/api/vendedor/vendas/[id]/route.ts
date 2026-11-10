@@ -4,10 +4,10 @@ import { getActor } from '@/lib/sellers';
 
 export const dynamic = 'force-dynamic';
 
-/** Admin: edita o valor, status e observação da comissão de uma venda. */
+/** Admin / Vendedor+Admin: edita o valor, status e observação da comissão de uma venda. */
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const actor = await getActor();
-  if (actor?.kind !== 'ADMIN') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!actor?.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const b = await req.json();
   const data: any = {};
@@ -30,4 +30,3 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   await prisma.paymentLink.update({ where: { id: params.id }, data });
   return NextResponse.json({ success: true });
 }
-

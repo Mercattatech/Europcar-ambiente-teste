@@ -11,7 +11,7 @@ async function checkAdmin() {
   const isHardcoded = ADMIN_EMAILS.includes(session.user.email);
   if (isHardcoded) return { ok: true, session };
   const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
-  return { ok: dbUser?.role === 'ADMIN', session };
+  return { ok: (dbUser?.role === 'ADMIN' || dbUser?.role === 'VENDEDOR_ADMIN') && dbUser?.status !== 'BLOCKED', session };
 }
 
 export async function GET(request: Request) {

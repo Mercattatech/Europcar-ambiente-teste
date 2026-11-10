@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-const EMPTY = { name: "", email: "", password: "", phone: "", cpf: "", commissionType: "PERCENTAGE", commissionValue: "5", pixKey: "", sellerNotes: "" };
+const EMPTY = { name: "", email: "", password: "", phone: "", cpf: "", role: "VENDEDOR", commissionType: "PERCENTAGE", commissionValue: "5", pixKey: "", sellerNotes: "" };
 
 export default function PainelVendedores() {
    const [sellers, setSellers] = useState<any[]>([]);
@@ -31,7 +31,7 @@ export default function PainelVendedores() {
    const openNew = () => { setForm(EMPTY); setEditing({}); };
    const openEdit = (s: any) => {
       setForm({
-         name: s.name || "", email: s.email || "", password: "", phone: s.phone || "", cpf: s.cpf || "",
+         name: s.name || "", email: s.email || "", password: "", phone: s.phone || "", cpf: s.cpf || "", role: s.role === "VENDEDOR_ADMIN" ? "VENDEDOR_ADMIN" : "VENDEDOR",
          commissionType: s.commissionType || "PERCENTAGE", commissionValue: String(s.commissionValue ?? 0),
          pixKey: s.pixKey || "", sellerNotes: s.sellerNotes || "",
       });
@@ -97,7 +97,9 @@ export default function PainelVendedores() {
                   {!loading && sellers.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-gray-500">Nenhum vendedor cadastrado.</td></tr>}
                   {sellers.map((s) => (
                      <tr key={s.id} className="border-b border-gray-800/60 text-gray-300">
-                        <td className="p-4"><p className="font-bold text-white">{s.name}</p><p className="text-xs text-gray-500">{s.email}</p></td>
+                        <td className="p-4"><p className="font-bold text-white">{s.name}</p><p className="text-xs text-gray-500">{s.email}</p>
+                           <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded ${s.role === "VENDEDOR_ADMIN" ? "bg-amber-500/20 text-amber-400" : "bg-emerald-500/20 text-emerald-400"}`}>{s.role === "VENDEDOR_ADMIN" ? "Vendedor + Admin" : "Apenas Vendedor"}</span>
+                        </td>
                         <td className="p-4 text-xs">{s.phone || "—"}<br /><span className="text-gray-500">PIX: {s.pixKey || "—"}</span></td>
                         <td className="p-4 font-bold text-green-400">
                            {s.commissionType === "FIXED" ? `R$ ${Number(s.commissionValue || 0).toFixed(2).replace(".", ",")} / venda` : `${s.commissionValue ?? 0}% da venda`}
@@ -143,6 +145,13 @@ export default function PainelVendedores() {
                         <label className={label}>{form.commissionType === "FIXED" ? "Valor (R$)" : "Percentual (%)"}</label>
                         <input className={input} inputMode="decimal" value={form.commissionValue} onChange={(e) => setForm({ ...form, commissionValue: e.target.value })} />
                      </div>
+                  </div>
+                  <div>
+                     <label className={label}>Perfil de acesso</label>
+                     <select className={input} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                        <option value="VENDEDOR">Apenas Vendedor — acessa só o painel de comissão</option>
+                        <option value="VENDEDOR_ADMIN">Vendedor + Administrador — acesso total ao painel</option>
+                     </select>
                   </div>
                   <div><label className={label}>Chave PIX para pagamento da comissão</label><input className={input} value={form.pixKey} onChange={(e) => setForm({ ...form, pixKey: e.target.value })} /></div>
                   <div><label className={label}>Observações</label><textarea rows={2} className={input} value={form.sellerNotes} onChange={(e) => setForm({ ...form, sellerNotes: e.target.value })} /></div>

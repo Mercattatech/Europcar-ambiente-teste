@@ -12,7 +12,7 @@ async function checkAdmin() {
    if (!session?.user?.email) return false;
    if (ADMIN_EMAILS.includes(session.user.email)) return true;
    const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
-   return dbUser?.role === 'ADMIN';
+   return (dbUser?.role === 'ADMIN' || dbUser?.role === 'VENDEDOR_ADMIN') && dbUser?.status !== 'BLOCKED';
 }
 
 // PATCH - Update reservation status

@@ -76,6 +76,20 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.sub = (user as any).id;
         token.role = (user as any).role;
+        (token as any).roleSyncedAt = Date.now();
+      } else if (token.sub && (!((token as any).roleSyncedAt) || Date.now() - Number((token as any).roleSyncedAt) > 30_000)) {
+        try {
+          const fresh = await prisma.user.findUnique({
+            where: { id: token.sub },
+            select: { role: true, status: true },
+          });
+          if (fresh) {
+            token.role = fresh.status === "BLOCKED" ? "BLOCKED" : fresh.role;
+            (token as any).roleSyncedAt = Date.now();
+          }
+        } catch {
+          // Mantém token.role em caso de lentidão temporária no banco
+        }
       }
       return token;
     }

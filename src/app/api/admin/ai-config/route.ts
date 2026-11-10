@@ -13,7 +13,7 @@ async function checkAdmin() {
    if (ADMIN_EMAILS.includes(session.user.email)) return true;
    try {
       const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
-      return dbUser?.role === 'ADMIN';
+      return (dbUser?.role === 'ADMIN' || dbUser?.role === 'VENDEDOR_ADMIN') && dbUser?.status !== 'BLOCKED';
    } catch {
       return false; // DB might be unreachable
    }

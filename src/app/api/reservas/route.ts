@@ -918,12 +918,17 @@ export async function POST(request: Request) {
                 ...(bookingData?.payerSplit && { payerSplit: bookingData.payerSplit }),
                 // Cupom de desconto aplicado
                 ...(couponData && { couponData }),
-                ...((sellerLink || sellerActor?.kind === 'VENDEDOR') && {
-                  sellerData: {
-                    sellerId: sellerLink ? sellerLink.sellerId : (sellerActor as any).id,
-                    paymentLinkToken: sellerLink ? sellerLink.token : undefined,
-                  },
-                }),
+                ...(() => {
+                  const effectiveSellerId = sellerLink ? sellerLink.sellerId : (sellerActor?.isSeller ? sellerActor.id : null);
+                  return effectiveSellerId
+                    ? {
+                        sellerData: {
+                          sellerId: effectiveSellerId,
+                          paymentLinkToken: sellerLink ? sellerLink.token : undefined,
+                        },
+                      }
+                    : {};
+                })(),
                 ...(pricingSnapshot && { pricingSnapshot }),
                 ...(paymentSplit && { paymentSplit }),
                 ...(xrsWarnings.length > 0 && { xrsWarnings }),

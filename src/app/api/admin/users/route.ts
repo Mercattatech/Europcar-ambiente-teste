@@ -1,20 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/authOptions';
+import { checkAdmin } from '@/lib/checkAdmin';
+import { isSellerRole, normalizeUserRole } from '@/lib/sellerCommission';
 
 export const dynamic = 'force-dynamic';
-
-const ADMIN_EMAILS = ["grupomercatta@gmail.com", "matheus@grupomercatta.com.br", "matheusconti@gmail.com", "matheus@grupomercatta.com"];
-
-async function checkAdmin() {
-   const session = await getServerSession(authOptions);
-   if (!session?.user?.email) return false;
-   if (ADMIN_EMAILS.includes(session.user.email)) return true;
-   const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
-   return dbUser?.role === 'ADMIN';
-}
 
 export async function GET() {
    try {
@@ -29,7 +19,10 @@ export async function GET() {
 export async function POST(req: Request) {
    try {
       if (!(await checkAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const { name, email, password, role } = await req.json();
+      const body = await req.json();
+      const { name, password, phone, cpf, commissionType, commissionValue, pixKey, sellerNotes } = body;
+      const email = String(body.email || '').trim().toLowerCase();
+      const role = normalizeUserRole(body.role);
 
       if (!email || !password) {
          return NextResponse.json({ error: 'E-mail e senha são obrigatórios' }, { status: 400 });
@@ -41,13 +34,25 @@ export async function POST(req: Request) {
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
+      const sellerFields = isSellerRole(role)
+         ? {
+              commissionType: commissionType === 'FIXED' ? 'FIXED' : 'PERCENTAGE',
+              commissionValue: commissionValue !== undefined && commissionValue !== '' ? (Number(commissionValue) || 0) : 5,
+              pixKey: pixKey || null,
+              sellerNotes: sellerNotes || null,
+           }
+         : {};
+
       const user = await prisma.user.create({
          data: {
             name,
             email,
             password: hashedPassword,
-            role: role || 'USER',
-            status: 'ACTIVE'
+            role,
+            status: 'ACTIVE',
+            ...(phone !== undefined ? { phone: phone || null } : {}),
+            ...(cpf !== undefined ? { cpf: cpf || null } : {}),
+            ...sellerFields,
          }
       });
 
@@ -64,7 +69,7 @@ export async function PUT(req: Request) {
       if (!(await checkAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       const { id, role, email, name } = await req.json();
       const updateData: any = {};
-      if (role !== undefined) updateData.role = role;
+      if (role !== undefined) updateData.role = normalizeUserRole(role);
       if (name !== undefined) updateData.name = name;
       if (email !== undefined) updateData.email = String(email).trim().toLowerCase();
       const updatedUser = await prisma.user.update({

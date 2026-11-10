@@ -127,12 +127,12 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
-  role          String    @default("USER") // USER, ADMIN or VENDEDOR
+  role          String    @default("USER") // USER, VENDEDOR, VENDEDOR_ADMIN, ADMIN
   status        String    @default("ACTIVE") // ACTIVE or BLOCKED
   phone         String?
   city          String?
   cpf           String?
-  // Vendedor (role = VENDEDOR): regra de comissão padrão e dados de recebimento
+  // Vendedor (role = VENDEDOR ou VENDEDOR_ADMIN): regra de comissão padrão e dados de recebimento
   commissionType  String?  // PERCENTAGE | FIXED
   commissionValue Float?   // ex: 5 (5%) ou 50 (R$ 50)
   pixKey          String?
@@ -145,12 +145,12 @@ model User {
   paymentLinks   PaymentLink[]
 }
 
-// Link de pagamento gerado por um vendedor para o cliente concluir a compra
+// Link de pagamento compartilhável (gerado por vendedor com comissão, ou por usuário comum sem vendedor)
 model PaymentLink {
   id               String    @id @default(cuid())
   token            String    @unique
-  sellerId         String
-  seller           User      @relation(fields: [sellerId], references: [id])
+  sellerId         String?
+  seller           User?     @relation(fields: [sellerId], references: [id], onDelete: SetNull)
 
   customerName     String
   customerEmail    String

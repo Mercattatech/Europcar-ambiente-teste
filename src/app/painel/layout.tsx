@@ -74,6 +74,7 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
    const pathname = usePathname();
    const router = useRouter();
    const [isSeller, setIsSeller] = useState(false);
+   const [isSellerAdmin, setIsSellerAdmin] = useState(false);
    const [sidebarOpen, setSidebarOpen] = useState(true);
    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
    const [showLoginModal, setShowLoginModal] = useState(false);
@@ -91,28 +92,61 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
          setChecking(false);
          return;
       }
-      if (ADMIN_EMAILS.includes(session.user.email)) {
-         setAuthorized(true);
+
+      let cancelled = false;
+      const applyRole = (roleRaw: string | undefined, userStatus?: string) => {
+         if (cancelled) return;
+         const email = session.user?.email || "";
+         const role = String(roleRaw || "").toUpperCase();
+         const hardcoded = ADMIN_EMAILS.includes(email);
+
+         if (!hardcoded && userStatus === "BLOCKED") {
+            setIsSeller(false);
+            setIsSellerAdmin(false);
+            setAuthorized(false);
+            setChecking(false);
+            return;
+         }
+
+         if (hardcoded || role === "ADMIN" || role === "VENDEDOR_ADMIN") {
+            setIsSeller(false);
+            setIsSellerAdmin(role === "VENDEDOR_ADMIN" || (hardcoded && role === "VENDEDOR"));
+            setAuthorized(true);
+            setChecking(false);
+            return;
+         }
+
+         if (role === "VENDEDOR") {
+            setIsSeller(true);
+            setIsSellerAdmin(false);
+            setAuthorized(true);
+            setChecking(false);
+            return;
+         }
+
+         setIsSeller(false);
+         setIsSellerAdmin(false);
+         setAuthorized(false);
          setChecking(false);
-         return;
-      }
-      if ((session.user as any).role === "ADMIN") {
-         setAuthorized(true);
-         setChecking(false);
-         return;
-      }
-      if ((session.user as any).role === "VENDEDOR") {
-         setIsSeller(true);
-         setAuthorized(true);
-         setChecking(false);
-         return;
-      }
-      setChecking(false);
+      };
+
+      // Consulta o papel atualizado direto no banco para refletir mudanças imediatas em /painel/usuarios
+      fetch("/api/auth/me")
+         .then((r) => (r.ok ? r.json() : null))
+         .then((me) => {
+            if (me && me.role) applyRole(me.role, me.status);
+            else applyRole((session.user as any).role);
+         })
+         .catch(() => applyRole((session.user as any).role));
+
+      return () => { cancelled = true; };
    }, [session, status]);
 
-   // Vendedor só acessa a própria área de vendas
+   // Apenas Vendedor só acessa o seu painel de comissão (/painel/vendedores/vendas)
    useEffect(() => {
-      if (isSeller && pathname !== "/painel/vendedores/vendas") router.replace("/painel/vendedores/vendas");
+      if (isSeller && pathname !== "/painel/vendedores/vendas") {
+         router.replace("/painel/vendedores/vendas");
+      }
    }, [isSeller, pathname, router]);
 
    const navGroups: NavGroup[] = isSeller ? [{ id: "vendedor", label: "Menu", icon: "🧾", items: sellerLinks }] : menuGroups;
@@ -256,8 +290,10 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
                      </svg>
                   </button>
-                  <h1 className="text-white font-bold text-base md:text-lg">{isSeller ? "Painel do Vendedor" : "Painel Administrativo"}</h1>
-                  <span className="text-[10px] bg-green-600/20 text-green-400 px-2 py-0.5 rounded-full font-bold uppercase hidden sm:inline">{isSeller ? "Vendedor" : "Admin"}</span>
+                  <h1 className="text-white font-bold text-base md:text-lg">{isSeller ? "Painel de Comissões" : "Painel Administrativo"}</h1>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase hidden sm:inline ${isSellerAdmin ? "bg-amber-500/20 text-amber-400" : "bg-green-600/20 text-green-400"}`}>
+                     {isSeller ? "Vendedor" : isSellerAdmin ? "Vendedor + Admin" : "Admin"}
+                  </span>
                </div>
                <div className="flex items-center gap-4">
                   <Link href="/" className="text-xs md:text-sm text-gray-400 hover:text-white transition-colors font-medium" target="_blank">
@@ -268,7 +304,11 @@ export default function PainelLayout({ children }: { children: React.ReactNode }
 
             {/* Page Content - with bottom padding for mobile bottom tab */}
             <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-950 pb-20 md:pb-6">
-               {children}
+               {isSeller && pathname !== "/painel/vendedores/vendas" ? (
+                  <div className="py-16 text-center text-gray-400 text-sm">Redirecionando para o seu painel de comissões...</div>
+               ) : (
+                  children
+               )}
             </div>
          </main>
 

@@ -6,21 +6,22 @@ import { getActor } from '@/lib/sellers';
 export const dynamic = 'force-dynamic';
 
 const sellerSelect = {
-  id: true, name: true, email: true, phone: true, cpf: true, status: true,
+  id: true, name: true, email: true, phone: true, cpf: true, role: true, status: true,
   commissionType: true, commissionValue: true, pixKey: true, sellerNotes: true, createdAt: true,
 } as const;
 
 async function listSellers() {
   const actor = await getActor();
-  if (actor?.kind !== 'ADMIN') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!actor?.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const sellers = await prisma.user.findMany({
-    where: { role: 'VENDEDOR' },
+    where: { role: { in: ['VENDEDOR', 'VENDEDOR_ADMIN'] } },
     select: sellerSelect,
     orderBy: { createdAt: 'desc' },
   });
   const links = await prisma.paymentLink.groupBy({
     by: ['sellerId', 'status'],
+    where: { sellerId: { not: null } },
     _count: { _all: true },
   });
   const result = sellers.map((s) => {
@@ -36,7 +37,7 @@ async function listSellers() {
 
 async function createSeller(req: Request) {
   const actor = await getActor();
-  if (actor?.kind !== 'ADMIN') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!actor?.isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const b = await req.json();
   const email = String(b.email || '').trim().toLowerCase();
@@ -48,13 +49,14 @@ async function createSeller(req: Request) {
     return NextResponse.json({ error: 'A senha deve ter ao menos 6 caracteres' }, { status: 400 });
   }
   if (await prisma.user.findUnique({ where: { email } })) {
-    return NextResponse.json({ error: 'E-mail já cadastrado' }, { status: 400 });
+    return NextResponse.json({ error: 'E-mail já cadastrado. Você pode vincular este usuário como vendedor em Gestão de Usuários.' }, { status: 400 });
   }
+  const role = b.role === 'VENDEDOR_ADMIN' ? 'VENDEDOR_ADMIN' : 'VENDEDOR';
   const seller = await prisma.user.create({
     data: {
       name, email,
       password: await bcrypt.hash(String(b.password), 10),
-      role: 'VENDEDOR',
+      role,
       status: 'ACTIVE',
       phone: b.phone || null,
       cpf: b.cpf || null,

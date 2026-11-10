@@ -1,21 +1,12 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/authOptions';
+import { checkAdmin } from '@/lib/checkAdmin';
+import { isSellerRole, normalizeUserRole } from '@/lib/sellerCommission';
+
 export const dynamic = 'force-dynamic';
 
-const ADMIN_EMAILS = ["grupomercatta@gmail.com", "matheus@grupomercatta.com.br", "matheusconti@gmail.com", "matheus@grupomercatta.com"];
-
-async function checkAdmin() {
-   const session = await getServerSession(authOptions);
-   if (!session?.user?.email) return false;
-   if (ADMIN_EMAILS.includes(session.user.email)) return true;
-   const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
-   return dbUser?.role === 'ADMIN';
-}
-
-// PATCH /api/admin/users/[id] - Update user (role, status, password, name, email)
+// PATCH /api/admin/users/[id] - Update user (role, seller commission fields, status, password, name, email)
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
    if (!(await checkAdmin())) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -33,9 +24,28 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
          return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
       }
 
-      if (body.role !== undefined) updateData.role = body.role;
+      if (body.role !== undefined) {
+         const nextRole = normalizeUserRole(body.role);
+         updateData.role = nextRole;
+         if (isSellerRole(nextRole) && !currentUser.commissionType && body.commissionType === undefined) {
+            updateData.commissionType = 'PERCENTAGE';
+         }
+         if (isSellerRole(nextRole) && currentUser.commissionValue == null && body.commissionValue === undefined) {
+            updateData.commissionValue = 0;
+         }
+      }
       if (body.status !== undefined) updateData.status = body.status;
       if (body.name !== undefined) updateData.name = body.name;
+      if (body.phone !== undefined) updateData.phone = body.phone || null;
+      if (body.cpf !== undefined) updateData.cpf = body.cpf || null;
+      if (body.pixKey !== undefined) updateData.pixKey = body.pixKey || null;
+      if (body.sellerNotes !== undefined) updateData.sellerNotes = body.sellerNotes || null;
+      if (body.commissionType !== undefined) {
+         updateData.commissionType = body.commissionType === 'FIXED' ? 'FIXED' : 'PERCENTAGE';
+      }
+      if (body.commissionValue !== undefined) {
+         updateData.commissionValue = Number(body.commissionValue) || 0;
+      }
 
       let emailChanged = false;
       const oldEmail = currentUser.email ? currentUser.email.trim().toLowerCase() : null;
@@ -84,6 +94,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             email: true,
             role: true,
             status: true,
+            phone: true,
+            cpf: true,
+            commissionType: true,
+            commissionValue: true,
+            pixKey: true,
+            sellerNotes: true,
             createdAt: true,
          }
       });
@@ -163,7 +179,8 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
    }
 
    try {
-      // Delete related data first (sessions, accounts)
+      // Desvincula links de pagamento antes da exclusão para evitar erro de chave estrangeira
+      await prisma.paymentLink.updateMany({ where: { sellerId: params.id }, data: { sellerId: null } }).catch(() => {});
       await prisma.session.deleteMany({ where: { userId: params.id } });
       await prisma.account.deleteMany({ where: { userId: params.id } });
       await prisma.user.delete({ where: { id: params.id } });

@@ -11,7 +11,7 @@ async function checkAdmin() {
    if (!session?.user?.email) return false;
    if (ADMIN_EMAILS.includes(session.user.email)) return true;
    const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
-   return dbUser?.role === 'ADMIN';
+   return (dbUser?.role === 'ADMIN' || dbUser?.role === 'VENDEDOR_ADMIN') && dbUser?.status !== 'BLOCKED';
 }
 
 export async function GET(request: Request) {
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
       ] = await Promise.all([
          prisma.user.count(),
          prisma.user.count({ where: { status: 'BLOCKED' } }),
-         prisma.user.count({ where: { role: 'ADMIN' } }),
+         prisma.user.count({ where: { role: { in: ['ADMIN', 'VENDEDOR_ADMIN'] } } }),
          prisma.localReservation.count({ where: resWhere }),
          prisma.localReservation.count({ where: { ...resWhere, status: 'CONFIRMED_PREPAID' } }),
          prisma.localReservation.count({ where: { ...resWhere, status: { in: ['PENDING_PIX', 'CONFIRMED_NON_PREPAID'] } } }),

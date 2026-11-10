@@ -19,8 +19,12 @@ export default function CheckoutPage() {
   const [sellerLinkLoading, setSellerLinkLoading] = useState(false);
   const [sellerLinkError, setSellerLinkError] = useState<string>("");
   const [sellerLinkCopied, setSellerLinkCopied] = useState(false);
-  const sessionRole = (session?.user as any)?.role as string | undefined;
-  const isSellerSession = (sessionRole === "VENDEDOR" || sessionRole === "ADMIN") && !paymentLinkToken;
+  const sessionRole = String((session?.user as any)?.role || "").toUpperCase();
+  // Vendedor (Apenas Vendedor ou Vendedor + Admin): o link gerado registra a venda no nome dele
+  const isSellerRoleSession = sessionRole === "VENDEDOR" || sessionRole === "VENDEDOR_ADMIN";
+  const isSellerSession = isSellerRoleSession && !paymentLinkToken;
+  // Qualquer pessoa (inclusive usuário comum/visitante) pode gerar um link de compartilhamento — sem vendedor
+  const canShareLink = !paymentLinkToken;
   const [carCategoryOverrides, setCarCategoryOverrides] = useState<Record<string, string>>({});
   const [pickupStationName, setPickupStationName] = useState<string>("");
   const [returnStationName, setReturnStationName] = useState<string>("");
@@ -584,8 +588,16 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     const isLinkFlow = typeof window !== "undefined" && !!sessionStorage.getItem("europcar_payment_link_token");
-    const roleNow = (session?.user as any)?.role;
-    if (status === "authenticated" && session?.user?.email && !isLinkFlow && roleNow !== "VENDEDOR") {
+    const roleNow = String((session?.user as any)?.role || "").toUpperCase();
+    const sellerNow = roleNow === "VENDEDOR" || roleNow === "VENDEDOR_ADMIN";
+    // Vendedor vendendo para um cliente: fidelidade e voo começam vazios (só preenche se o vendedor digitar)
+    if (status === "authenticated" && sellerNow && !isLinkFlow) {
+      setLoyaltyProgramId("");
+      setLoyaltyProgramName("");
+      setLoyaltyId("");
+      setFlightNumber("");
+    }
+    if (status === "authenticated" && session?.user?.email && !isLinkFlow && !sellerNow) {
       // Fetch full profile to get phone, city, cpf
       fetch("/api/auth/me")
         .then(r => r.json())
@@ -814,6 +826,21 @@ export default function CheckoutPage() {
   const balcaoFullAmountCents = Math.round(((totalBRL > 0 ? totalBRL : totalRateXRS) + _extrasSumBRL + _equipSumBRL + _insSumBRL) * 100);
 
 
+  // Fidelidade e voo são opcionais: só envia o que foi realmente preenchido
+  const buildOptionalTravelData = () => {
+    const out: Record<string, string> = {};
+    const progId = loyaltyProgramId.trim();
+    const memberId = loyaltyId.trim();
+    if (progId && memberId) {
+      out.loyaltyProgramId = progId;
+      out.loyaltyProgramName = loyaltyProgramName;
+      out.loyaltyId = memberId;
+    }
+    const flight = flightNumber.trim();
+    if (flight) out.flightNumber = flight;
+    return out;
+  };
+
   // Envia a reserva de fato para o backend. threeDsAuth vem preenchido quando o
   // callback onSuccess do BP.Mpi trouxe CAVV/ECI; undefined nos demais casos
   // (falha, não elegível, desabilitado) — a cobrança segue sem Liability Shift.
@@ -825,7 +852,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           bookingData: booking,
           paymentLinkToken: paymentLinkToken || undefined,
-          customerData: { nome, sobrenome, email, telefone, cpf, loyaltyProgramId, loyaltyProgramName, loyaltyId, flightNumber,
+          customerData: { nome, sobrenome, email, telefone, cpf, ...buildOptionalTravelData(),
             ...(pidAcknowledged ? { pidAcknowledged: true, pidAcknowledgedAt: new Date().toISOString() } : {}),
           },
           paymentData: {
@@ -1029,7 +1056,7 @@ export default function CheckoutPage() {
     setSellerLinkError("");
     if (!booking) return;
     if (!nome.trim() || !sobrenome.trim() || !validateEmail(email)) {
-      setSellerLinkError("Preencha nome, sobrenome e um e-mail válido do cliente antes de gerar o link.");
+      setSellerLinkError("Preencha nome, sobrenome e um e-mail válido do condutor antes de gerar o link.");
       return;
     }
     setSellerLinkLoading(true);
@@ -1040,7 +1067,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           bookingData: booking,
           amountInCents,
-          customerData: { nome, sobrenome, email, telefone, cpf, loyaltyProgramId, loyaltyProgramName, loyaltyId, flightNumber },
+          customerData: { nome, sobrenome, email, telefone, cpf, ...buildOptionalTravelData() },
         }),
       });
       const json = await res.json();
@@ -1685,6 +1712,7 @@ export default function CheckoutPage() {
                   <label className="block text-xs font-bold text-gray-700 mb-1">Programa de Fidelidade <span className="text-gray-400 font-normal">(Opcional)</span></label>
                   <select
                     value={loyaltyProgramId}
+                    autoComplete="off"
                     onChange={e => {
                       setLoyaltyProgramId(e.target.value);
                       const prog = loyaltyPrograms.find(p => p.code === e.target.value);
@@ -1700,12 +1728,12 @@ export default function CheckoutPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Número Fidelidade <span className="text-gray-400 font-normal">(Opcional)</span></label>
-                  <input value={loyaltyId} onChange={e => setLoyaltyId(e.target.value)} className="w-full border rounded p-3 outline-none focus:border-[#008d36]" placeholder="Ex: 12345678" />
+                  <input value={loyaltyId} onChange={e => setLoyaltyId(e.target.value)} name="loyalty-member-id" autoComplete="off" className="w-full border rounded p-3 outline-none focus:border-[#008d36]" placeholder="Ex: 12345678" />
                 </div>
               </div>
               <div className="mt-4">
                 <label className="block text-xs font-bold text-gray-700 mb-1">Número do Voo <span className="text-gray-400 font-normal">(Opcional)</span></label>
-                <input value={flightNumber} onChange={e => setFlightNumber(e.target.value.toUpperCase())} maxLength={8} className="w-full border rounded p-3 outline-none focus:border-[#008d36]" placeholder="Ex: LA3212" />
+                <input value={flightNumber} onChange={e => setFlightNumber(e.target.value.toUpperCase())} name="flight-number-optional" autoComplete="off" maxLength={8} className="w-full border rounded p-3 outline-none focus:border-[#008d36]" placeholder="Ex: LA3212" />
               </div>
             </div>
 
@@ -1968,14 +1996,23 @@ export default function CheckoutPage() {
               )}
             </div>
 
-            {isSellerSession && (
+            {canShareLink && (
               <div className="rounded-lg border-2 border-dashed border-[#008d36] bg-green-50 p-4 space-y-3">
-                <p className="text-sm font-bold text-[#006b29]">🧑‍💼 Modo vendedor</p>
-                <p className="text-xs text-gray-600">Preencha os dados do cliente e gere um link para ele concluir o pagamento (PIX ou cartão). A venda será registrada no seu nome.</p>
+                {isSellerSession ? (
+                  <>
+                    <p className="text-sm font-bold text-[#006b29]">🧑‍💼 Modo vendedor</p>
+                    <p className="text-xs text-gray-600">Preencha os dados do cliente e gere um link para ele concluir o pagamento (PIX ou cartão). A venda será registrada no seu nome.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-bold text-[#006b29]">🔗 Compartilhar link de pagamento</p>
+                    <p className="text-xs text-gray-600">Gere um link desta reserva para enviar a outra pessoa concluir o pagamento (PIX ou cartão).</p>
+                  </>
+                )}
                 {sellerLinkError && <p className="text-xs text-red-600 font-medium">{sellerLinkError}</p>}
                 <button type="button" onClick={handleGenerateSellerLink} disabled={sellerLinkLoading || splitLoading || etoNothingOnline}
                   className="w-full md:w-auto bg-[#1f2421] hover:bg-black text-white font-bold py-3 px-6 rounded-lg text-sm disabled:opacity-50">
-                  {sellerLinkLoading ? "Gerando link..." : "🔗 Gerar link para enviar ao cliente"}
+                  {sellerLinkLoading ? "Gerando link..." : isSellerSession ? "🔗 Gerar link para enviar ao cliente" : "🔗 Gerar link de compartilhamento"}
                 </button>
               </div>
             )}

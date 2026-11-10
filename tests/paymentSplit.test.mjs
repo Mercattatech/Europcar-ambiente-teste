@@ -21,7 +21,7 @@ import {
   filterEmailHtmlByConfig,
 } from '../src/lib/email/emailSummaryConfig.ts';
 import { computeReservationMetrics } from '../src/lib/europcar/reservationMetrics.ts';
-import { calcCommission } from '../src/lib/sellerCommission.ts';
+import { calcCommission, isAdminRole, isSellerRole, isSellerOnlyRole, normalizeUserRole } from '../src/lib/sellerCommission.ts';
 import { buildCreateVoucherXml, buildReservationPaymentAttrs } from '../src/lib/europcar/paymentMapping.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -675,4 +675,16 @@ test('Comissão do vendedor — % sobre a venda, valor fixo e regra zerada', () 
   assert.equal(calcCommission('PERCENTAGE', 0, 1000), 0);
   assert.equal(calcCommission(null, null, 1000), 0);
   assert.equal(calcCommission(undefined, 10, 200), 20); // sem tipo = percentual
+});
+
+test('perfis: VENDEDOR só comissão, VENDEDOR_ADMIN tudo + comissão, ADMIN sem comissão, USER nada', () => {
+  assert.equal(isAdminRole('VENDEDOR_ADMIN'), true);
+  assert.equal(isSellerRole('VENDEDOR_ADMIN'), true);
+  assert.equal(isAdminRole('VENDEDOR'), false);
+  assert.equal(isSellerOnlyRole('VENDEDOR'), true);
+  assert.equal(isSellerRole('ADMIN'), false);
+  assert.equal(isAdminRole('USER'), false);
+  assert.equal(isSellerRole('USER'), false);
+  assert.equal(normalizeUserRole('hacker'), 'USER');
+  assert.equal(normalizeUserRole('vendedor_admin'), 'VENDEDOR_ADMIN');
 });

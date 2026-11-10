@@ -25,7 +25,7 @@ async function checkAdmin() {
   if (!session?.user?.email) return false;
   if (ADMIN_EMAILS.includes(session.user.email)) return true;
   const dbUser = await prisma.user.findUnique({ where: { email: session.user.email } });
-  return dbUser?.role === 'ADMIN';
+  return (dbUser?.role === 'ADMIN' || dbUser?.role === 'VENDEDOR_ADMIN') && dbUser?.status !== 'BLOCKED';
 }
 
 const isEnabled = (value?: string | null) => value !== 'false'; // ausente = ativo
