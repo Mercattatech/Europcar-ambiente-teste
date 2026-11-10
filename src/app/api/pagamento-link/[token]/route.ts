@@ -18,3 +18,4 @@ export async function GET(_req: Request, { params }: { params: { token: string }
     customerData: link.customerData,
   });
 }
+

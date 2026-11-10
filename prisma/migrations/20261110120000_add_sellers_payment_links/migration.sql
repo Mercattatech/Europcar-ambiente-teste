@@ -40,3 +40,4 @@ DO $$ BEGIN
   ALTER TABLE "PaymentLink" ADD CONSTRAINT "PaymentLink_sellerId_fkey"
     FOREIGN KEY ("sellerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+

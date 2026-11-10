@@ -30,3 +30,4 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   await prisma.paymentLink.update({ where: { id: params.id }, data });
   return NextResponse.json({ success: true });
 }
+

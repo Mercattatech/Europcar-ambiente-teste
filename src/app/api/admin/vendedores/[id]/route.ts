@@ -36,3 +36,4 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   await prisma.user.update({ where: { id: target.id }, data });
   return NextResponse.json({ success: true });
 }
+
