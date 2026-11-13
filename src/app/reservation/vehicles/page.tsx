@@ -158,7 +158,7 @@ const isSnowChainsItem = (item: any): boolean => {
   if (!item) return false;
   const code = (item.code || item.auxK || item.id || '').toString().toUpperCase();
   const descr = (item.descr || item.name || item.chrgTyDesc || '').toString().toLowerCase();
-  if (code === 'SNO' || code === 'CHN') return true;
+  if (code === 'SNO' || code === 'CHN' || code.includes('SNOW')) return true;
   if (descr.includes('snow chain') || descr.includes('snowchain') || descr.includes('snow-chain')) return true;
   if (descr.includes('corrente') && descr.includes('neve')) return true;
   if (descr.includes('catene') && descr.includes('neve')) return true;
