@@ -2821,6 +2821,7 @@ function VehiclesContent() {
                     const etoZeroCar = etoZeroCars.find(e => e.carCategoryCode === code);
                     if (!etoZeroCar) return null;
                     if (extrasSearchCfg.disabledProtections.includes('ZERO_EXCESS')) return null;
+                    const originalCar = cars.find(c => c.carCategoryCode === code);
                     const originalEtoCar = etoCars.find(e => e.carCategoryCode === code);
                     const zeroTotal_raw = parseFloat(etoZeroCar.totalRateEstimate || 0);
                     const baseTotal_raw = originalEtoCar ? parseFloat(originalEtoCar.totalRateEstimate || 0) : (parseFloat(selectedCar?.totalRateEstimate || 0) / (1 + (etoMargin || 0) / 100));
@@ -2836,10 +2837,20 @@ function VehiclesContent() {
                     const upgradeBRL = rawUpgradeBRL * protectionMultiplier;
 
                     const currency = selectedCar?.currency || 'EUR';
-                    const currentTotal = parseFloat(selectedCar?.totalRateEstimate || 0);
-                    const currentBRL = parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || 0);
-                    const zeroTotal = currentTotal + upgradeCost;
-                    const zeroBRL = currentBRL + upgradeBRL;
+
+                    // Preço base ETO (sem Franquia Zero) calculado de forma pura/determinística
+                    const baseTotal = originalEtoCar
+                      ? parseFloat(originalEtoCar.totalRateEstimate || 0) * (1 + (etoMargin || 0) / 100)
+                      : (zeroExcessUpgrade ? Math.max(0, parseFloat(selectedCar?.totalRateEstimate || 0) - upgradeCost) : parseFloat(selectedCar?.totalRateEstimate || 0));
+
+                    const baseBRL = originalEtoCar
+                      ? parseFloat(originalEtoCar.totalRateEstimateInBookingCurrency || 0) * (1 + (etoMargin || 0) / 100)
+                      : (zeroExcessUpgrade ? Math.max(0, parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || 0) - upgradeBRL) : parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || 0));
+
+                    // Preço com Franquia Zero: sempre base + upgrade fixo (nunca acumula)
+                    const zeroTotal = baseTotal + upgradeCost;
+                    const zeroBRL = baseBRL + upgradeBRL;
+
                     if (rawUpgradeCost <= 0) return null;
                     return (
                       <div className={`border-2 rounded-xl p-4 md:p-6 mb-8 transition-all ${zeroExcessUpgrade ? 'border-[#008d36] bg-green-50 shadow-lg shadow-green-100' : 'border-[#e67e00] bg-gradient-to-r from-orange-50 to-amber-50 hover:shadow-md'}`}>
@@ -2859,8 +2870,19 @@ function VehiclesContent() {
                               </div>
                               <button
                                 onClick={() => {
-                                  if (zeroExcessUpgrade) { setZeroExcessUpgrade(false); }
-                                  else {
+                                  if (zeroExcessUpgrade) {
+                                    setZeroExcessUpgrade(false);
+                                    setSelectedCar((prev: any) => ({
+                                      ...prev,
+                                      ...(originalCar || {}),
+                                      ...(originalEtoCar || {}),
+                                      totalRateEstimate: baseTotal.toFixed(2),
+                                      totalRateEstimateInBookingCurrency: baseBRL.toFixed(2),
+                                      optionalInsurances: originalCar?.optionalInsurances || prev?.optionalInsurances,
+                                      imageUrl: prev?.imageUrl,
+                                      _etoCID: '56935466'
+                                    }));
+                                  } else {
                                     setZeroExcessUpgrade(true);
                                     setSelectedCar((prev: any) => ({
                                       ...prev,
