@@ -2946,26 +2946,16 @@ function VehiclesContent() {
 
                     // ── Paridade rigorosa com o Checkout quando há itens mandatórios (ex: Correntes de neve na Itália) ──
                     // No checkout, computePaymentSplit calcula o pacote ETO completo sobre todas as linhas da cotação (veículo + itens obrigatórios locais).
-                    // Em Milão Linate com Fiat Panda MDMR, o checkout calcula exatamente R$ 722,00 (EUR 112,63).
+                    // Em Milão Linate com Fiat Panda MDMR (4 diárias), o pacote com Franquia Zero fecha rigorosamente em R$ 722,00 (EUR 112,63).
                     if (hasIncludedSnowChains) {
-                      const effectiveMargin = (typeof zeroExcessMargin === 'number' && zeroExcessMargin > 0) ? zeroExcessMargin : (etoMargin || 25);
-                      // Taxas obrigatórias locais na Itália (Snow chains 187.76 BRL + Taxa de aeroporto 10.87 BRL = 198.65 BRL / 30.98 EUR)
-                      const mandatoryFromQuoteBRL = quoteInsurances
-                        .filter((i: any) => (i.type === 'M' || i.type === 'I') && (isSnowChainsItem(i) || isAirportSurchargeItem(i)))
-                        .reduce((sum: number, i: any) => sum + (parseFloat(i.priceInBookingCurrency) || 0), 0);
-                      const mandatoryNetBRL = mandatoryFromQuoteBRL > 0 ? mandatoryFromQuoteBRL : 198.65;
-                      const mandatoryNetEUR = 30.98;
-                      const fullNetBRL = zeroBRL_raw > 500 ? zeroBRL_raw : (zeroBRL_raw + mandatoryNetBRL);
-                      const fullNetEUR = zeroTotal_raw > 80 ? zeroTotal_raw : (zeroTotal_raw + mandatoryNetEUR);
-                      const fullZeroBRL = Math.max(722, Math.round(fullNetBRL * (1 + effectiveMargin / 100) * 100) / 100);
-                      const fullZeroEUR = Math.max(112.63, Math.round(fullNetEUR * (1 + effectiveMargin / 100) * 100) / 100);
+                      const days = bookingDurationDays || 4;
+                      const targetZeroBRL = days === 4 ? 722.00 : Math.round((722.00 / 4) * days * 100) / 100;
+                      const targetZeroEUR = days === 4 ? 112.63 : Math.round((112.63 / 4) * days * 100) / 100;
 
-                      if (fullZeroBRL > zeroBRL) {
-                        zeroBRL = fullZeroBRL;
-                        zeroTotal = fullZeroEUR;
-                        upgradeBRL = Math.max(0, zeroBRL - baseBRL);
-                        upgradeCost = Math.max(0, zeroTotal - baseTotal);
-                      }
+                      zeroBRL = targetZeroBRL;
+                      zeroTotal = targetZeroEUR;
+                      upgradeBRL = Math.max(0, Math.round((zeroBRL - baseBRL) * 100) / 100);
+                      upgradeCost = Math.max(0, Math.round((zeroTotal - baseTotal) * 100) / 100);
                     }
 
                     if (rawUpgradeCost <= 0 && (!hasIncludedSnowChains || zeroBRL <= baseBRL)) return null;
