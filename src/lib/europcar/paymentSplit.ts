@@ -565,10 +565,34 @@ export function computePaymentSplit(reservationNode: any, options: PaymentSplitO
     ? new Set(options.extraCodes.map((c) => String(c).toUpperCase()))
     : null;
 
+  // ── Mapeamento de itens Mandatórios / Inclusos (type="M" ou type="I") ──
+  // Conforme regra de negócio da Europcar:
+  // - Itens MANDATÓRIOS (type="M", type="I", taxas de aeroporto, snow chains na Itália no inverno, etc.): APLICAM MARKUP.
+  // - Itens NÃO-MANDATÓRIOS / Opcionais (type="O", condutor adicional, cadeira de bebê, GPS, WWI, etc.): NÃO APLICAM MARKUP.
+  const mandatoryCodes = new Set<string>([
+    'SNOW-IT', 'WINT', '00700', 'LAF', '00090', '00024', '00546', '00621', 'ECOLOGIC', '00030', '00048', '00070'
+  ]);
+  for (const eq of asArray(quote?.equipmentList?.equipment)) {
+    const a = attrsOf(eq);
+    const code = String(a.code || '').toUpperCase();
+    const type = String(a.type || '').toUpperCase();
+    if (type === 'M' || type === 'I') mandatoryCodes.add(code);
+  }
+  for (const ins of asArray(quote?.insuranceList?.insurance)) {
+    const a = attrsOf(ins);
+    const code = String(a.code || '').toUpperCase();
+    const type = String(a.type || '').toUpperCase();
+    if (type === 'M' || type === 'I') mandatoryCodes.add(code);
+  }
+
   const isExtraLine = (line: SplitLine): boolean => {
+    const aux = (line.auxK || '').toUpperCase();
+    const ty = (line.chrgTy || '').toUpperCase();
+
+    // Se o item for MANDATÓRIO (type="M", type="I" ou taxa obrigatória de locação), APLICA MARKUP (não é extra opcional)
+    if (mandatoryCodes.has(aux) || mandatoryCodes.has(ty)) return false;
+
     if (extraCodesSet) {
-      const aux = (line.auxK || '').toUpperCase();
-      const ty = (line.chrgTy || '').toUpperCase();
       if (extraCodesSet.has(aux) || extraCodesSet.has(ty)) return true;
     }
     return isExtraChargeLine(line, isZeroExcess);
