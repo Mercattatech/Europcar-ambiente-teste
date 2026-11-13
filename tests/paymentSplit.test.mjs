@@ -302,6 +302,51 @@ test('Extras adicionados (equipamentos e proteções) NUNCA recebem markup comer
   assert.equal(splitWWI.totalLocal, 95.63);
 });
 
+test('Lisboa (LIST01) com Condutor Adicional — total confere com o Passo 3 (336,27 BRL) sem inflar para 376,89 BRL', async () => {
+  // Simula a cotação real de Lisboa com Citroen C3 + Condutor Adicional (ADD)
+  // Total Líquido XRS: 47,02 EUR / 301,51 BRL
+  // Carro base líquido: 21,72 EUR / 139,28 BRL
+  // Condutor adicional (ADD): 25,30 EUR / 162,17 BRL
+  // Margem de Portugal: 25% (deve incidir SOMENTE sobre o carro 139,28 -> 174,10)
+  const xmlLisboa = buildXml({
+    resNumber: '1208999996',
+    totalBRL: '301.51',
+    totalEUR: '47.02',
+    lines: [
+      line({ ty: '00001', desc: 'Basic Rental', eur: '15.36', brl: '98.50', payer: BA }),
+      line({ ty: '00028', desc: 'VAT', eur: '3.53', brl: '22.63', payer: BA }),
+      line({ ty: '00024', desc: 'Airport Surcharge', eur: '2.30', brl: '14.75', payer: DVR }),
+      line({ ty: '00076', desc: 'ADDITIONAL DRIVER', eur: '17.88', brl: '114.65', payer: DVR, auxK: 'ADD' }),
+      line({ ty: '00028', desc: 'VAT', eur: '7.95', brl: '50.98', payer: DVR }),
+    ],
+    payers: [payerBA('121.13', '18.89'), payerDVR('180.38', '28.13')],
+  });
+
+  const split = computePaymentSplit(await reservationOf(xmlLisboa), {
+    onlineMarkupPercent: 25,
+    extraCodes: ['ADD', 'ADR'],
+    knownExtrasBRL: 162.17,
+    knownExtrasLocal: 25.30,
+    logger: null,
+  });
+
+  assert.ok(split);
+  // O on-line deve ser o carro base com margem (174,18) - aeroporto no balcão (18,21) = 155,97 BRL (24,32 EUR)
+  // NUNCA 196,51 BRL (que conteria +40,56 de margem do condutor adicional)!
+  assert.equal(split.online.subtotalBRL, 155.97);
+  assert.equal(split.online.subtotalLocal, 24.32);
+
+  // O balcão deve ser 180,38 BRL (28,13 EUR) = aeroporto 18,15 + condutor adicional 162,23
+  assert.equal(split.counter.subtotalBRL, 180.38);
+  assert.equal(split.counter.subtotalLocal, 28.13);
+
+  // O total da reserva deve ser 155,97 + 180,38 = 336,35 BRL (52,45 EUR)
+  // Bate exatamente com os 336,27 BRL do Passo 3 (diferença ínfima de centavos de câmbio)
+  // NUNCA 376,89 BRL!
+  assert.equal(split.totalBRL, 336.35);
+  assert.equal(split.totalLocal, 52.45);
+});
+
 // ── Cenário 1: tudo com ba ───────────────────────────────────────────────────
 
 test('cenário 1 — todas as linhas com ba → só bloco on-line', async () => {

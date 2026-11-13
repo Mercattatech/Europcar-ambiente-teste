@@ -119,6 +119,10 @@ export interface PaymentSplitOptions {
   isZeroExcess?: boolean;
   /** Códigos de extras opcionais adicionados (equipamentos, proteções extras) que NÃO devem receber markup */
   extraCodes?: Set<string> | string[];
+  /** Valor total em BRL dos extras adicionados conhecidos */
+  knownExtrasBRL?: number;
+  /** Valor total em moeda local dos extras adicionados conhecidos */
+  knownExtrasLocal?: number;
   /** Logger (default: console). Use `null` para silenciar. */
   logger?: Pick<Console, 'warn'> | null;
 }
@@ -216,15 +220,20 @@ export function formatBRLWithLocal(brl: number, local: number, localCurrency: st
   return `${formatBRL(brl)} (${formatMoney(local, cur)})`;
 }
 
-const EQUIPMENT_CHRGTY = new Set(['00018', '00020', '00021', '00022', '00023']);
-const OPTIONAL_INSURANCE_CODES = new Set([
-  'WWI', 'PAI', 'SPPAI', 'RSA', 'PEP', 'APP', 'INTERIOR', 'AWC',
-  'SCDW', 'SPCDW', 'STHW', 'SPTHW', 'MEDIUM', 'PREMPRE', 'PREMPLUS', 'PREMIUM'
+const EQUIPMENT_CHRGTY = new Set(['00018', '00020', '00021', '00022', '00023', '00076']);
+const OPTIONAL_EXTRA_CODES = new Set([
+  'ADD', 'ADR', 'CSB', 'CSI', 'CST', 'CBS', 'BST', 'NVS', 'NAV', 'GPS',
+  'TOL', 'TOLL', 'VVR', 'ETL', 'CBF', 'LRC', 'SKR', 'SKB', 'SKV', 'WFI',
+  'WIFI', 'CO2', 'SCH', 'ED1', 'IER', 'DVD', 'DSL', 'STR', 'WWI', 'WIN',
+  'RSA', 'RSE', 'LRSA', 'PAI', 'SPAI', 'SPPAI', 'MEDIUM', 'PREMIUM',
+  'PREMPRE', 'PREMPLUS', 'PREMUP', 'PROPLUS', 'INTERIOR', 'INTCLEAN',
+  'APP', 'AWC', 'PEP', 'FAW', 'FCO', 'GOZEN', 'RIM', 'SCDW', 'SPCDW',
+  'STHW', 'SPTHW'
 ]);
 
 /**
  * Identifica se uma linha de cobrança do XRS é um EXTRA ADICIONADO opcional
- * (equipamentos como cadeira de bebê, GPS, ou proteções opcionais adicionadas).
+ * (equipamentos como cadeira de bebê, GPS, condutor adicional, ou proteções opcionais adicionadas).
  * Extras adicionados NUNCA devem receber markup comercial.
  */
 export function isExtraChargeLine(line: SplitLine, isZeroExcess = false): boolean {
@@ -250,15 +259,15 @@ export function isExtraChargeLine(line: SplitLine, isZeroExcess = false): boolea
     return false;
   }
 
-  // Equipamentos opcionais
-  if (EQUIPMENT_CHRGTY.has(chrgTy)) return true;
-  if (/child|baby|booster|cadeira|assento|gps|navigation|rack|skirack|wi-fi|wifi/i.test(desc)) return true;
-
-  // Proteções opcionais adicionadas
-  if (OPTIONAL_INSURANCE_CODES.has(auxK)) {
+  // Equipamentos opcionais ou adicionais conhecidos (inclui 00076 condutor adicional, GPS, cadeiras, etc.)
+  if (EQUIPMENT_CHRGTY.has(chrgTy) || OPTIONAL_EXTRA_CODES.has(auxK)) {
     if (isZeroExcess && (auxK === 'SCDW' || auxK === 'SPCDW' || auxK === 'STHW' || auxK === 'SPTHW')) {
       return false; // Parte do pacote Franquia Zero
     }
+    return true;
+  }
+
+  if (/additional\s*driver|condutor\s*adicional|segundo\s*motorista|extra\s*driver|child|baby|booster|cadeira|assento|gps|navigation|navegador|rack|skirack|wi-fi|wifi|toll|ped[aá]gio|via\s*verde|transfronteiri[çc]a|cross\s*border|co2|carbon/i.test(desc)) {
     return true;
   }
 
@@ -568,13 +577,35 @@ export function computePaymentSplit(reservationNode: any, options: PaymentSplitO
   const onlineExtraLines = (online?.lines || []).filter(isExtraLine);
   const counterExtraLines = (counter?.lines || []).filter(isExtraLine);
 
-  const onlineExtraNetBRL = round2(onlineExtraLines.reduce((s, l) => s + l.priceBRL, 0));
-  const onlineExtraNetLocal = round2(onlineExtraLines.reduce((s, l) => s + l.priceLocal, 0));
-  const counterExtraNetBRL = round2(counterExtraLines.reduce((s, l) => s + l.priceBRL, 0));
-  const counterExtraNetLocal = round2(counterExtraLines.reduce((s, l) => s + l.priceLocal, 0));
+  let onlineExtraNetBRL = round2(onlineExtraLines.reduce((s, l) => s + l.priceBRL, 0));
+  let onlineExtraNetLocal = round2(onlineExtraLines.reduce((s, l) => s + l.priceLocal, 0));
+  let counterExtraNetBRL = round2(counterExtraLines.reduce((s, l) => s + l.priceBRL, 0));
+  let counterExtraNetLocal = round2(counterExtraLines.reduce((s, l) => s + l.priceLocal, 0));
 
-  const totalExtraNetBRL = round2(onlineExtraNetBRL + counterExtraNetBRL);
-  const totalExtraNetLocal = round2(onlineExtraNetLocal + counterExtraNetLocal);
+  let totalExtraNetBRL = round2(onlineExtraNetBRL + counterExtraNetBRL);
+  let totalExtraNetLocal = round2(onlineExtraNetLocal + counterExtraNetLocal);
+
+  // Se foram informados knownExtras (valores all-inclusive com taxas dos extras),
+  // ajusta para garantir que a soma total dos extras seja no mínimo o valor conhecido
+  if (options.knownExtrasBRL && options.knownExtrasBRL > totalExtraNetBRL) {
+    const diffBRL = round2(options.knownExtrasBRL - totalExtraNetBRL);
+    if (counterExtraLines.length > 0 || (counter?.lines?.length ?? 0) > 0) {
+      counterExtraNetBRL = round2(counterExtraNetBRL + diffBRL);
+    } else {
+      onlineExtraNetBRL = round2(onlineExtraNetBRL + diffBRL);
+    }
+    totalExtraNetBRL = options.knownExtrasBRL;
+  }
+
+  if (options.knownExtrasLocal && options.knownExtrasLocal > totalExtraNetLocal) {
+    const diffLocal = round2(options.knownExtrasLocal - totalExtraNetLocal);
+    if (counterExtraLines.length > 0 || (counter?.lines?.length ?? 0) > 0) {
+      counterExtraNetLocal = round2(counterExtraNetLocal + diffLocal);
+    } else {
+      onlineExtraNetLocal = round2(onlineExtraNetLocal + diffLocal);
+    }
+    totalExtraNetLocal = options.knownExtrasLocal;
+  }
 
   // Custo líquido do pacote base do veículo (sem extras adicionados)
   const baseNetBRL = Math.max(0, round2((totalRateEstimateBRL ?? netTotalBRL) - totalExtraNetBRL));

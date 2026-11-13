@@ -123,10 +123,22 @@ export function useEtoPaymentSplit(booking: any, setBooking: (updater: (prev: an
           if (Number(qty) > 0) extraCodes.add(String(code).toUpperCase());
         }
 
+        const days = booking.duration || 1;
+        const knownExtrasBRL = Math.round((
+          (booking?.xrsInsurances || []).reduce((s: number, i: any) => s + (parseFloat(i.priceBRL) || 0), 0) +
+          (booking?.xrsEquipment || []).reduce((s: number, e: any) => s + (parseFloat(e.totalBRL) || (parseFloat(e.priceBRL || 0) * days * (e.qty || 1))), 0)
+        ) * 100) / 100;
+        const knownExtrasLocal = Math.round((
+          (booking?.xrsInsurances || []).reduce((s: number, i: any) => s + (parseFloat(i.price) || 0), 0) +
+          (booking?.xrsEquipment || []).reduce((s: number, e: any) => s + ((parseFloat(e.price) || 0) * days * (e.qty || 1)), 0)
+        ) * 100) / 100;
+
         const computed = computePaymentSplit(reservation, {
           onlineMarkupPercent: markup,
           isZeroExcess: isZeroExcessBooking(booking),
           extraCodes,
+          knownExtrasBRL,
+          knownExtrasLocal,
         });
         if (!computed) {
           fallback("cotação sem chargeList");
