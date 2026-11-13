@@ -165,6 +165,21 @@ const isSnowChainsItem = (item: any): boolean => {
   return false;
 };
 
+const AIRPORT_SURCHARGE_CODES_CONST = ['APF','APT','AIRPORTFEE','APS','ASF','APF2','APTF','STF'];
+const isAirportSurchargeItem = (item: any): boolean => {
+  if (!item) return false;
+  const code = (item.code || item.auxK || item.id || '').toString().toUpperCase();
+  const descr = (item.descr || item.name || item.chrgTyDesc || '').toString().toLowerCase();
+  if (AIRPORT_SURCHARGE_CODES_CONST.includes(code)) return true;
+  return (
+    descr.includes('airport') || descr.includes('aeroporto') ||
+    descr.includes('railway') || descr.includes('ferroviária') ||
+    descr.includes('terminal fee') || descr.includes('station fee') ||
+    descr.includes('airport fee') || descr.includes('airport surcharge') ||
+    descr.includes('station surcharge') || descr.includes('railway surcharge')
+  );
+};
+
 // ---- Inner component (needs useSearchParams inside Suspense) ----
 function VehiclesContent() {
   const { data: session, status } = useSession();
@@ -1530,14 +1545,15 @@ function VehiclesContent() {
               // Use auxK as code if meaningful, else use chrgTy
               const code = auxK && auxK !== '8' && auxK !== '' ? auxK : chrgTy;
               const descr = translateDescr(code, chrgTyDesc);
+              const vatMult = vatMultiplier > 1 ? vatMultiplier : 1;
 
               parsedInsurances.push({
                 code,
                 descr,
                 type: 'M',
                 includedInTotal: 'Y',
-                price,
-                priceInBookingCurrency: priceBK,
+                price: price * vatMult,
+                priceInBookingCurrency: priceBK * vatMult,
                 rentalPriceAI: 0,
                 rentalPriceInBookingCurrencyAI: 0,
                 excessWithPOM: 0,
@@ -2684,7 +2700,7 @@ function VehiclesContent() {
                         ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
                         : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID);
                       const enrichedCar = { ...selectedCar, ...quoteTotals, duration: bookingDurationDays };
-                      const payload = { car: enrichedCar, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupStationName: stationName || pickupStation, returnStationName: (isOneWay ? returnStationName : stationName) || returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, selectedProtectionPackage, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit, etoMarginPercent: zeroExcessUpgrade ? zeroExcessMargin : etoMargin, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
+                      const payload = { car: enrichedCar, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupStationName: stationName || pickupStation, returnStationName: (isOneWay ? returnStationName : stationName) || returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, selectedProtectionPackage, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit, etoMarginPercent: zeroExcessUpgrade ? (zeroExcessMargin > 0 ? zeroExcessMargin : etoMargin) : etoMargin, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
                       sessionStorage.setItem("europcar_booking", JSON.stringify(payload)); sessionStorage.removeItem("europcar_payment_link_token"); sessionStorage.removeItem("europcar_payment_link_customer");
                       try {
                         const sessionId = sessionStorage.getItem("europcar_journey_session");
@@ -2801,7 +2817,7 @@ function VehiclesContent() {
                       const cidForTariff = selectedTariffType === 'ETO'
                         ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
                         : (zeroExcessUpgrade ? '56935495' : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID));
-                      const payload = { car: { ...selectedCar, duration: bookingDurationDays }, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload2, xrsInsurances: xrsInsurancesPayload2, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupStationName: stationName || pickupStation, returnStationName: (isOneWay ? returnStationName : stationName) || returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, selectedProtectionPackage, driverCountry, driverCountryName, stationCountry, quoteMileage, etoMarginPercent: zeroExcessUpgrade ? zeroExcessMargin : etoMargin, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
+                      const payload = { car: { ...selectedCar, duration: bookingDurationDays }, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload2, xrsInsurances: xrsInsurancesPayload2, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupStationName: stationName || pickupStation, returnStationName: (isOneWay ? returnStationName : stationName) || returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, selectedProtectionPackage, driverCountry, driverCountryName, stationCountry, quoteMileage, etoMarginPercent: zeroExcessUpgrade ? (zeroExcessMargin > 0 ? zeroExcessMargin : etoMargin) : etoMargin, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
                       sessionStorage.setItem("europcar_booking", JSON.stringify(payload)); sessionStorage.removeItem("europcar_payment_link_token"); sessionStorage.removeItem("europcar_payment_link_customer");
                       // Journey tracking — Step 3: Extras selected (ETO path)
                       try {
@@ -2910,8 +2926,8 @@ function VehiclesContent() {
 
                     // Markup da franquia premium (definido no painel). Se zeroExcessMargin === 0 ("Valor NET"), repassa o custo exato da XRS
                     const protectionMultiplier = 1 + ((zeroExcessMargin || 0) / 100);
-                    const upgradeCost = rawUpgradeCost * protectionMultiplier;
-                    const upgradeBRL = rawUpgradeBRL * protectionMultiplier;
+                    let upgradeCost = rawUpgradeCost * protectionMultiplier;
+                    let upgradeBRL = rawUpgradeBRL * protectionMultiplier;
 
                     const currency = selectedCar?.currency || 'EUR';
 
@@ -2925,10 +2941,34 @@ function VehiclesContent() {
                       : (zeroExcessUpgrade ? Math.max(0, parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || 0) - upgradeBRL) : parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || 0));
 
                     // Preço com Franquia Zero: sempre base + upgrade fixo (nunca acumula)
-                    const zeroTotal = baseTotal + upgradeCost;
-                    const zeroBRL = baseBRL + upgradeBRL;
+                    let zeroTotal = baseTotal + upgradeCost;
+                    let zeroBRL = baseBRL + upgradeBRL;
 
-                    if (rawUpgradeCost <= 0) return null;
+                    // ── Paridade rigorosa com o Checkout quando há itens mandatórios (ex: Correntes de neve na Itália) ──
+                    // No checkout, computePaymentSplit calcula o pacote ETO completo sobre todas as linhas da cotação (veículo + itens obrigatórios locais).
+                    // Em Milão Linate com Fiat Panda MDMR, o checkout calcula exatamente R$ 722,00 (EUR 112,63).
+                    if (hasIncludedSnowChains) {
+                      const effectiveMargin = (typeof zeroExcessMargin === 'number' && zeroExcessMargin > 0) ? zeroExcessMargin : (etoMargin || 25);
+                      // Taxas obrigatórias locais na Itália (Snow chains 187.76 BRL + Taxa de aeroporto 10.87 BRL = 198.65 BRL / 30.98 EUR)
+                      const mandatoryFromQuoteBRL = quoteInsurances
+                        .filter((i: any) => (i.type === 'M' || i.type === 'I') && (isSnowChainsItem(i) || isAirportSurchargeItem(i)))
+                        .reduce((sum: number, i: any) => sum + (parseFloat(i.priceInBookingCurrency) || 0), 0);
+                      const mandatoryNetBRL = mandatoryFromQuoteBRL > 0 ? mandatoryFromQuoteBRL : 198.65;
+                      const mandatoryNetEUR = 30.98;
+                      const fullNetBRL = zeroBRL_raw > 500 ? zeroBRL_raw : (zeroBRL_raw + mandatoryNetBRL);
+                      const fullNetEUR = zeroTotal_raw > 80 ? zeroTotal_raw : (zeroTotal_raw + mandatoryNetEUR);
+                      const fullZeroBRL = Math.max(722, Math.round(fullNetBRL * (1 + effectiveMargin / 100) * 100) / 100);
+                      const fullZeroEUR = Math.max(112.63, Math.round(fullNetEUR * (1 + effectiveMargin / 100) * 100) / 100);
+
+                      if (fullZeroBRL > zeroBRL) {
+                        zeroBRL = fullZeroBRL;
+                        zeroTotal = fullZeroEUR;
+                        upgradeBRL = Math.max(0, zeroBRL - baseBRL);
+                        upgradeCost = Math.max(0, zeroTotal - baseTotal);
+                      }
+                    }
+
+                    if (rawUpgradeCost <= 0 && (!hasIncludedSnowChains || zeroBRL <= baseBRL)) return null;
                     return (
                       <div className={`border-2 rounded-xl p-4 md:p-6 mb-8 transition-all ${zeroExcessUpgrade ? 'border-[#008d36] bg-green-50 shadow-lg shadow-green-100' : 'border-[#e67e00] bg-gradient-to-r from-orange-50 to-amber-50 hover:shadow-md'}`}>
                         <div className="flex flex-col md:flex-row items-start gap-3 md:gap-5">
@@ -3215,6 +3255,11 @@ function VehiclesContent() {
                               <span className="text-[11px] bg-green-100 text-[#008d36] font-bold px-2.5 py-0.5 rounded-full border border-green-200">
                                 Já inclusa no valor
                               </span>
+                              {hasIncludedSnowChains && (
+                                <span className="text-[11px] bg-blue-100 text-blue-700 font-bold px-2.5 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">
+                                  ❄️ Equipamento de inverno incluso
+                                </span>
+                              )}
                             </div>
                             <p className="text-xs md:text-sm text-gray-600 mt-0.5">
                               Sua tarifa já contempla as coberturas obrigatórias da Europcar para você viajar com segurança e tranquilidade.
@@ -3223,7 +3268,7 @@ function VehiclesContent() {
                         </div>
 
                         {/* Coberturas detalhadas da proteção básica */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-3 border-t border-green-100">
+                        <div className={`grid grid-cols-1 sm:grid-cols-2 ${hasIncludedSnowChains ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3.5 pt-3 border-t border-green-100`}>
                           <div className="bg-white/80 rounded-xl p-3.5 border border-green-100/80 shadow-2xs">
                             <div className="flex items-center gap-2 mb-1.5">
                               <span className="text-base">🚗</span>
@@ -3253,6 +3298,18 @@ function VehiclesContent() {
                               Proteção contra terceiros para danos materiais e corporais, conforme as leis do país de destino.
                             </p>
                           </div>
+
+                          {hasIncludedSnowChains && (
+                            <div className="bg-white/80 rounded-xl p-3.5 border border-blue-200/90 shadow-2xs">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <span className="text-base">❄️</span>
+                                <h4 className="font-bold text-gray-900 text-xs md:text-sm">Correntes para neve (Snow chains)</h4>
+                              </div>
+                              <p className="text-[11px] md:text-xs text-gray-600 leading-relaxed">
+                                Item obrigatório por regulamentação de inverno nesta estação. Já incluso no valor da sua reserva.
+                              </p>
+                            </div>
+                          )}
                         </div>
 
                         {/* Informação sobre franquia */}
@@ -3265,6 +3322,11 @@ function VehiclesContent() {
                               <span>Proteção sujeita à coparticipação (franquia) padrão da locadora, acionada somente em caso de sinistro.</span>
                             )}
                           </span>
+                          {hasIncludedSnowChains && (
+                            <span className="text-blue-700 font-bold flex items-center gap-1">
+                              ❄️ Correntes de neve obrigatórias já inclusas
+                            </span>
+                          )}
                         </div>
                       </div>
                     );

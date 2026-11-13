@@ -229,6 +229,42 @@ test('Milão Linate (LINT01) — confere 100% com o portal B2B Europcar Tour Ope
   assert.equal(onlineLinesSum, 321.07);
 });
 
+test('Milão Linate (LINT01) com Franquia Zero — total fecha rigorosamente em R$ 722,00 (112,63 EUR)', async () => {
+  // Simula a cotação real de Milão Linate com Fiat Panda (MDMR) e Franquia Zero (CID 56935495)
+  // Total Líquido XRS: 90,10 EUR / 577,60 BRL
+  // Balcão (Driver): Snow Chains 24,00 EUR (153,88 BRL) + Airport 1,39 EUR (8,91 BRL) + VAT 5,59 EUR (35,86 BRL) = 30,98 EUR / 198,65 BRL
+  // Online (BA): Diárias + Franquia Zero = 59,12 EUR / 378,95 BRL
+  const xmlMilaoZero = buildXml({
+    resNumber: '1208999995',
+    totalBRL: '577.60',
+    totalEUR: '90.10',
+    lines: [
+      line({ ty: '00001', desc: 'Basic Rental', eur: '35.00', brl: '224.35', payer: BA }),
+      line({ ty: '00010', desc: 'Zero Excess', eur: '18.00', brl: '115.38', payer: BA }),
+      line({ ty: '00028', desc: 'VAT', eur: '6.12', brl: '39.22', payer: BA }),
+      line({ ty: '00024', desc: 'Airport Surcharge', eur: '1.39', brl: '8.91', payer: DVR }),
+      line({ ty: '00621', desc: 'Snow chains Italy', eur: '24.00', brl: '153.88', payer: DVR, auxK: 'WINT' }),
+      line({ ty: '00028', desc: 'VAT', eur: '5.59', brl: '35.86', payer: DVR }),
+    ],
+    payers: ['<payer ba="73804373" dueToPayInBookingCurrency="378.95" dueToPay="59.12"/>', '<payer dvrName="Driver" dueToPayInBookingCurrency="198.65" dueToPay="30.98"/>'],
+  });
+
+  const splitZero = computePaymentSplit(await reservationOf(xmlMilaoZero), { onlineMarkupPercent: 25, isZeroExcess: true, logger: null });
+
+  assert.ok(splitZero);
+  // Total pacote garantido com 25% de margem: 577,60 * 1,25 = 722,00 BRL / 90,10 * 1,25 = 112,63 EUR
+  assert.equal(splitZero.totalBRL, 722);
+  assert.equal(splitZero.totalLocal, 112.63);
+
+  // A pagar no balcão na chegada (Snow chains obrigatório + aeroporto): 198,65 BRL / 30,98 EUR
+  assert.equal(splitZero.counter.subtotalBRL, 198.65);
+  assert.equal(splitZero.counter.subtotalLocal, 30.98);
+
+  // A pagar online ao Tour Operator: 722,00 - 198,65 = 523,35 BRL / 112,63 - 30,98 = 81,65 EUR
+  assert.equal(splitZero.online.subtotalBRL, 523.35);
+  assert.equal(splitZero.online.subtotalLocal, 81.65);
+});
+
 test('Extras adicionados (equipamentos e proteções) NUNCA recebem markup comercial', async () => {
   // Cenário 1: Equipamento (Cadeira de Bebê - CST) adicionado no balcão
   const xmlWithEquip = buildXml({
