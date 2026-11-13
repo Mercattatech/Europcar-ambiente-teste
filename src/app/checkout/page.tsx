@@ -9,6 +9,18 @@ import { isZeroExcessBooking } from "@/lib/europcar/protectionSummary";
 import PaymentSplitBlocks from "@/components/checkout/PaymentSplitBlocks";
 import { useEtoPaymentSplit } from "./usePaymentSplit";
 
+// Helper: detecta se um item representa correntes para neve
+const isSnowChainsItem = (item: any): boolean => {
+  if (!item) return false;
+  const code = (item.code || item.auxK || item.id || '').toString().toUpperCase();
+  const descr = (item.descr || item.name || item.chrgTyDesc || '').toString().toLowerCase();
+  if (code === 'SNO' || code === 'CHN') return true;
+  if (descr.includes('snow chain') || descr.includes('snowchain') || descr.includes('snow-chain')) return true;
+  if (descr.includes('corrente') && descr.includes('neve')) return true;
+  if (descr.includes('catene') && descr.includes('neve')) return true;
+  return false;
+};
+
 export default function CheckoutPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -206,6 +218,14 @@ export default function CheckoutPage() {
     const data = sessionStorage.getItem("europcar_booking");
     if (data) {
       const parsed = JSON.parse(data);
+      // Remove equipamentos de corrente de neve adicionados se a tarifa já inclui correntes (ex: Snow chains Italy)
+      const hasIncludedSnowChains = (parsed.quoteInsurances || []).some(isSnowChainsItem) ||
+        (parsed.car?.includedInsurances || []).some(isSnowChainsItem) ||
+        (parsed.xrsInsurances || []).some(isSnowChainsItem);
+      if (hasIncludedSnowChains && parsed.xrsEquipment?.length) {
+        parsed.xrsEquipment = parsed.xrsEquipment.filter((eq: any) => !isSnowChainsItem(eq));
+        try { sessionStorage.setItem("europcar_booking", JSON.stringify(parsed)); } catch {}
+      }
       setBooking(parsed);
       if (parsed.pickupStationName) setPickupStationName(parsed.pickupStationName);
       if (parsed.returnStationName) setReturnStationName(parsed.returnStationName);

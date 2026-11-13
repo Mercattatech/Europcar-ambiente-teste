@@ -153,6 +153,18 @@ function EquipmentVisual({ code, icon }: { code: string; icon?: string }) {
   return <span className="text-2xl">{icon || '📦'}</span>;
 }
 
+// Helper: detecta se um item (seguro, taxa ou equipamento) representa correntes para neve (ex: Snow chains Italy)
+const isSnowChainsItem = (item: any): boolean => {
+  if (!item) return false;
+  const code = (item.code || item.auxK || item.id || '').toString().toUpperCase();
+  const descr = (item.descr || item.name || item.chrgTyDesc || '').toString().toLowerCase();
+  if (code === 'SNO' || code === 'CHN') return true;
+  if (descr.includes('snow chain') || descr.includes('snowchain') || descr.includes('snow-chain')) return true;
+  if (descr.includes('corrente') && descr.includes('neve')) return true;
+  if (descr.includes('catene') && descr.includes('neve')) return true;
+  return false;
+};
+
 // ---- Inner component (needs useSearchParams inside Suspense) ----
 function VehiclesContent() {
   const { data: session, status } = useSession();
@@ -407,6 +419,40 @@ function VehiclesContent() {
   const [quoteTotals, setQuoteTotals] = useState<any>(null);
   // PayerSplit from XRS payerList (chargesDetail=TRE) — quem paga o quê
   const [payerSplit, setPayerSplit] = useState<PayerSplit | null>(null);
+
+  // Verifica se a reserva/tarifa já inclui correntes para neve (ex: "Snow chains Italy" mandatório em Milão/Itália)
+  const hasIncludedSnowChains = useMemo(() => {
+    if (quoteInsurances.some(i => isSnowChainsItem(i))) return true;
+    if ((selectedCar?.includedInsurances || []).some((i: any) => isSnowChainsItem(i))) return true;
+    if (ratesEquipment.some((e: any) => isSnowChainsItem(e) && (e.type === 'I' || e.type === 'M'))) return true;
+    try {
+      const raw = sessionStorage.getItem("europcar_booking");
+      if (raw) {
+        const b = JSON.parse(raw);
+        if ((b?.quoteInsurances || []).some((i: any) => isSnowChainsItem(i))) return true;
+        if ((b?.car?.includedInsurances || []).some((i: any) => isSnowChainsItem(i))) return true;
+        if ((b?.xrsInsurances || []).some((i: any) => isSnowChainsItem(i))) return true;
+      }
+    } catch {}
+    return false;
+  }, [quoteInsurances, selectedCar, ratesEquipment]);
+
+  // Se correntes para neve já estão inclusas na tarifa, remove automaticamente qualquer seleção manual
+  useEffect(() => {
+    if (hasIncludedSnowChains) {
+      setSelectedEquipmentMap(prev => {
+        let changed = false;
+        const next = { ...prev };
+        for (const k of Object.keys(next)) {
+          if (isSnowChainsItem({ code: k })) {
+            delete next[k];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+  }, [hasIncludedSnowChains]);
 
   // ETO protection skip state
   const [protectionsSkipped, setProtectionsSkipped] = useState(false);
@@ -996,7 +1042,11 @@ function VehiclesContent() {
     // Build stationEquipment from ratesEquipment (already loaded in Step 2)
     // Only include type "O" (optional) — mandatory/included are automatic
     const stationEquipment = ratesEquipment
-      .filter((eq: any) => eq.type === 'O' && !EXCLUDED_EQUIPMENT_CODES.has(eq.code))
+      .filter((eq: any) => {
+        if (eq.type !== 'O' || EXCLUDED_EQUIPMENT_CODES.has(eq.code)) return false;
+        if (hasIncludedSnowChains && isSnowChainsItem(eq)) return false;
+        return true;
+      })
       .map((eq: any) => {
         const meta = EQUIPMENT_CATALOG[eq.code];
         const isToll = ['TOL', 'TOLL', 'VVR', 'ETL'].includes(eq.code);
@@ -1151,6 +1201,7 @@ function VehiclesContent() {
         // ── Parse prices from getQuote responses (merged across chunks) ──
         // ── Use equipment prices from getMultipleRates (pricesFromRates) ──────
         const prices: Record<string, { price: number; priceBRL: number; totalBRL: number; currency: string; exchangeRate: number; onRequest: boolean }> = { ...pricesFromRates };
+        let allParsedInsurances: any[] = [];
 
         for (const quoteData of quoteDataList) {
           if (!quoteData) continue;
@@ -1231,6 +1282,11 @@ function VehiclesContent() {
             if (d.includes('collision') || d.includes('damage waiver') || d.includes('cdw')) return 'Cobertura por Danos à Colisão (CDW)';
             if (d.includes('theft') || d.includes('thw')) return 'Cobertura por Roubo/Furto (THW)';
             if (d.includes('vat') || d.includes('imposto') || d.includes('tax')) return 'Impostos e Taxas';
+            if (d.includes('snow chain') || (d.includes('corrente') && d.includes('neve')) || (d.includes('catene') && d.includes('neve'))) {
+              return d.includes('italy') || d.includes('italia')
+                ? 'Correntes para neve (Snow chains Italy)'
+                : 'Correntes para neve';
+            }
             return apiDescr || code; // fallback to API description
           };
 
@@ -1360,8 +1416,9 @@ function VehiclesContent() {
 
               // Skip pure rental/mileage infrastructure lines
               if (skipChrgTy.has(chrgTy)) return;
-              // Skip equipment items (already shown in extras section)
-              if (equipmentCodes.has(auxK)) return;
+              // Skip equipment items (already shown in extras section), EXCETO se for item mandatório/incluso como Snow chains
+              const isMandatorySnowChains = isSnowChainsItem({ code: auxK, chrgTyDesc }) || isSnowChainsItem(a);
+              if (equipmentCodes.has(auxK) && !isMandatorySnowChains) return;
 
               // ── Airport surcharge (chrgTy 00024) ─────────────────────────────────────
               // The correct \"at counter\" value depends on prepaidMode:
@@ -1520,6 +1577,7 @@ function VehiclesContent() {
           }
 
           setQuoteInsurances(parsedInsurances);
+          allParsedInsurances = parsedInsurances;
 
           // ── payerList — split entre motorista e conta corporativa ────────────
           // Usa parsePayerList para extrair driverDueBRL (cobrado online) e
@@ -1589,6 +1647,7 @@ function VehiclesContent() {
             };
             currentInsurances.push(airportEntry);
             setQuoteInsurances(currentInsurances);
+            allParsedInsurances = currentInsurances;
             console.log(`[Step3] ✈️ Airport surcharge injetada via NP fallback: EUR ${npAirportEntry.price.toFixed(2)} / BRL ${npAirportEntry.priceBRL.toFixed(2)} (VAT ${npAirportEntry.vatPct}%) → paidBy=counter`);
           }
         }
@@ -1625,7 +1684,14 @@ function VehiclesContent() {
             }
           }
         }
-        const finalEquipment = Array.from(seenNames.values());
+        let finalEquipment = Array.from(seenNames.values());
+        const quoteHasSnowChains = allParsedInsurances.some(isSnowChainsItem) ||
+          (selectedCar?.includedInsurances || []).some(isSnowChainsItem) ||
+          ratesEquipment.some((e: any) => isSnowChainsItem(e) && (e.type === 'I' || e.type === 'M'));
+        if (quoteHasSnowChains) {
+          finalEquipment = finalEquipment.filter((eq: any) => !isSnowChainsItem(eq));
+          console.log('[Step3] ❄️ Snow chains already included in quote/rate — Correntes para neve removed from available extras');
+        }
 
         setXrsEquipment(finalEquipment);
         setStep3FetchedCarCategory(carCategory);
@@ -1643,6 +1709,11 @@ function VehiclesContent() {
   const TOLL_CODES = useMemo(() => new Set(['TOL', 'TOLL', 'VVR', 'ETL']), []);
 
   const handleEquipmentQuantity = (code: string, delta: number, maxQty: number = 1) => {
+    // Bloqueia adição de correntes para neve se já inclusas na tarifa da reserva (ex: Milão/Itália)
+    if (hasIncludedSnowChains && isSnowChainsItem({ code }) && delta > 0) {
+      return;
+    }
+
     setSelectedEquipmentMap(prev => {
       const current = prev[code] || 0;
       const next = current + delta;
@@ -1712,14 +1783,14 @@ function VehiclesContent() {
   // BRL total de equipamentos XRS selecionados
   const selectedEquipmentTotalBRL = useMemo(() => {
     return Object.entries(selectedEquipmentMap)
-      .filter(([, qty]) => (qty as number) > 0)
+      .filter(([code, qty]) => (qty as number) > 0 && !(hasIncludedSnowChains && isSnowChainsItem({ code })))
       .reduce((sum: number, [code, qty]) => {
         const ep = equipmentPrices[code];
         if (!ep) return sum;
         const total = ep.totalBRL > 0 ? ep.totalBRL : ep.priceBRL * bookingDurationDays;
         return sum + total * (qty as number);
       }, 0);
-  }, [selectedEquipmentMap, equipmentPrices, bookingDurationDays]);
+  }, [selectedEquipmentMap, equipmentPrices, bookingDurationDays, hasIncludedSnowChains]);
 
   const absolutePriceRange = useMemo(() => {
     if (!cars.length) return { min: 0, max: 0 };
@@ -2595,7 +2666,9 @@ function VehiclesContent() {
                     onClick={() => {
                       if (step3Error || loadingEquipment) return;
                       const selectedInsuranceCodes = Object.keys(selectedExtrasMap).filter(k => selectedExtrasMap[k] > 0);
-                      const xrsEquipmentPayload = Object.entries(selectedEquipmentMap).filter(([, qty]) => qty > 0).map(([code, qty]) => {
+                      const xrsEquipmentPayload = Object.entries(selectedEquipmentMap)
+                        .filter(([code, qty]) => (qty as number) > 0 && !(hasIncludedSnowChains && isSnowChainsItem({ code })))
+                        .map(([code, qty]) => {
                         const ep = equipmentPrices[code];
                         const meta = xrsEquipment.find((e: any) => e.code === code);
                         return { code, qty, name: meta?.name || code, icon: meta?.icon || '📦', price: ep?.price || 0, priceBRL: ep?.priceBRL || 0, totalBRL: ep?.totalBRL || 0, currency: ep?.currency || 'EUR' };
@@ -2711,7 +2784,9 @@ function VehiclesContent() {
                   <button
                     onClick={() => {
                       const selectedInsuranceCodes2 = Object.keys(selectedExtrasMap).filter(k => selectedExtrasMap[k] > 0);
-                      const xrsEquipmentPayload2 = Object.entries(selectedEquipmentMap).filter(([, qty]) => qty > 0).map(([code, qty]) => {
+                      const xrsEquipmentPayload2 = Object.entries(selectedEquipmentMap)
+                        .filter(([code, qty]) => (qty as number) > 0 && !(hasIncludedSnowChains && isSnowChainsItem({ code })))
+                        .map(([code, qty]) => {
                         const ep2 = equipmentPrices[code];
                         const meta2 = xrsEquipment.find((e: any) => e.code === code);
                         return { code, qty, name: meta2?.name || code, icon: meta2?.icon || '📦', price: ep2?.price || 0, priceBRL: ep2?.priceBRL || 0, totalBRL: ep2?.totalBRL || 0, currency: ep2?.currency || 'EUR' };
@@ -3228,7 +3303,11 @@ function VehiclesContent() {
                   <div className="mt-10">
                     <h3 className="font-black text-xl text-gray-900 mb-6">{t('extras.availableExtras')}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                      {xrsEquipment.filter((eq: any) => !extrasSearchCfg.disabledExtras.includes(String(eq.code).toUpperCase())).sort((a: any, b: any) => {
+                      {xrsEquipment.filter((eq: any) => {
+                        if (extrasSearchCfg.disabledExtras.includes(String(eq.code).toUpperCase())) return false;
+                        if (hasIncludedSnowChains && isSnowChainsItem(eq)) return false;
+                        return true;
+                      }).sort((a: any, b: any) => {
                         const epA = equipmentPrices[a.code];
                         const fbA = parseFloat(a.priceFromList) || 0;
                         const hasPriceA = (epA && (epA.price > 0 || epA.priceBRL > 0 || epA.totalBRL > 0)) || fbA > 0;
