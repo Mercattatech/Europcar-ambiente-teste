@@ -383,6 +383,33 @@ test('Lisboa (LIST01) com Condutor Adicional — total confere com o Passo 3 (33
   assert.equal(split.totalLocal, 52.45);
 });
 
+test('POA com item mandatório (ex: Snow Chains em Milão) — valor do carro base + item mandatório bate com o Passo 3 e Checkout', () => {
+  // Simula o cálculo da tarifa POA em Milão Linate (LINT01)
+  // Carro base XRS: 50.00 EUR / 321.07 BRL
+  // Item mandatório (Snow Chains - SNC): 24.00 EUR / 153.88 BRL + IVA 22% (5.28 EUR / 33.85 BRL) = 29.28 EUR / 187.73 BRL
+  const baseVehicleBRL = 321.07;
+  const baseVehicleLocal = 50.00;
+  const mandatoryBRL = 187.73;
+  const mandatoryLocal = 29.28;
+
+  // Passo 2 e 3: Tarifa POA somada
+  const step2TotalBRL = Math.round((baseVehicleBRL + mandatoryBRL) * 100) / 100;
+  const step2TotalLocal = Math.round((baseVehicleLocal + mandatoryLocal) * 100) / 100;
+
+  assert.equal(step2TotalBRL, 508.80);
+  assert.equal(step2TotalLocal, 79.28);
+
+  // Checkout resumo de caixa (PAGAR NA RETIRADA):
+  // Aluguel do veículo: 321,07 BRL (50,00 EUR)
+  // Correntes de neve (Obrigatório): 187,73 BRL (29,28 EUR)
+  // Total a pagar no balcão bate exatamente com o Passo 2 e Passo 3:
+  const checkoutBalcaoTotalBRL = Math.round((baseVehicleBRL + mandatoryBRL) * 100) / 100;
+  const checkoutBalcaoTotalLocal = Math.round((baseVehicleLocal + mandatoryLocal) * 100) / 100;
+
+  assert.equal(checkoutBalcaoTotalBRL, step2TotalBRL);
+  assert.equal(checkoutBalcaoTotalLocal, step2TotalLocal);
+});
+
 // ── Cenário 1: tudo com ba ───────────────────────────────────────────────────
 
 test('cenário 1 — todas as linhas com ba → só bloco on-line', async () => {

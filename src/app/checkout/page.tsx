@@ -14,7 +14,7 @@ const isSnowChainsItem = (item: any): boolean => {
   if (!item) return false;
   const code = (item.code || item.auxK || item.id || '').toString().toUpperCase();
   const descr = (item.descr || item.name || item.chrgTyDesc || '').toString().toLowerCase();
-  if (code === 'SNO' || code === 'CHN' || code.includes('SNOW')) return true;
+  if (code === 'SNO' || code === 'CHN' || code === 'SNC' || code.includes('SNOW')) return true;
   if (descr.includes('snow chain') || descr.includes('snowchain') || descr.includes('snow-chain')) return true;
   if (descr.includes('corrente') && descr.includes('neve')) return true;
   if (descr.includes('catene') && descr.includes('neve')) return true;
@@ -762,6 +762,21 @@ export default function CheckoutPage() {
   const hasContract = contractID !== "";  // tag aparece SEMPRE quando há contrato
   const hasDiscountValue = discountXRS > 0.01; // valor exato só quando getQuote funcionou
 
+  // Itens mandatórios de equipamento para POA
+  const mandatoryEquipList: any[] = booking?.mandatoryEquipment?.length
+    ? booking.mandatoryEquipment
+    : (car?.mandatoryEquipmentList || []);
+  const mandatoryEquipBRL = mandatoryEquipList.reduce((s: number, m: any) => s + (parseFloat(m.priceBRL) || 0), 0);
+  const mandatoryEquipLocal = mandatoryEquipList.reduce((s: number, m: any) => s + (parseFloat(m.priceLocal) || 0), 0);
+
+  const baseVehicleTotalBRL = paymentMethod === 'BALCAO' && mandatoryEquipBRL > 0
+    ? (car.baseRateEstimateInBookingCurrency ? parseFloat(car.baseRateEstimateInBookingCurrency) : Math.max(0, (totalBRL > 0 ? totalBRL : totalRateXRS) - mandatoryEquipBRL))
+    : (totalBRL > 0 ? totalBRL : totalRateXRS);
+
+  const baseVehicleTotalLocal = paymentMethod === 'BALCAO' && mandatoryEquipLocal > 0
+    ? (car.baseRateEstimate ? parseFloat(car.baseRateEstimate) : (exchangeRate > 0 ? baseVehicleTotalBRL / exchangeRate : 0))
+    : (exchangeRate > 0 ? (totalBRL > 0 ? totalBRL : totalRateXRS) / exchangeRate : totalRateXRS);
+
   // Calculate days (ciclos de 24h + tolerância do país + prioridade da API XRS)
   const days = calculateRentalDays({
     pickupDate,
@@ -1506,13 +1521,30 @@ export default function CheckoutPage() {
               <div className="flex flex-col gap-1 border-t border-gray-200 pt-3 text-xs">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Aluguel ({currency})</span>
-                  <span className="font-bold text-gray-900">{currency} {totalRateXRS.toFixed(2).replace(".", ",")}</span>
+                  <span className="font-bold text-gray-900">{currency} {(baseVehicleTotalLocal || (baseVehicleTotalBRL / (exchangeRate || 1))).toFixed(2).replace(".", ",")}</span>
                 </div>
-                {totalBRL > 0 && (
+                {baseVehicleTotalBRL > 0 && (
                   <div className="flex justify-between">
                     <span className="text-gray-500">Em BRL</span>
-                    <span className="font-bold text-gray-900">R$ {totalBRL.toFixed(2).replace(".", ",")}</span>
+                    <span className="font-bold text-gray-900">R$ {baseVehicleTotalBRL.toFixed(2).replace(".", ",")}</span>
                   </div>
+                )}
+
+                {/* Itens mandatórios */}
+                {mandatoryEquipList.length > 0 && (
+                  <>
+                    <div className="text-[10px] font-bold text-blue-700 uppercase mt-2 mb-1">Itens obrigatórios da estação</div>
+                    {mandatoryEquipList.map((m: any) => (
+                      <div key={`acc-m-${m.code}`} className="flex justify-between text-blue-800">
+                        <span className="flex items-center gap-1">{m.icon || '❄️'} {m.name || m.descr || m.code} (Obrigatório)</span>
+                        <span className="font-bold">
+                          {hasLocal && m.priceLocal > 0
+                            ? fmtLocal(m.priceLocal)
+                            : `R$ ${(m.priceBRL || 0).toFixed(2).replace(".", ",")}`}
+                        </span>
+                      </div>
+                    ))}
+                  </>
                 )}
 
                 {/* Extras */}
@@ -2430,15 +2462,32 @@ export default function CheckoutPage() {
                       {/* Itens detalhados da retirada */}
                       <div className="mt-3 pt-2.5 border-t border-gray-100 space-y-1.5 text-xs text-gray-700">
                         {isBalcaoOnly && (
-                          <div className="flex justify-between items-start gap-2">
-                            <div className="flex items-start gap-1.5 min-w-0">
-                              <span className="text-gray-400 font-bold">-</span>
-                              <span>Aluguel do veículo ({days} {days === 1 ? 'diária' : 'diárias'}) + taxas</span>
+                          <>
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="flex items-start gap-1.5 min-w-0">
+                                <span className="text-gray-400 font-bold">-</span>
+                                <span>Aluguel do veículo ({days} {days === 1 ? 'diária' : 'diárias'}) + taxas</span>
+                              </div>
+                              <span className="font-semibold text-gray-900 shrink-0">
+                                {hasLocal ? fmtLocal(baseVehicleTotalLocal) : fmtBRL(baseVehicleTotalBRL)}
+                              </span>
                             </div>
-                            <span className="font-semibold text-gray-900 shrink-0">
-                              {hasLocal ? fmtLocal(vehicleTotalBRL / exchangeRate) : fmtBRL(vehicleTotalBRL)}
-                            </span>
-                          </div>
+
+                            {mandatoryEquipList.map((m: any) => (
+                              <div key={`ret-m-${m.code}`} className="flex justify-between items-start gap-2">
+                                <div className="flex items-start gap-1.5 min-w-0">
+                                  <span className="text-blue-500 font-bold">-</span>
+                                  <span>
+                                    {m.icon || '❄️'} {m.name || m.descr || m.code}{' '}
+                                    <span className="text-[10px] text-blue-700 font-bold uppercase">(Obrigatório)</span>
+                                  </span>
+                                </div>
+                                <span className="font-semibold text-gray-900 shrink-0">
+                                  {hasLocal && m.priceLocal > 0 ? fmtLocal(m.priceLocal) : fmtBRL(m.priceBRL)}
+                                </span>
+                              </div>
+                            ))}
+                          </>
                         )}
 
                         {booking?.xrsEquipment?.map((eq: any) => {

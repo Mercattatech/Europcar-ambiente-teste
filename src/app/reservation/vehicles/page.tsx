@@ -158,12 +158,83 @@ const isSnowChainsItem = (item: any): boolean => {
   if (!item) return false;
   const code = (item.code || item.auxK || item.id || '').toString().toUpperCase();
   const descr = (item.descr || item.name || item.chrgTyDesc || '').toString().toLowerCase();
-  if (code === 'SNO' || code === 'CHN' || code.includes('SNOW')) return true;
+  if (code === 'SNO' || code === 'CHN' || code === 'SNC' || code.includes('SNOW')) return true;
   if (descr.includes('snow chain') || descr.includes('snowchain') || descr.includes('snow-chain')) return true;
   if (descr.includes('corrente') && descr.includes('neve')) return true;
   if (descr.includes('catene') && descr.includes('neve')) return true;
   return false;
 };
+
+// Friendly name / icon catalog (mesmos nomes e categorias do site oficial da Europcar)
+const EQUIPMENT_CATALOG: Record<string, { name: string; icon: string; description: string; maxQty: number }> = {
+  CSB: { name: 'Assento de bebê (1–3 anos)', icon: '👶', description: 'Cadeira infantil para crianças de 1 a 3 anos (grupo 1, 9–18 kg).', maxQty: 3 },
+  CSI: { name: 'Bebê conforto (0–12 meses)', icon: '👶', description: 'Cadeira infantil voltada para trás para bebês de 0 a 12 meses (até 13 kg).', maxQty: 3 },
+  CST: { name: 'Assento criança (4–7 anos)', icon: '🧒', description: 'Cadeira para crianças de 4 a 7 anos (15–30 kg).', maxQty: 3 },
+  CBS: { name: 'Assento de elevação Booster (8–12 anos)', icon: '💺', description: 'Assento de elevação para crianças de 8 a 12 anos (até 150 cm / 22–36 kg).', maxQty: 3 },
+  BST: { name: 'Assento de elevação Booster (8–12 anos)', icon: '💺', description: 'Assento de elevação para crianças de 8 a 12 anos (até 150 cm / 22–36 kg).', maxQty: 3 },
+  NVS: { name: 'Sistema de navegação GPS', icon: '🗺️', description: 'Navegador GPS portátil com mapas atualizados.', maxQty: 1 },
+  NAV: { name: 'Sistema de navegação GPS', icon: '🗺️', description: 'GPS com mapeamento local e internacional.', maxQty: 1 },
+  TOL: { name: 'Ativação de pedágio eletrônico (Via Verde / Toll)', icon: '🛣️', description: 'Taxa de ativação do dispositivo eletrônico para pedágios e portagens (ex: Via Verde). O valor do consumo será cobrado pela locadora.', maxQty: 1 },
+  TOLL: { name: 'Ativação de pedágio eletrônico (Via Verde / Toll)', icon: '🛣️', description: 'Taxa de ativação do dispositivo eletrônico para pedágios.', maxQty: 1 },
+  VVR: { name: 'Ativação de dispositivo Via Verde', icon: '🛣️', description: 'Taxa de ativação para pagamento automático de portagens em Portugal.', maxQty: 1 },
+  ETL: { name: 'Ativação de pedágio eletrônico', icon: '🛣️', description: 'Taxa de ativação de dispositivo eletrônico para pedágios.', maxQty: 1 },
+  ADD: { name: 'Condutor adicional', icon: '👤', description: 'Permite compartilhar a direção em longas viagens.', maxQty: 3 },
+  ADR: { name: 'Condutor adicional', icon: '👤', description: 'Condutor extra habilitado a dirigir o veículo alugado.', maxQty: 3 },
+  JAC: { name: 'Sobretaxa motorista jovem', icon: '🧑‍🦱', description: 'Exigida para motoristas com menos de 25 anos.', maxQty: 2 },
+  YOU: { name: 'Sobretaxa motorista jovem', icon: '🧑‍🦱', description: 'Taxa para motoristas com menos de 25 anos.', maxQty: 2 },
+  TRH: { name: 'Engate para reboque', icon: '🔗', description: 'Suporte para reboque de trailers ou caravanas.', maxQty: 1 },
+  CBF: { name: 'Taxa transfronteiriça', icon: '🌍', description: 'Permite conduzir o veículo em países adicionais.', maxQty: 1 },
+  LRC: { name: 'Taxa transfronteiriça', icon: '🌍', description: 'Autorização para condução em países adicionais.', maxQty: 1 },
+  DVD: { name: 'Diesel garantido', icon: '⛽', description: 'Disponível apenas para categorias EDMR, CDMR, EVMR, IVMR e SDMR.', maxQty: 1 },
+  SKR: { name: 'Rack de esqui', icon: '🎿', description: 'Suporte para transporte de esquis no teto do veículo.', maxQty: 2 },
+  SKB: { name: 'Rack de esqui', icon: '🎿', description: 'Rack para esquis ou snowboards.', maxQty: 2 },
+  SKV: { name: 'Rack de esqui', icon: '🎿', description: 'Rack para transporte de esquis.', maxQty: 2 },
+  SNO: { name: 'Correntes para neve (Snow chains)', icon: '❄️', description: 'Correntes para pneus — obrigatórias em certas regiões de inverno.', maxQty: 2 },
+  SNC: { name: 'Correntes para neve (Snow chains)', icon: '❄️', description: 'Correntes para pneus — obrigatórias por regulamentação de inverno.', maxQty: 2 },
+  SNR: { name: 'Sobretaxa motorista sênior', icon: '👴', description: 'Taxa para motoristas acima da idade máxima.', maxQty: 1 },
+  CHN: { name: 'Correntes para neve (Snow chains)', icon: '❄️', description: 'Correntes para pneus em condições de neve.', maxQty: 2 },
+  WFI: { name: 'Wi-Fi portátil', icon: '📶', description: 'Hotspot Wi-Fi móvel com dados inclusos.', maxQty: 1 },
+  LUG: { name: 'Proteção de bagagem', icon: '🧳', description: 'Cobertura para danos ou roubo de bagagem.', maxQty: 1 },
+  HEL: { name: 'Capacete de motocicleta', icon: '🪖', description: 'Capacete fornecido junto com o veículo.', maxQty: 2 },
+  MMS: { name: 'Proteção de espelhos', icon: '🪞', description: 'Cobertura adicional para espelhos retrovisores.', maxQty: 1 },
+  JAB: { name: 'Dispositivo antiabandono', icon: '🔔', description: 'Alarme antiabandono para crianças.', maxQty: 1 },
+  STR: { name: 'Pneus de neve', icon: '🛞', description: 'Pneus especiais para condições de neve.', maxQty: 1 },
+  DSL: { name: 'Carga para carros a diesel', icon: '⛽', description: 'Suplemento para veículos a diesel.', maxQty: 1 },
+  EMS: { name: 'Serviço de emergência no exterior', icon: '🆘', description: 'Assistência de emergência para viagens internacionais.', maxQty: 1 },
+  LSR: { name: 'Cinta de amarração com catraca', icon: '🔧', description: 'Cinta para fixação de carga.', maxQty: 1 },
+};
+
+// Exclui equipamentos internos de furgões de carga / vinhetas internas que o site oficial da Europcar não oferece em carros de passeio
+const EXCLUDED_EQUIPMENT_CODES = new Set(['ETR', 'VIG', 'LSR', 'TRH', 'HEL']);
+
+// Calcula custo total em BRL e local de um equipamento
+function getEquipmentCost(eq: any, days: number) {
+  const hasRealCap = eq.rentalMax > 0 && eq.rentalMax < 99999;
+  const capBRL = hasRealCap && eq.rentalMaxInBookingCurrencyAI > 0 ? eq.rentalMaxInBookingCurrencyAI : Infinity;
+  const capLocal = hasRealCap && eq.rentalMaxAI > 0 ? eq.rentalMaxAI : Infinity;
+  const vatMult = (eq.tax && eq.tax > 0) ? (1 + eq.tax / 100) : 1;
+
+  let totalBRL = 0;
+  if (eq.rentalPriceInBookingCurrencyAI && eq.rentalPriceInBookingCurrencyAI > 0) {
+    totalBRL = Math.min(eq.rentalPriceInBookingCurrencyAI, capBRL);
+  } else if (eq.priceInBookingCurrency && eq.priceInBookingCurrency > 0) {
+    const raw = eq.per === 'R' ? eq.priceInBookingCurrency : eq.priceInBookingCurrency * days;
+    totalBRL = Math.min(raw * vatMult, capBRL);
+  }
+
+  let totalLocal = 0;
+  if (eq.rentalPriceAI && eq.rentalPriceAI > 0) {
+    totalLocal = Math.min(eq.rentalPriceAI, capLocal);
+  } else if (eq.price && eq.price > 0) {
+    const raw = eq.per === 'R' ? eq.price : eq.price * days;
+    totalLocal = Math.min(raw * vatMult, capLocal);
+  }
+
+  return {
+    totalBRL: Math.round(totalBRL * 100) / 100,
+    totalLocal: Math.round(totalLocal * 100) / 100,
+  };
+}
 
 const AIRPORT_SURCHARGE_CODES_CONST = ['APF','APT','AIRPORTFEE','APS','ASF','APF2','APTF','STF'];
 const isAirportSurchargeItem = (item: any): boolean => {
@@ -872,6 +943,43 @@ function VehiclesContent() {
       setRatesEquipment(mergedEquipment);
       console.log(`[fetchCars] Equipment from getMultipleRates: ${mergedEquipment.length} items`);
 
+      // ── Incorpora itens mandatórios de equipamento (ex: Correntes de neve na Itália) na tarifa POA ──
+      const mandatoryEquipmentItems = mergedEquipment
+        .filter((eq: any) => eq.type === 'M' || (isSnowChainsItem(eq) && eq.type !== 'O'))
+        .map((eq: any) => {
+          const cost = getEquipmentCost(eq, bookingDurationDays || 1);
+          const meta = EQUIPMENT_CATALOG[eq.code];
+          return {
+            code: eq.code,
+            name: meta?.name || eq.descr || eq.code,
+            icon: meta?.icon || (isSnowChainsItem(eq) ? '❄️' : '📦'),
+            descr: eq.descr || '',
+            priceBRL: cost.totalBRL,
+            priceLocal: cost.totalLocal,
+            type: 'M',
+            isMandatory: true,
+          };
+        });
+
+      const totalMandatoryBRL = mandatoryEquipmentItems.reduce((sum, item) => sum + item.priceBRL, 0);
+      const totalMandatoryLocal = mandatoryEquipmentItems.reduce((sum, item) => sum + item.priceLocal, 0);
+
+      if (totalMandatoryBRL > 0 || totalMandatoryLocal > 0) {
+        for (const car of poaRates) {
+          const rawTotalLocal = parseFloat(car.totalRateEstimate || '0');
+          const rawTotalBRL = parseFloat(car.totalRateEstimateInBookingCurrency || '0');
+
+          car.baseRateEstimate = car.baseRateEstimate || rawTotalLocal.toFixed(2);
+          car.baseRateEstimateInBookingCurrency = car.baseRateEstimateInBookingCurrency || rawTotalBRL.toFixed(2);
+          car.mandatoryEquipmentBRL = totalMandatoryBRL;
+          car.mandatoryEquipmentLocal = totalMandatoryLocal;
+          car.mandatoryEquipmentList = mandatoryEquipmentItems;
+
+          car.totalRateEstimate = (rawTotalLocal + totalMandatoryLocal).toFixed(2);
+          car.totalRateEstimateInBookingCurrency = (rawTotalBRL + totalMandatoryBRL).toFixed(2);
+        }
+      }
+
       // Parse ETO rates (may fail for some stations)
       let etoRates: any[] = [];
       if (etoRatesRes) {
@@ -1013,47 +1121,6 @@ function VehiclesContent() {
     setLoadingEquipment(true);
 
     // ── Step 3a: Equipment from getMultipleRates (already loaded in Step 2) ──
-    // Friendly name / icon catalog (mesmos nomes e categorias do site oficial da Europcar)
-    const EQUIPMENT_CATALOG: Record<string, { name: string; icon: string; description: string; maxQty: number }> = {
-      CSB: { name: 'Assento de bebê (1–3 anos)', icon: '👶', description: 'Cadeira infantil para crianças de 1 a 3 anos (grupo 1, 9–18 kg).', maxQty: 3 },
-      CSI: { name: 'Bebê conforto (0–12 meses)', icon: '👶', description: 'Cadeira infantil voltada para trás para bebês de 0 a 12 meses (até 13 kg).', maxQty: 3 },
-      CST: { name: 'Assento criança (4–7 anos)', icon: '🧒', description: 'Cadeira para crianças de 4 a 7 anos (15–30 kg).', maxQty: 3 },
-      CBS: { name: 'Assento de elevação Booster (8–12 anos)', icon: '💺', description: 'Assento de elevação para crianças de 8 a 12 anos (até 150 cm / 22–36 kg).', maxQty: 3 },
-      BST: { name: 'Assento de elevação Booster (8–12 anos)', icon: '💺', description: 'Assento de elevação para crianças de 8 a 12 anos (até 150 cm / 22–36 kg).', maxQty: 3 },
-      NVS: { name: 'Sistema de navegação GPS', icon: '🗺️', description: 'Navegador GPS portátil com mapas atualizados.', maxQty: 1 },
-      NAV: { name: 'Sistema de navegação GPS', icon: '🗺️', description: 'GPS com mapeamento local e internacional.', maxQty: 1 },
-      TOL: { name: 'Ativação de pedágio eletrônico (Via Verde / Toll)', icon: '🛣️', description: 'Taxa de ativação do dispositivo eletrônico para pedágios e portagens (ex: Via Verde). O valor do consumo será cobrado pela locadora.', maxQty: 1 },
-      TOLL: { name: 'Ativação de pedágio eletrônico (Via Verde / Toll)', icon: '🛣️', description: 'Taxa de ativação do dispositivo eletrônico para pedágios.', maxQty: 1 },
-      VVR: { name: 'Ativação de dispositivo Via Verde', icon: '🛣️', description: 'Taxa de ativação para pagamento automático de portagens em Portugal.', maxQty: 1 },
-      ETL: { name: 'Ativação de pedágio eletrônico', icon: '🛣️', description: 'Taxa de ativação de dispositivo eletrônico para pedágios.', maxQty: 1 },
-      ADD: { name: 'Condutor adicional', icon: '👤', description: 'Permite compartilhar a direção em longas viagens.', maxQty: 3 },
-      ADR: { name: 'Condutor adicional', icon: '👤', description: 'Condutor extra habilitado a dirigir o veículo alugado.', maxQty: 3 },
-      JAC: { name: 'Sobretaxa motorista jovem', icon: '🧑‍🦱', description: 'Exigida para motoristas com menos de 25 anos.', maxQty: 2 },
-      YOU: { name: 'Sobretaxa motorista jovem', icon: '🧑‍🦱', description: 'Taxa para motoristas com menos de 25 anos.', maxQty: 2 },
-      TRH: { name: 'Engate para reboque', icon: '🔗', description: 'Suporte para reboque de trailers ou caravanas.', maxQty: 1 },
-      CBF: { name: 'Taxa transfronteiriça', icon: '🌍', description: 'Permite conduzir o veículo em países adicionais.', maxQty: 1 },
-      LRC: { name: 'Taxa transfronteiriça', icon: '🌍', description: 'Autorização para condução em países adicionais.', maxQty: 1 },
-      DVD: { name: 'Diesel garantido', icon: '⛽', description: 'Disponível apenas para categorias EDMR, CDMR, EVMR, IVMR e SDMR.', maxQty: 1 },
-      SKR: { name: 'Rack de esqui', icon: '🎿', description: 'Suporte para transporte de esquis no teto do veículo.', maxQty: 2 },
-      SKB: { name: 'Rack de esqui', icon: '🎿', description: 'Rack para esquis ou snowboards.', maxQty: 2 },
-      SKV: { name: 'Rack de esqui', icon: '🎿', description: 'Rack para transporte de esquis.', maxQty: 2 },
-      SNO: { name: 'Correntes para neve', icon: '⛓️', description: 'Correntes para pneus — obrigatórias em certas regiões.', maxQty: 2 },
-      SNR: { name: 'Sobretaxa motorista sênior', icon: '👴', description: 'Taxa para motoristas acima da idade máxima.', maxQty: 1 },
-      CHN: { name: 'Correntes para neve', icon: '⛓️', description: 'Correntes para pneus em condições de neve.', maxQty: 2 },
-      WFI: { name: 'Wi-Fi portátil', icon: '📶', description: 'Hotspot Wi-Fi móvel com dados inclusos.', maxQty: 1 },
-      LUG: { name: 'Proteção de bagagem', icon: '🧳', description: 'Cobertura para danos ou roubo de bagagem.', maxQty: 1 },
-      HEL: { name: 'Capacete de motocicleta', icon: '🪖', description: 'Capacete fornecido junto com o veículo.', maxQty: 2 },
-      MMS: { name: 'Proteção de espelhos', icon: '🪞', description: 'Cobertura adicional para espelhos retrovisores.', maxQty: 1 },
-      JAB: { name: 'Dispositivo antiabandono', icon: '🔔', description: 'Alarme antiabandono para crianças.', maxQty: 1 },
-      STR: { name: 'Pneus de neve', icon: '🛞', description: 'Pneus especiais para condições de neve.', maxQty: 1 },
-      DSL: { name: 'Carga para carros a diesel', icon: '⛽', description: 'Suplemento para veículos a diesel.', maxQty: 1 },
-      EMS: { name: 'Serviço de emergência no exterior', icon: '🆘', description: 'Assistência de emergência para viagens internacionais.', maxQty: 1 },
-      LSR: { name: 'Cinta de amarração com catraca', icon: '🔧', description: 'Cinta para fixação de carga.', maxQty: 1 },
-    };
-
-    // Exclui equipamentos internos de furgões de carga / vinhetas internas que o site oficial da Europcar não oferece em carros de passeio
-    const EXCLUDED_EQUIPMENT_CODES = new Set(['ETR', 'VIG', 'LSR', 'TRH', 'HEL']);
-
     // Build stationEquipment from ratesEquipment (already loaded in Step 2)
     // Only include type "O" (optional) — mandatory/included are automatic
     const stationEquipment = ratesEquipment
@@ -2700,7 +2767,7 @@ function VehiclesContent() {
                         ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
                         : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID);
                       const enrichedCar = { ...selectedCar, ...quoteTotals, duration: bookingDurationDays };
-                      const payload = { car: enrichedCar, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupStationName: stationName || pickupStation, returnStationName: (isOneWay ? returnStationName : stationName) || returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, selectedProtectionPackage, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit, etoMarginPercent: zeroExcessUpgrade ? (zeroExcessMargin > 0 ? zeroExcessMargin : etoMargin) : etoMargin, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
+                      const payload = { car: enrichedCar, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload, xrsInsurances: xrsInsurancesPayload, quoteInsurances: quoteInsurances, mandatoryEquipment: selectedCar?.mandatoryEquipmentList || [], pickupStation, returnStation, pickupStationName: stationName || pickupStation, returnStationName: (isOneWay ? returnStationName : stationName) || returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, selectedProtectionPackage, driverCountry, driverCountryName, stationCountry, quoteMileage, payerSplit, etoMarginPercent: zeroExcessUpgrade ? (zeroExcessMargin > 0 ? zeroExcessMargin : etoMargin) : etoMargin, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
                       sessionStorage.setItem("europcar_booking", JSON.stringify(payload)); sessionStorage.removeItem("europcar_payment_link_token"); sessionStorage.removeItem("europcar_payment_link_customer");
                       try {
                         const sessionId = sessionStorage.getItem("europcar_journey_session");
@@ -2817,7 +2884,7 @@ function VehiclesContent() {
                       const cidForTariff = selectedTariffType === 'ETO'
                         ? (zeroExcessUpgrade ? '56935495' : (selectedCar?._etoCID || '56935466'))
                         : (zeroExcessUpgrade ? '56935495' : (selectedCar?.contractID || effectiveContractID || DEFAULT_POA_CID));
-                      const payload = { car: { ...selectedCar, duration: bookingDurationDays }, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload2, xrsInsurances: xrsInsurancesPayload2, quoteInsurances: quoteInsurances, pickupStation, returnStation, pickupStationName: stationName || pickupStation, returnStationName: (isOneWay ? returnStationName : stationName) || returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, selectedProtectionPackage, driverCountry, driverCountryName, stationCountry, quoteMileage, etoMarginPercent: zeroExcessUpgrade ? (zeroExcessMargin > 0 ? zeroExcessMargin : etoMargin) : etoMargin, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
+                      const payload = { car: { ...selectedCar, duration: bookingDurationDays }, duration: bookingDurationDays, extras: selectedExtrasMap, xrsEquipment: xrsEquipmentPayload2, xrsInsurances: xrsInsurancesPayload2, quoteInsurances: quoteInsurances, mandatoryEquipment: selectedCar?.mandatoryEquipmentList || [], pickupStation, returnStation, pickupStationName: stationName || pickupStation, returnStationName: (isOneWay ? returnStationName : stationName) || returnStation, pickupDate, returnDate, pickupTime, returnTime, contractID: cidForTariff, tariffType: selectedTariffType, zeroExcess: zeroExcessUpgrade, selectedProtectionPackage, driverCountry, driverCountryName, stationCountry, quoteMileage, etoMarginPercent: zeroExcessUpgrade ? (zeroExcessMargin > 0 ? zeroExcessMargin : etoMargin) : etoMargin, driverAge, xrsLanguage, stationInfo: pickupStationInfo ? { type: pickupStationInfo.type, hasShuttle: pickupStationInfo.features?.hasShuttle, hasDelivery: pickupStationInfo.features?.hasDelivery, hasCollection: pickupStationInfo.features?.hasCollection } : undefined };
                       sessionStorage.setItem("europcar_booking", JSON.stringify(payload)); sessionStorage.removeItem("europcar_payment_link_token"); sessionStorage.removeItem("europcar_payment_link_customer");
                       // Journey tracking — Step 3: Extras selected (ETO path)
                       try {
@@ -3245,9 +3312,9 @@ function VehiclesContent() {
                               <span className="text-[11px] bg-green-100 text-[#008d36] font-bold px-2.5 py-0.5 rounded-full border border-green-200">
                                 Já inclusa no valor
                               </span>
-                              {hasIncludedSnowChains && (
+                              {(hasIncludedSnowChains || (selectedCar?.mandatoryEquipmentList || []).length > 0) && (
                                 <span className="text-[11px] bg-blue-100 text-blue-700 font-bold px-2.5 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">
-                                  ❄️ Equipamento de inverno incluso
+                                  ❄️ Equipamento obrigatório incluso
                                 </span>
                               )}
                             </div>
@@ -3258,7 +3325,7 @@ function VehiclesContent() {
                         </div>
 
                         {/* Coberturas detalhadas da proteção básica */}
-                        <div className={`grid grid-cols-1 sm:grid-cols-2 ${hasIncludedSnowChains ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3.5 pt-3 border-t border-green-100`}>
+                        <div className={`grid grid-cols-1 sm:grid-cols-2 ${(hasIncludedSnowChains || (selectedCar?.mandatoryEquipmentList || []).length > 0) ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3.5 pt-3 border-t border-green-100`}>
                           <div className="bg-white/80 rounded-xl p-3.5 border border-green-100/80 shadow-2xs">
                             <div className="flex items-center gap-2 mb-1.5">
                               <span className="text-base">🚗</span>
@@ -3300,6 +3367,20 @@ function VehiclesContent() {
                               </p>
                             </div>
                           )}
+
+                          {(selectedCar?.mandatoryEquipmentList || [])
+                            .filter((m: any) => !isSnowChainsItem(m) || !hasIncludedSnowChains)
+                            .map((m: any) => (
+                              <div key={`mand-card-${m.code}`} className="bg-white/80 rounded-xl p-3.5 border border-blue-200/90 shadow-2xs">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <span className="text-base">{m.icon || '📦'}</span>
+                                  <h4 className="font-bold text-gray-900 text-xs md:text-sm">{m.name}</h4>
+                                </div>
+                                <p className="text-[11px] md:text-xs text-gray-600 leading-relaxed">
+                                  Item obrigatório regulamentado nesta estação. Já incluso no valor da sua reserva.
+                                </p>
+                              </div>
+                            ))}
                         </div>
 
                         {/* Informação sobre franquia */}
@@ -3360,6 +3441,8 @@ function VehiclesContent() {
                       {xrsEquipment.filter((eq: any) => {
                         if (extrasSearchCfg.disabledExtras.includes(String(eq.code).toUpperCase())) return false;
                         if (hasIncludedSnowChains && isSnowChainsItem(eq)) return false;
+                        if (eq.type === 'M' || eq.type === 'I') return false;
+                        if ((selectedCar?.mandatoryEquipmentList || []).some((m: any) => m.code === eq.code)) return false;
                         return true;
                       }).sort((a: any, b: any) => {
                         const epA = equipmentPrices[a.code];
