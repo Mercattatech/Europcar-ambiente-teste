@@ -117,6 +117,8 @@ export interface PaymentSplitOptions {
   resNumber?: string | null;
   /** Se a reserva possui Proteção Premium / Franquia Zero */
   isZeroExcess?: boolean;
+  /** Códigos de extras opcionais adicionados (equipamentos, proteções extras) que NÃO devem receber markup */
+  extraCodes?: Set<string> | string[];
   /** Logger (default: console). Use `null` para silenciar. */
   logger?: Pick<Console, 'warn'> | null;
 }
@@ -214,23 +216,86 @@ export function formatBRLWithLocal(brl: number, local: number, localCurrency: st
   return `${formatBRL(brl)} (${formatMoney(local, cur)})`;
 }
 
+const EQUIPMENT_CHRGTY = new Set(['00018', '00020', '00021', '00022', '00023']);
+const OPTIONAL_INSURANCE_CODES = new Set([
+  'WWI', 'PAI', 'SPPAI', 'RSA', 'PEP', 'APP', 'INTERIOR', 'AWC',
+  'SCDW', 'SPCDW', 'STHW', 'SPTHW', 'MEDIUM', 'PREMPRE', 'PREMPLUS', 'PREMIUM'
+]);
+
+/**
+ * Identifica se uma linha de cobrança do XRS é um EXTRA ADICIONADO opcional
+ * (equipamentos como cadeira de bebê, GPS, ou proteções opcionais adicionadas).
+ * Extras adicionados NUNCA devem receber markup comercial.
+ */
+export function isExtraChargeLine(line: SplitLine, isZeroExcess = false): boolean {
+  const chrgTy = String(line.chrgTy || '');
+  const auxK = String(line.auxK || '').toUpperCase();
+  const desc = String(line.originalDesc || '').toLowerCase();
+
+  // Itens padrão do pacote básico do veículo NUNCA são extras:
+  // Diárias (00001), IVA (00028), Aeroporto (00024), One-way (00030), LAF (00090), HSS (00546),
+  // Snow chains na Itália (00700 / SNOW-IT), Ecological fee (00621 / ECOLOGIC), Jovem condutor (00070), Km livre (00048)
+  if (
+    chrgTy === '00001' || chrgTy === '00028' || chrgTy === '00024' ||
+    chrgTy === '00030' || chrgTy === '00090' || chrgTy === '00546' ||
+    chrgTy === '00700' || auxK === 'SNOW-IT' || chrgTy === '00621' ||
+    auxK === 'ECOLOGIC' || chrgTy === '00070' || chrgTy === '00048' ||
+    chrgTy === '00006' || chrgTy === '00008'
+  ) {
+    return false;
+  }
+
+  // Se a tarifa for Franquia Zero (contractID 56935495), a Franquia Zero é a tarifa básica do carro
+  if (isZeroExcess && (auxK === 'ZERO_EXCESS' || chrgTy === 'ZERO_EXCESS' || /franquia\s*zero|premium\s*protection/i.test(desc))) {
+    return false;
+  }
+
+  // Equipamentos opcionais
+  if (EQUIPMENT_CHRGTY.has(chrgTy)) return true;
+  if (/child|baby|booster|cadeira|assento|gps|navigation|rack|skirack|wi-fi|wifi/i.test(desc)) return true;
+
+  // Proteções opcionais adicionadas
+  if (OPTIONAL_INSURANCE_CODES.has(auxK)) {
+    if (isZeroExcess && (auxK === 'SCDW' || auxK === 'SPCDW' || auxK === 'STHW' || auxK === 'SPTHW')) {
+      return false; // Parte do pacote Franquia Zero
+    }
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * Aplica markup às linhas e ao subtotal, garantindo que a soma das linhas
  * exibidas seja exatamente o subtotal exibido (resíduo de arredondamento
- * vai para a maior linha).
+ * vai para a maior linha base). Linhas marcadas como extras NUNCA recebem markup.
  */
-function applyMarkup(lines: SplitLine[], target: number, key: 'priceBRL' | 'priceLocal', factor: number): number {
+function applyMarkup(
+  lines: SplitLine[],
+  target: number,
+  key: 'priceBRL' | 'priceLocal',
+  factor: number,
+  isExtraPredicate?: (line: SplitLine) => boolean
+): number {
   const targetRounded = round2(target);
   if (lines.length === 0) return targetRounded;
+
+  const baseLines = isExtraPredicate ? lines.filter((l) => !isExtraPredicate(l)) : lines;
+  const extraLines = isExtraPredicate ? lines.filter((l) => isExtraPredicate(l)) : [];
+  const extraSum = extraLines.reduce((s, l) => s + l[key], 0);
+  const targetBase = round2(targetRounded - extraSum);
+
+  if (baseLines.length === 0) return targetRounded;
+
   let sum = 0;
   let maxIdx = 0;
-  lines.forEach((l, i) => {
+  baseLines.forEach((l, i) => {
     l[key] = round2(l[key] * factor);
     sum += l[key];
-    if (Math.abs(l[key]) > Math.abs(lines[maxIdx][key])) maxIdx = i;
+    if (Math.abs(l[key]) > Math.abs(baseLines[maxIdx][key])) maxIdx = i;
   });
-  const residual = round2(targetRounded - sum);
-  if (residual !== 0) lines[maxIdx][key] = round2(lines[maxIdx][key] + residual);
+  const residual = round2(targetBase - sum);
+  if (residual !== 0) baseLines[maxIdx][key] = round2(baseLines[maxIdx][key] + residual);
   return targetRounded;
 }
 
@@ -481,28 +546,68 @@ export function computePaymentSplit(reservationNode: any, options: PaymentSplitO
 
   // ── Markup no bloco on-line (ex.: margem ETO) ──
   // No modelo Europcar Tour Operator (B2B):
-  // O markup comercial (ex: 25%) incide sobre o pacote total da locação (netTotal / totalRateEstimate).
+  // O markup comercial (ex: 25%) incide ESTRITAMENTE sobre o pacote base do veículo (diárias + taxas obrigatórias).
+  // Extras adicionados (equipamentos, proteções opcionais) NUNCA recebem markup comercial (margem 0%).
   // O valor no balcão é fixo/exato em moeda local (definido pela Europcar local, ex: taxas e extras locais).
-  // O que é pago ao Tour Operator (on-line) é a diferença garantida: Total com Margem - Balcão.
-  // Assim, Total = targetTotal = round2(baseNet * factor).
-  // Exemplo Milão: Líquido 415,78 * 1.25 = 519,72. Balcão = 198,65. Online = 519,72 - 198,65 = 321,07.
-  const baseNetBRL = totalRateEstimateBRL ?? netTotalBRL;
-  const baseNetLocal = totalRateEstimateLocal ?? netTotalLocal;
+  // O que é pago ao Tour Operator (on-line) é a soma: (Base com Margem - Balcão Base) + Extras On-line (sem markup).
+  const extraCodesSet = options.extraCodes instanceof Set
+    ? options.extraCodes
+    : Array.isArray(options.extraCodes)
+    ? new Set(options.extraCodes.map((c) => String(c).toUpperCase()))
+    : null;
+
+  const isExtraLine = (line: SplitLine): boolean => {
+    if (extraCodesSet) {
+      const aux = (line.auxK || '').toUpperCase();
+      const ty = (line.chrgTy || '').toUpperCase();
+      if (extraCodesSet.has(aux) || extraCodesSet.has(ty)) return true;
+    }
+    return isExtraChargeLine(line, isZeroExcess);
+  };
+
+  const onlineExtraLines = (online?.lines || []).filter(isExtraLine);
+  const counterExtraLines = (counter?.lines || []).filter(isExtraLine);
+
+  const onlineExtraNetBRL = round2(onlineExtraLines.reduce((s, l) => s + l.priceBRL, 0));
+  const onlineExtraNetLocal = round2(onlineExtraLines.reduce((s, l) => s + l.priceLocal, 0));
+  const counterExtraNetBRL = round2(counterExtraLines.reduce((s, l) => s + l.priceBRL, 0));
+  const counterExtraNetLocal = round2(counterExtraLines.reduce((s, l) => s + l.priceLocal, 0));
+
+  const totalExtraNetBRL = round2(onlineExtraNetBRL + counterExtraNetBRL);
+  const totalExtraNetLocal = round2(onlineExtraNetLocal + counterExtraNetLocal);
+
+  // Custo líquido do pacote base do veículo (sem extras adicionados)
+  const baseNetBRL = Math.max(0, round2((totalRateEstimateBRL ?? netTotalBRL) - totalExtraNetBRL));
+  const baseNetLocal = Math.max(0, round2((totalRateEstimateLocal ?? netTotalLocal) - totalExtraNetLocal));
+
+  // Balcão base (taxas obrigatórias locais do carro, ex: aeroporto e snow chains na Itália)
+  const baseCounterBRL = Math.max(0, round2((counter?.netSubtotalBRL ?? 0) - counterExtraNetBRL));
+  const baseCounterLocal = Math.max(0, round2((counter?.netSubtotalLocal ?? 0) - counterExtraNetLocal));
+
+  // On-line base líquido
+  const baseOnlineNetBRL = Math.max(0, round2((online?.netSubtotalBRL ?? 0) - onlineExtraNetBRL));
+  const baseOnlineNetLocal = Math.max(0, round2((online?.netSubtotalLocal ?? 0) - onlineExtraNetLocal));
+
   if (online && markupPct !== 0) {
     const factor = 1 + markupPct / 100;
-    const targetTotalBRL = round2(baseNetBRL * factor);
-    const targetTotalLocal = round2(baseNetLocal * factor);
-    const counterBRL = counter?.subtotalBRL ?? 0;
-    const counterLocal = counter?.subtotalLocal ?? 0;
 
-    const targetOnlineBRL = Math.max(0, round2(targetTotalBRL - counterBRL));
-    const targetOnlineLocal = Math.max(0, round2(targetTotalLocal - counterLocal));
+    // Markup incide SOMENTE sobre o pacote base do veículo
+    const targetBaseTotalBRL = round2(baseNetBRL * factor);
+    const targetBaseTotalLocal = round2(baseNetLocal * factor);
 
-    const effectiveFactorBRL = online.netSubtotalBRL > 0 ? (targetOnlineBRL / online.netSubtotalBRL) : factor;
-    const effectiveFactorLocal = online.netSubtotalLocal > 0 ? (targetOnlineLocal / online.netSubtotalLocal) : factor;
+    // O on-line base é a diferença do pacote base com margem menos o balcão base
+    const targetBaseOnlineBRL = Math.max(0, round2(targetBaseTotalBRL - baseCounterBRL));
+    const targetBaseOnlineLocal = Math.max(0, round2(targetBaseTotalLocal - baseCounterLocal));
 
-    online.subtotalBRL = applyMarkup(online.lines, targetOnlineBRL, 'priceBRL', effectiveFactorBRL);
-    online.subtotalLocal = applyMarkup(online.lines, targetOnlineLocal, 'priceLocal', effectiveFactorLocal);
+    // Extras adicionados entram no on-line a 0% de margem (valor líquido/facial exato)
+    const targetOnlineBRL = round2(targetBaseOnlineBRL + onlineExtraNetBRL);
+    const targetOnlineLocal = round2(targetBaseOnlineLocal + onlineExtraNetLocal);
+
+    const effectiveFactorBRL = baseOnlineNetBRL > 0 ? (targetBaseOnlineBRL / baseOnlineNetBRL) : factor;
+    const effectiveFactorLocal = baseOnlineNetLocal > 0 ? (targetBaseOnlineLocal / baseOnlineNetLocal) : factor;
+
+    online.subtotalBRL = applyMarkup(online.lines, targetOnlineBRL, 'priceBRL', effectiveFactorBRL, isExtraLine);
+    online.subtotalLocal = applyMarkup(online.lines, targetOnlineLocal, 'priceLocal', effectiveFactorLocal, isExtraLine);
   }
 
   const totalBRL = round2((online?.subtotalBRL ?? 0) + (counter?.subtotalBRL ?? 0));

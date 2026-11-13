@@ -116,9 +116,17 @@ export function useEtoPaymentSplit(booking: any, setBooking: (updater: (prev: an
           fallback(data?._errorCode || `HTTP ${res.status}`);
           return;
         }
+        const extraCodes = new Set<string>();
+        for (const ins of insuranceList) if (ins?.code) extraCodes.add(String(ins.code).toUpperCase());
+        for (const eq of equipmentList) if (eq?.code) extraCodes.add(String(eq.code).toUpperCase());
+        for (const [code, qty] of Object.entries(booking?.extras || {})) {
+          if (Number(qty) > 0) extraCodes.add(String(code).toUpperCase());
+        }
+
         const computed = computePaymentSplit(reservation, {
           onlineMarkupPercent: markup,
           isZeroExcess: isZeroExcessBooking(booking),
+          extraCodes,
         });
         if (!computed) {
           fallback("cotação sem chargeList");

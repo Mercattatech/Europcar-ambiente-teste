@@ -229,6 +229,79 @@ test('Milão Linate (LINT01) — confere 100% com o portal B2B Europcar Tour Ope
   assert.equal(onlineLinesSum, 321.07);
 });
 
+test('Extras adicionados (equipamentos e proteções) NUNCA recebem markup comercial', async () => {
+  // Cenário 1: Equipamento (Cadeira de Bebê - CST) adicionado no balcão
+  const xmlWithEquip = buildXml({
+    resNumber: '1208999998',
+    totalBRL: '735.78', // 415.78 base + 320.00 cadeira de bebê
+    totalEUR: '114.84', // 64.84 base + 50.00 cadeira de bebê
+    lines: [
+      line({ ty: '00001', desc: 'Basic Rental', eur: '27.76', brl: '177.98', payer: BA }),
+      line({ ty: '00028', desc: 'VAT', eur: '6.10', brl: '39.14', payer: BA }),
+      line({ ty: '00024', desc: 'Airport Surcharge', eur: '1.39', brl: '8.91', payer: DVR }),
+      line({ ty: '00621', desc: 'Snow chains Italy', eur: '24.00', brl: '153.88', payer: DVR, auxK: 'WINT' }),
+      line({ ty: '00028', desc: 'VAT', eur: '5.59', brl: '35.86', payer: DVR }),
+      line({ ty: '00020', desc: 'CHILD SAFETY SEAT', eur: '50.00', brl: '320.00', payer: DVR, auxK: 'CST' }),
+    ],
+    payers: [payerBA('217.12', '33.86'), payerDVR('518.65', '80.98')],
+  });
+
+  const splitEquip = computePaymentSplit(await reservationOf(xmlWithEquip), {
+    onlineMarkupPercent: 25,
+    extraCodes: ['CST'],
+    logger: null,
+  });
+
+  assert.ok(splitEquip);
+  // O online NÃO deve ser inflado pelo equipamento no balcão (continua 321,07 BRL / 50,07 EUR)
+  assert.equal(splitEquip.online.subtotalLocal, 50.07);
+  assert.equal(splitEquip.online.subtotalBRL, 321.07);
+  // O balcão deve ter o balcão base (198,65) + equipamento facial sem margem (320,00) = 518,65
+  assert.equal(splitEquip.counter.subtotalBRL, 518.65);
+  assert.equal(splitEquip.counter.subtotalLocal, 80.98);
+  // Total da reserva = 519,72 (carro) + 320,00 (cadeira) = 839,72 BRL (131,05 EUR)
+  assert.equal(splitEquip.totalBRL, 839.72);
+  assert.equal(splitEquip.totalLocal, 131.05);
+
+  // Cenário 2: Proteção opcional (WWI - Vidros e Pneus) adicionada no pagamento on-line
+  const xmlWithWWI = buildXml({
+    resNumber: '1208999997',
+    totalBRL: '509.25', // 415.78 base + 93.47 WWI
+    totalEUR: '79.42',  // 64.84 base + 14.58 WWI
+    lines: [
+      line({ ty: '00001', desc: 'Basic Rental', eur: '27.76', brl: '177.98', payer: BA }),
+      line({ ty: '00028', desc: 'VAT', eur: '6.10', brl: '39.14', payer: BA }),
+      line({ ty: '00024', desc: 'Airport Surcharge', eur: '1.39', brl: '8.91', payer: DVR }),
+      line({ ty: '00621', desc: 'Snow chains Italy', eur: '24.00', brl: '153.88', payer: DVR, auxK: 'WINT' }),
+      line({ ty: '00028', desc: 'VAT', eur: '5.59', brl: '35.86', payer: DVR }),
+      line({ ty: '00010', desc: 'WHEELS AND WINDSCREEN PROTECTION', eur: '14.58', brl: '93.47', payer: BA, auxK: 'WWI' }),
+    ],
+    payers: [payerBA('310.59', '48.44'), payerDVR('198.65', '30.98')],
+  });
+
+  const splitWWI = computePaymentSplit(await reservationOf(xmlWithWWI), {
+    onlineMarkupPercent: 25,
+    extraCodes: ['WWI'],
+    logger: null,
+  });
+
+  assert.ok(splitWWI);
+  // O balcão permanece exatamente o mesmo (198,65 BRL / 30,98 EUR)
+  assert.equal(splitWWI.counter.subtotalLocal, 30.98);
+  assert.equal(splitWWI.counter.subtotalBRL, 198.65);
+  // O on-line deve ser o online base (321,07) + WWI sem markup (93,47) = 414,54 BRL (64,65 EUR)
+  assert.equal(splitWWI.online.subtotalBRL, 414.54);
+  assert.equal(splitWWI.online.subtotalLocal, 64.65);
+  // A linha específica do WWI no detalhamento on-line NUNCA recebe markup (permanece 93,47 BRL)
+  const wwiLine = splitWWI.online.lines.find((l) => l.auxK === 'WWI');
+  assert.ok(wwiLine);
+  assert.equal(wwiLine.priceBRL, 93.47);
+  assert.equal(wwiLine.priceLocal, 14.58);
+  // Total da reserva = 519,72 (carro) + 93.47 (WWI sem markup) = 613,19 BRL (95,63 EUR)
+  assert.equal(splitWWI.totalBRL, 613.19);
+  assert.equal(splitWWI.totalLocal, 95.63);
+});
+
 // ── Cenário 1: tudo com ba ───────────────────────────────────────────────────
 
 test('cenário 1 — todas as linhas com ba → só bloco on-line', async () => {
