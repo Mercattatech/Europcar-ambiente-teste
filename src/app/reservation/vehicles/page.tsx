@@ -2657,7 +2657,9 @@ function VehiclesContent() {
                     <div className="text-xl md:text-3xl font-black text-gray-900">
                       R$ {fmtPrice(
                         (parseFloat(selectedCar?.totalRateEstimateInBookingCurrency || selectedCar?.totalRateEstimate || "0")) +
-                        (selectedExtrasPricePerDay * bookingDurationDays)
+                        (selectedExtrasPricePerDay * bookingDurationDays) +
+                        selectedInsuranceTotalBRL +
+                        selectedEquipmentTotalBRL
                       )}
                     </div>
                   </div>

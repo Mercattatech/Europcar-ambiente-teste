@@ -219,9 +219,9 @@ export function formatBRLWithLocal(brl: number, local: number, localCurrency: st
  * exibidas seja exatamente o subtotal exibido (resíduo de arredondamento
  * vai para a maior linha).
  */
-function applyMarkup(lines: SplitLine[], subtotal: number, key: 'priceBRL' | 'priceLocal', factor: number): number {
-  const target = round2(subtotal * factor);
-  if (lines.length === 0) return target;
+function applyMarkup(lines: SplitLine[], target: number, key: 'priceBRL' | 'priceLocal', factor: number): number {
+  const targetRounded = round2(target);
+  if (lines.length === 0) return targetRounded;
   let sum = 0;
   let maxIdx = 0;
   lines.forEach((l, i) => {
@@ -229,9 +229,9 @@ function applyMarkup(lines: SplitLine[], subtotal: number, key: 'priceBRL' | 'pr
     sum += l[key];
     if (Math.abs(l[key]) > Math.abs(lines[maxIdx][key])) maxIdx = i;
   });
-  const residual = round2(target - sum);
+  const residual = round2(targetRounded - sum);
   if (residual !== 0) lines[maxIdx][key] = round2(lines[maxIdx][key] + residual);
-  return target;
+  return targetRounded;
 }
 
 // ─── Função principal ───────────────────────────────────────────────────────
@@ -480,10 +480,29 @@ export function computePaymentSplit(reservationNode: any, options: PaymentSplitO
   }
 
   // ── Markup no bloco on-line (ex.: margem ETO) ──
+  // No modelo Europcar Tour Operator (B2B):
+  // O markup comercial (ex: 25%) incide sobre o pacote total da locação (netTotal / totalRateEstimate).
+  // O valor no balcão é fixo/exato em moeda local (definido pela Europcar local, ex: taxas e extras locais).
+  // O que é pago ao Tour Operator (on-line) é a diferença garantida: Total com Margem - Balcão.
+  // Assim, Total = targetTotal = round2(baseNet * factor).
+  // Exemplo Milão: Líquido 415,78 * 1.25 = 519,72. Balcão = 198,65. Online = 519,72 - 198,65 = 321,07.
+  const baseNetBRL = totalRateEstimateBRL ?? netTotalBRL;
+  const baseNetLocal = totalRateEstimateLocal ?? netTotalLocal;
   if (online && markupPct !== 0) {
     const factor = 1 + markupPct / 100;
-    online.subtotalBRL = applyMarkup(online.lines, online.netSubtotalBRL, 'priceBRL', factor);
-    online.subtotalLocal = applyMarkup(online.lines, online.netSubtotalLocal, 'priceLocal', factor);
+    const targetTotalBRL = round2(baseNetBRL * factor);
+    const targetTotalLocal = round2(baseNetLocal * factor);
+    const counterBRL = counter?.subtotalBRL ?? 0;
+    const counterLocal = counter?.subtotalLocal ?? 0;
+
+    const targetOnlineBRL = Math.max(0, round2(targetTotalBRL - counterBRL));
+    const targetOnlineLocal = Math.max(0, round2(targetTotalLocal - counterLocal));
+
+    const effectiveFactorBRL = online.netSubtotalBRL > 0 ? (targetOnlineBRL / online.netSubtotalBRL) : factor;
+    const effectiveFactorLocal = online.netSubtotalLocal > 0 ? (targetOnlineLocal / online.netSubtotalLocal) : factor;
+
+    online.subtotalBRL = applyMarkup(online.lines, targetOnlineBRL, 'priceBRL', effectiveFactorBRL);
+    online.subtotalLocal = applyMarkup(online.lines, targetOnlineLocal, 'priceLocal', effectiveFactorLocal);
   }
 
   const totalBRL = round2((online?.subtotalBRL ?? 0) + (counter?.subtotalBRL ?? 0));

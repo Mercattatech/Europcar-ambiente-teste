@@ -176,16 +176,57 @@ test('itens inclusos a 0,00 com payer dvrName vão para o bloco do balcão', asy
   assert.equal(split.counter.included[0].side, 'counter');
 });
 
-test('1208543518 — markup (margem ETO) só no bloco on-line, linhas somam o subtotal', async () => {
+test('1208543518 — markup (margem ETO) preserva total do pacote (netTotal * markup) menos balcão', async () => {
   const split = computePaymentSplit(await reservationOf(XML_1208543518), { onlineMarkupPercent: 10, logger: null });
   assert.equal(split.online.netSubtotalBRL, 1391.92);
-  assert.equal(split.online.subtotalBRL, 1531.11); // 1391,92 × 1,10
+  // Total líquido 1462,83 * 1,10 = 1609,11. Balcão = 70,91. Online = 1609,11 - 70,91 = 1538,20.
+  assert.equal(split.online.subtotalBRL, 1538.20);
   const linesSum = Math.round(split.online.lines.reduce((s, l) => s + l.priceBRL, 0) * 100) / 100;
   assert.equal(linesSum, split.online.subtotalBRL);
   assert.equal(split.counter.subtotalBRL, 70.91); // balcão nunca recebe markup
-  assert.equal(split.totalBRL, 1602.02);
+  assert.equal(split.totalBRL, 1609.11);
   assert.equal(split.netTotalBRL, 1462.83);
   assert.equal(split.totalMatches, true);
+});
+
+test('Milão Linate (LINT01) — confere 100% com o portal B2B Europcar Tour Operator', async () => {
+  // Simula o XML da cotação de Milão Linate (CDMR - KIA Stonic)
+  // Total Líquido XRS: 64,84 EUR / 415,78 BRL
+  // Balcão (Driver): Snow Chains 24,00 EUR (153,88 BRL) + Airport 1,39 EUR (8,91 BRL) + VAT 5,59 EUR (35,86 BRL) = 30,98 EUR / 198,65 BRL
+  // Online (BA): Diárias 27,76 EUR (177,98 BRL) + VAT 6,10 EUR (39,14 BRL) = 33,86 EUR / 217,12 BRL
+  const xmlMilao = buildXml({
+    resNumber: '1208999999',
+    totalBRL: '415.78',
+    totalEUR: '64.84',
+    lines: [
+      line({ ty: '00001', desc: 'Basic Rental', eur: '27.76', brl: '177.98', payer: BA }),
+      line({ ty: '00028', desc: 'VAT', eur: '6.10', brl: '39.14', payer: BA }),
+      line({ ty: '00024', desc: 'Airport Surcharge', eur: '1.39', brl: '8.91', payer: DVR }),
+      line({ ty: '00621', desc: 'Snow chains Italy', eur: '24.00', brl: '153.88', payer: DVR, auxK: 'WINT' }),
+      line({ ty: '00028', desc: 'VAT', eur: '5.59', brl: '35.86', payer: DVR }),
+    ],
+    payers: [payerBA('217.12', '33.86'), payerDVR('198.65', '30.98')],
+  });
+
+  // Margem da Itália: 25%
+  const split = computePaymentSplit(await reservationOf(xmlMilao), { onlineMarkupPercent: 25, logger: null });
+
+  assert.ok(split);
+  // Total pacote garantido: 64,84 EUR * 1.25 = 81,05 EUR / 415,78 BRL * 1.25 = 519,72 BRL
+  assert.equal(split.totalLocal, 81.05);
+  assert.equal(split.totalBRL, 519.72);
+
+  // A pagar no balcão na chegada (garantido): 30,98 EUR / 198,65 BRL
+  assert.equal(split.counter.subtotalLocal, 30.98);
+  assert.equal(split.counter.subtotalBRL, 198.65);
+
+  // A pagar ao Tour Operator online: 81,05 - 30,98 = 50,07 EUR / 519,72 - 198,65 = 321,07 BRL
+  assert.equal(split.online.subtotalLocal, 50.07);
+  assert.equal(split.online.subtotalBRL, 321.07);
+
+  // Soma das linhas bate rigorosamente com o subtotal
+  const onlineLinesSum = Math.round(split.online.lines.reduce((s, l) => s + l.priceBRL, 0) * 100) / 100;
+  assert.equal(onlineLinesSum, 321.07);
 });
 
 // ── Cenário 1: tudo com ba ───────────────────────────────────────────────────
