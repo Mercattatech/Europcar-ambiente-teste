@@ -3346,11 +3346,6 @@ function VehiclesContent() {
                               <span className="text-[11px] bg-green-100 text-[#008d36] font-bold px-2.5 py-0.5 rounded-full border border-green-200">
                                 Já inclusa no valor
                               </span>
-                              {(hasIncludedSnowChains || (selectedCar?.mandatoryEquipmentList || []).length > 0) && (
-                                <span className="text-[11px] bg-blue-100 text-blue-700 font-bold px-2.5 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">
-                                  ❄️ Equipamento obrigatório incluso
-                                </span>
-                              )}
                             </div>
                             <p className="text-xs md:text-sm text-gray-600 mt-0.5">
                               Sua tarifa já contempla as coberturas obrigatórias da Europcar para você viajar com segurança e tranquilidade.
@@ -3359,7 +3354,7 @@ function VehiclesContent() {
                         </div>
 
                         {/* Coberturas detalhadas da proteção básica */}
-                        <div className={`grid grid-cols-1 sm:grid-cols-2 ${(hasIncludedSnowChains || (selectedCar?.mandatoryEquipmentList || []).length > 0) ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3.5 pt-3 border-t border-green-100`}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 pt-3 border-t border-green-100">
                           <div className="bg-white/80 rounded-xl p-3.5 border border-green-100/80 shadow-2xs">
                             <div className="flex items-center gap-2 mb-1.5">
                               <span className="text-base">🚗</span>
@@ -3389,32 +3384,6 @@ function VehiclesContent() {
                               Proteção contra terceiros para danos materiais e corporais, conforme as leis do país de destino.
                             </p>
                           </div>
-
-                          {hasIncludedSnowChains && (
-                            <div className="bg-white/80 rounded-xl p-3.5 border border-blue-200/90 shadow-2xs">
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <span className="text-base">❄️</span>
-                                <h4 className="font-bold text-gray-900 text-xs md:text-sm">Correntes para neve (Snow chains)</h4>
-                              </div>
-                              <p className="text-[11px] md:text-xs text-gray-600 leading-relaxed">
-                                Item obrigatório por regulamentação de inverno nesta estação. Já incluso no valor da sua reserva.
-                              </p>
-                            </div>
-                          )}
-
-                          {(selectedCar?.mandatoryEquipmentList || [])
-                            .filter((m: any) => !isSnowChainsItem(m) || !hasIncludedSnowChains)
-                            .map((m: any) => (
-                              <div key={`mand-card-${m.code}`} className="bg-white/80 rounded-xl p-3.5 border border-blue-200/90 shadow-2xs">
-                                <div className="flex items-center gap-2 mb-1.5">
-                                  <span className="text-base">{m.icon || '📦'}</span>
-                                  <h4 className="font-bold text-gray-900 text-xs md:text-sm">{m.name}</h4>
-                                </div>
-                                <p className="text-[11px] md:text-xs text-gray-600 leading-relaxed">
-                                  Item obrigatório regulamentado nesta estação. Já incluso no valor da sua reserva.
-                                </p>
-                              </div>
-                            ))}
                         </div>
 
                         {/* Informação sobre franquia */}
@@ -3427,11 +3396,6 @@ function VehiclesContent() {
                               <span>Proteção sujeita à coparticipação (franquia) padrão da locadora, acionada somente em caso de sinistro.</span>
                             )}
                           </span>
-                          {hasIncludedSnowChains && (
-                            <span className="text-blue-700 font-bold flex items-center gap-1">
-                              ❄️ Correntes de neve obrigatórias já inclusas
-                            </span>
-                          )}
                         </div>
                       </div>
                     );
