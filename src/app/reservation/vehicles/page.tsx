@@ -510,13 +510,16 @@ function VehiclesContent() {
   const hasIncludedSnowChains = useMemo(() => {
     if (quoteInsurances.some(i => isSnowChainsItem(i))) return true;
     if ((selectedCar?.includedInsurances || []).some((i: any) => isSnowChainsItem(i))) return true;
-    if (ratesEquipment.some((e: any) => isSnowChainsItem(e) && (e.type === 'I' || e.type === 'M'))) return true;
+    if ((selectedCar?.mandatoryEquipmentList || []).some((m: any) => isSnowChainsItem(m))) return true;
+    if (ratesEquipment.some((e: any) => isSnowChainsItem(e))) return true;
     try {
       const raw = sessionStorage.getItem("europcar_booking");
       if (raw) {
         const b = JSON.parse(raw);
         if ((b?.quoteInsurances || []).some((i: any) => isSnowChainsItem(i))) return true;
         if ((b?.car?.includedInsurances || []).some((i: any) => isSnowChainsItem(i))) return true;
+        if ((b?.mandatoryEquipment || []).some((i: any) => isSnowChainsItem(i))) return true;
+        if ((b?.car?.mandatoryEquipmentList || []).some((i: any) => isSnowChainsItem(i))) return true;
         if ((b?.xrsInsurances || []).some((i: any) => isSnowChainsItem(i))) return true;
       }
     } catch {}
@@ -945,7 +948,7 @@ function VehiclesContent() {
 
       // ── Incorpora itens mandatórios de equipamento (ex: Correntes de neve na Itália) na tarifa POA ──
       const mandatoryEquipmentItems = mergedEquipment
-        .filter((eq: any) => eq.type === 'M' || (isSnowChainsItem(eq) && eq.type !== 'O'))
+        .filter((eq: any) => eq.type === 'M' || isSnowChainsItem(eq))
         .map((eq: any) => {
           const cost = getEquipmentCost(eq, bookingDurationDays || 1);
           const meta = EQUIPMENT_CATALOG[eq.code];
@@ -1126,7 +1129,8 @@ function VehiclesContent() {
     const stationEquipment = ratesEquipment
       .filter((eq: any) => {
         if (eq.type !== 'O' || EXCLUDED_EQUIPMENT_CODES.has(eq.code)) return false;
-        if (hasIncludedSnowChains && isSnowChainsItem(eq)) return false;
+        if ((hasIncludedSnowChains || (selectedCar?.mandatoryEquipmentList || []).some((m: any) => isSnowChainsItem(m))) && isSnowChainsItem(eq)) return false;
+        if ((selectedCar?.mandatoryEquipmentList || []).some((m: any) => m.code === eq.code)) return false;
         return true;
       })
       .map((eq: any) => {
@@ -1770,7 +1774,8 @@ function VehiclesContent() {
         let finalEquipment = Array.from(seenNames.values());
         const quoteHasSnowChains = allParsedInsurances.some(isSnowChainsItem) ||
           (selectedCar?.includedInsurances || []).some(isSnowChainsItem) ||
-          ratesEquipment.some((e: any) => isSnowChainsItem(e) && (e.type === 'I' || e.type === 'M'));
+          (selectedCar?.mandatoryEquipmentList || []).some((m: any) => isSnowChainsItem(m)) ||
+          ratesEquipment.some((e: any) => isSnowChainsItem(e));
         if (quoteHasSnowChains) {
           finalEquipment = finalEquipment.filter((eq: any) => !isSnowChainsItem(eq));
           console.log('[Step3] ❄️ Snow chains already included in quote/rate — Correntes para neve removed from available extras');
@@ -3440,7 +3445,7 @@ function VehiclesContent() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                       {xrsEquipment.filter((eq: any) => {
                         if (extrasSearchCfg.disabledExtras.includes(String(eq.code).toUpperCase())) return false;
-                        if (hasIncludedSnowChains && isSnowChainsItem(eq)) return false;
+                        if ((hasIncludedSnowChains || (selectedCar?.mandatoryEquipmentList || []).some((m: any) => isSnowChainsItem(m))) && isSnowChainsItem(eq)) return false;
                         if (eq.type === 'M' || eq.type === 'I') return false;
                         if ((selectedCar?.mandatoryEquipmentList || []).some((m: any) => m.code === eq.code)) return false;
                         return true;

@@ -762,6 +762,24 @@ export default function CheckoutPage() {
   const hasContract = contractID !== "";  // tag aparece SEMPRE quando há contrato
   const hasDiscountValue = discountXRS > 0.01; // valor exato só quando getQuote funcionou
 
+  const exchangeRate = parseFloat(car?.exchangeRate || booking?.car?.exchangeRate || '1') || 1;
+  const hasLocal = currency !== 'BRL' && exchangeRate > 0;
+  const localSymbol = currency === 'EUR' ? '€' : currency;
+
+  const fmtBRL = (val: number) => `R$ ${val.toFixed(2).replace('.', ',')}`;
+  const fmtLocal = (val: number) => {
+    try {
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: currency || 'EUR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(val);
+    } catch {
+      return `${localSymbol || currency} ${val.toFixed(2).replace('.', ',')}`;
+    }
+  };
+
   // Itens mandatórios de equipamento para POA
   const mandatoryEquipList: any[] = booking?.mandatoryEquipment?.length
     ? booking.mandatoryEquipment
@@ -2264,10 +2282,6 @@ export default function CheckoutPage() {
             {/* ═══════════════ RESUMO FINANCEIRO (DIRETRIZES DE PAGAMENTO) ═══════════════ */}
             <div className="border-t border-gray-200 p-5 bg-gradient-to-b from-gray-50/60 to-white">
               {(() => {
-                const exchangeRate = parseFloat(car?.exchangeRate || '1');
-                const hasLocal = currency !== 'BRL' && exchangeRate > 0;
-                const localSymbol = currency === 'EUR' ? '€' : currency;
-
                 const currencyNames: Record<string, string> = {
                   CHF: 'francos suíços (CHF)',
                   EUR: 'euros (EUR)',
@@ -2313,20 +2327,6 @@ export default function CheckoutPage() {
                 const onlineLocal = hasLocal ? onlineAmountBRL / exchangeRate : 0;
                 const balcaoLocal = hasLocal ? balcaoAmountBRL / exchangeRate : 0;
                 const totalGeralLocal = hasLocal ? totalGeralBRL / exchangeRate : 0;
-
-                const fmtBRL = (val: number) => `R$ ${val.toFixed(2).replace('.', ',')}`;
-                const fmtLocal = (val: number) => {
-                  try {
-                    return new Intl.NumberFormat('pt-BR', {
-                      style: 'currency',
-                      currency: currency || 'EUR',
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }).format(val);
-                  } catch {
-                    return `${localSymbol || currency} ${val.toFixed(2).replace('.', ',')}`;
-                  }
-                };
 
                 // Regra on-line (payer ba) × balcão — ETO com cotação recalculada
                 if (paymentSplit) {
