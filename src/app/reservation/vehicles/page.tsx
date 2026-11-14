@@ -957,6 +957,7 @@ function VehiclesContent() {
             name: meta?.name || eq.descr || eq.code,
             icon: meta?.icon || (isSnowChainsItem(eq) ? '❄️' : '📦'),
             descr: eq.descr || '',
+            description: meta?.description || eq.descr || '',
             priceBRL: cost.totalBRL,
             priceLocal: cost.totalLocal,
             type: 'M',
@@ -1880,6 +1881,28 @@ function VehiclesContent() {
       }, 0);
   }, [selectedEquipmentMap, equipmentPrices, bookingDurationDays, hasIncludedSnowChains]);
 
+  // Lista de itens obrigatórios para exibição na etapa de Extras
+  const mandatoryItemsForDisplay = useMemo(() => {
+    const list = [...(selectedCar?.mandatoryEquipmentList || [])];
+    if (hasIncludedSnowChains && !list.some(m => isSnowChainsItem(m))) {
+      const sncEq = ratesEquipment.find((e: any) => isSnowChainsItem(e));
+      const cost = sncEq ? getEquipmentCost(sncEq, bookingDurationDays || 1) : { totalBRL: 0, totalLocal: 0 };
+      const meta = EQUIPMENT_CATALOG[sncEq?.code || 'SNC'] || EQUIPMENT_CATALOG['SNC'];
+      list.push({
+        code: sncEq?.code || 'SNC',
+        name: meta?.name || 'Correntes para neve (Snow chains)',
+        icon: meta?.icon || '❄️',
+        descr: sncEq?.descr || 'Snow chains',
+        description: meta?.description || 'Item obrigatório por regulamentação de inverno nesta estação. Já incluso no valor da sua reserva.',
+        priceBRL: cost.totalBRL,
+        priceLocal: cost.totalLocal,
+        type: 'M',
+        isMandatory: true,
+      });
+    }
+    return list;
+  }, [selectedCar, hasIncludedSnowChains, ratesEquipment, bookingDurationDays]);
+
   const absolutePriceRange = useMemo(() => {
     if (!cars.length) return { min: 0, max: 0 };
     const prices = cars.map((c: any) => parseFloat(c.totalRateEstimate || 0)).filter((p: number) => p > 0);
@@ -2498,6 +2521,12 @@ function VehiclesContent() {
                               <div className="text-[#008d36] flex items-center gap-2 text-sm font-bold">
                                 <svg className="w-[16px] h-[16px] text-[#008d36]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                                 Proteção básica incluída
+                              </div>
+                              )}
+                              {(car.mandatoryEquipmentList || []).length > 0 && (
+                              <div className="text-blue-700 flex items-center gap-2 text-sm font-bold">
+                                <span>❄️</span>
+                                <span>Equipamento obrigatório incluso</span>
                               </div>
                               )}
                             </div>
@@ -3442,6 +3471,67 @@ function VehiclesContent() {
                   {extrasSearchCfg.extras && (
                   <div className="mt-10">
                     <h3 className="font-black text-xl text-gray-900 mb-6">{t('extras.availableExtras')}</h3>
+
+                    {/* Extras obrigatórios da estação (ex: Correntes de neve na Itália) */}
+                    {mandatoryItemsForDisplay.length > 0 && (
+                      <div className="mb-8 bg-gradient-to-r from-blue-50/90 via-blue-50/50 to-indigo-50/40 border-2 border-blue-200 rounded-2xl p-5 shadow-xs">
+                        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">❄️</span>
+                            <h4 className="font-black text-base text-gray-900">
+                              Extras obrigatórios inclusos nesta estação
+                            </h4>
+                          </div>
+                          <span className="text-xs bg-[#008d36] text-white font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-xs">
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                            Já incluso no valor total
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mb-4 leading-relaxed">
+                          Por regulamentação local desta estação, os itens abaixo são obrigatórios e já estão integrados e somados ao valor da sua reserva — não haverá cobranças surpresa no balcão:
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {mandatoryItemsForDisplay.map((m: any) => (
+                            <div
+                              key={`extra-mand-card-${m.code}`}
+                              className="bg-white border-2 border-blue-200 rounded-xl p-5 flex flex-col justify-between h-full relative shadow-xs"
+                            >
+                              <div className="absolute -top-3 left-4 bg-blue-700 text-white text-[10px] font-black px-2 py-0.5 rounded flex items-center gap-1 uppercase tracking-wide">
+                                Obrigatório • Incluso
+                              </div>
+                              <div>
+                                <div className="flex items-start gap-3.5 mb-2.5">
+                                  <div className="w-14 h-14 shrink-0 rounded-xl flex items-center justify-center bg-blue-50 border border-blue-100">
+                                    <EquipmentVisual code={m.code} icon={m.icon || '❄️'} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-sm font-bold leading-snug text-gray-900">
+                                      {m.name}
+                                    </h4>
+                                  </div>
+                                </div>
+                                <p className="text-xs leading-relaxed text-gray-500 mb-4">
+                                  {m.description || m.descr || 'Item obrigatório por regulamentação de inverno nesta estação. Já incluso no valor total.'}
+                                </p>
+                              </div>
+                              <div className="mt-auto pt-2 border-t border-gray-100 flex items-center justify-between">
+                                <div>
+                                  <span className="text-lg font-black text-gray-900">
+                                    {m.priceBRL > 0 ? `R$ ${m.priceBRL.toFixed(2).replace('.', ',')}` : 'Incluso'}
+                                  </span>
+                                  {m.priceBRL > 0 && <span className="text-xs font-normal text-gray-400 ml-1">/ total</span>}
+                                </div>
+                                <div className="text-xs font-bold text-[#008d36] bg-green-50 border border-green-200 px-2.5 py-1.5 rounded-lg flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                                  Incluso
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                       {xrsEquipment.filter((eq: any) => {
                         if (extrasSearchCfg.disabledExtras.includes(String(eq.code).toUpperCase())) return false;
