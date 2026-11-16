@@ -133,7 +133,16 @@ export async function POST(
     return s + (t > 0 ? t : d * _days) * (eq.qty || 1);
   }, 0) : 0;
   // Total completo (fallback = amountInCents se booking não tiver dados suficientes)
-  const amountBRL = (_vehicleBRL2 + _insBRL + _eqBRL) || _baseAmountBRL;
+  // BALCÃO: o total da XRS (totalRateEstimate) JÁ inclui proteções/acessórios contratados —
+  // não somar de novo (evitava proteção em dobro no e-mail). Fonte da verdade = XRS.
+  const _xrsTotalBRL = Number(xrsSnap?.quote?.totalBooking) || 0;
+  const _extrasBRL = _insBRL + _eqBRL;
+  const _isBalcao = paymentMethod === 'BALCAO';
+  const amountBRL = _isBalcao && _xrsTotalBRL > 0
+    ? _xrsTotalBRL
+    : _isBalcao && _extrasBRL > 0 && _vehicleBRL2 > _extrasBRL
+      ? _vehicleBRL2
+      : ((_vehicleBRL2 + _insBRL + _eqBRL) || _baseAmountBRL);
 
   // ── Moeda local da reserva ─────────────────────────────────────────────
   // Prioridade:
@@ -180,13 +189,16 @@ export async function POST(
   };
 
   // Valor local + estimativa BRL para templates de e-mail
-  const _valorBRL = `R$ ${amountBRL.toFixed(2).replace('.', ',')}`;
+  const _valorBRL = `R$ ${amountBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   let _valorLocal: string;
   if (finalCurrency === 'BRL') {
     const brlAmt = overrideAmount || amountBRL;
-    _valorLocal = `R$ ${brlAmt.toFixed(2).replace('.', ',')}`;
+    _valorLocal = `R$ ${brlAmt.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   } else if (finalAmount > 0) {
     _valorLocal = fmtLocal(finalAmount);
+  } else if (_isBalcao && _xrsTotalBRL > 0 && xrsSnap?.quote && xrsSnap.quote.totalLocal > 0) {
+    // BALCÃO: valor exato em moeda local direto da XRS (sem reconverter de R$)
+    _valorLocal = fmtLocal(xrsSnap.quote.totalLocal);
   } else if (exchRate > 0) {
     // Converte o total (R$) pela taxa de câmbio da reserva
     _valorLocal = fmtLocal(amountBRL / exchRate);

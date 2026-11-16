@@ -242,6 +242,15 @@ export function buildReservationDetailVars(p: DetailVarsParams): Record<string, 
       : 'Nada a pagar — apenas a caução (bloqueio temporário no cartão)';
   }
 
+  // BALCÃO: tudo é pago na retirada — lista o aluguel + proteções e acessórios contratados
+  // (já inclusos no total da XRS), para o cliente ver o que está pagando.
+  const balcaoLines: string[] = [];
+  if (!isPrepaid) {
+    balcaoLines.push(`• Aluguel do veículo (${d} diária${d > 1 ? 's' : ''}) + taxas`);
+    for (const ex of extras) balcaoLines.push(`• ${ex.name || ex.code}${ex.qty > 1 ? ` ×${ex.qty}` : ''}`);
+    for (const eq of p.equipment || []) balcaoLines.push(`• ${eq.name || eq.code}${eq.qty > 1 ? ` ×${eq.qty}` : ''}`);
+  }
+
   return {
     QTD_DIARIAS: String(d),
     TEXTO_DIARIAS: `${d} diária${d > 1 ? 's' : ''}`,
@@ -255,7 +264,7 @@ export function buildReservationDetailVars(p: DetailVarsParams): Record<string, 
     VALOR_PAGO_ONLINE,
     PAGO_ONLINE_LABEL,
     VALOR_BALCAO,
-    LISTA_BALCAO: showSplit ? counterLines.join('<br/>') : '',
+    LISTA_BALCAO: showSplit ? counterLines.join('<br/>') : (balcaoLines.length > 1 ? balcaoLines.join('<br/>') : ''),
     LISTA_INCLUIDOS: includedLines.join('<br/>'),
     LISTA_FRANQUIA: franquiaLines.length > 0
       ? franquiaLines.join('<br/>')

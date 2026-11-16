@@ -82,11 +82,19 @@ export async function POST(
     return s + (t > 0 ? t : d * _days) * (eq.qty || 1);
   }, 0) : 0;
   // Total completo (fallback = amountInCents se booking não tiver dados suficientes)
-  const amountBRL = (_vehicleBRL2 + _insBRL + _eqBRL) || _baseAmountBRL;
+  // BALCÃO: o total da XRS JÁ inclui proteções/acessórios contratados — não somar de novo.
+  const xrsSnap = await fetchXrsSnapshot(reservation.resNumber);
+  const _xrsTotalBRL = Number(xrsSnap?.quote?.totalBooking) || 0;
+  const _extrasBRL = _insBRL + _eqBRL;
+  const _isBalcao = paymentMethod === 'BALCAO';
+  const amountBRL = _isBalcao && _xrsTotalBRL > 0
+    ? _xrsTotalBRL
+    : _isBalcao && _extrasBRL > 0 && _vehicleBRL2 > _extrasBRL
+      ? _vehicleBRL2
+      : ((_vehicleBRL2 + _insBRL + _eqBRL) || _baseAmountBRL);
   const finalResNumber = reservation.resNumber || reservation.merchantOrderId || resNumber;
 
   // Valor na moeda da estação de retirada (+ estimativa BRL) — câmbio do car ou da cotação no XRS
-  const xrsSnap = await fetchXrsSnapshot(reservation.resNumber);
   const _currVars = buildDestinationCurrencyVars(amountBRL, booking, car, xrsSnap);
   const valorTotal = _currVars.VALOR_TOTAL;
 

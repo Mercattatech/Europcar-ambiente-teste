@@ -205,7 +205,11 @@ export function buildDestinationCurrencyVars(
 ) {
   const isForeign = (c?: string | null) => !!c && c.length === 3 && c.toUpperCase() !== 'BRL';
   const hint = [car?.currency, xrs?.quote?.currency].find(isForeign) || null;
-  const rate = num(car?.exchangeRate) || num(xrs?.quote?.exchangeRate);
+  // Câmbio exato da XRS (total em R$ ÷ total em moeda local) — evita diferença de centavos
+  const xrsRatio = num(xrs?.quote?.totalLocal) > 0 && num(xrs?.quote?.totalBooking) > 0
+    ? num(xrs?.quote?.totalBooking) / num(xrs?.quote?.totalLocal)
+    : 0;
+  const rate = xrsRatio || num(car?.exchangeRate) || num(xrs?.quote?.exchangeRate);
   const cv = buildEmailCurrencyVars(totalBRL, booking?.pickupStation, rate, hint ? hint.toUpperCase() : null);
   return { ...cv, MOEDA_ESTRANGEIRA: cv.MOEDA !== 'BRL' ? '1' : '' };
 }

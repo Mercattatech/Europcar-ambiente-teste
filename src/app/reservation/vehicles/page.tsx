@@ -162,7 +162,7 @@ const getFuelLabel = (raw: any): string | null => {
   if (['I', 'PHEV', 'PLUGIN', 'PLUG-IN', 'PLUG-IN HYBRID'].includes(c)) return 'Híbrido plug-in';
   if (['H', 'HYB', 'HYBRID', 'HIBRIDO', 'HÍBRIDO', 'HEV'].includes(c)) return 'Híbrido';
   if (['D', 'Q', 'DIE', 'DIESEL'].includes(c)) return 'Diesel';
-  if (['P', 'V', 'Z', 'G', 'PET', 'PETROL', 'GASOLINE', 'GASOLINA', 'UNLEADED'].includes(c)) return 'Gasolina';
+  if (['P', 'V', 'Z', 'G', 'UL', 'ULP', 'UNL', 'PET', 'PETROL', 'GASOLINE', 'GASOLINA', 'UNLEADED'].includes(c)) return 'Gasolina';
   if (['L', 'S', 'LPG', 'GPL', 'GLP'].includes(c)) return 'GLP';
   if (['U', 'X', 'ETHANOL', 'ETANOL', 'FLEX', 'F', 'M'].includes(c)) return 'Flex';
   if (['A', 'HYDROGEN', 'H2'].includes(c)) return 'Hidrogênio';
