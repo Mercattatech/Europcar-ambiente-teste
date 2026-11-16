@@ -153,6 +153,22 @@ function EquipmentVisual({ code, icon }: { code: string; icon?: string }) {
   return <span className="text-2xl">{icon || '📦'}</span>;
 }
 
+// Helper: traduz o fuelTypeCode da XRS SEM inventar valor.
+// Código desconhecido → null (tag não é exibida) — nunca assume "Gasolina" por padrão.
+const getFuelLabel = (raw: any): string | null => {
+  const c = (raw ?? '').toString().trim().toUpperCase();
+  if (!c) return null;
+  if (['E', 'C', 'B', 'ELE', 'ELEC', 'ELECTRIC', 'ELECTRICO', 'ELÉTRICO', 'EV', 'BEV'].includes(c)) return 'Elétrico';
+  if (['I', 'PHEV', 'PLUGIN', 'PLUG-IN', 'PLUG-IN HYBRID'].includes(c)) return 'Híbrido plug-in';
+  if (['H', 'HYB', 'HYBRID', 'HIBRIDO', 'HÍBRIDO', 'HEV'].includes(c)) return 'Híbrido';
+  if (['D', 'Q', 'DIE', 'DIESEL'].includes(c)) return 'Diesel';
+  if (['P', 'V', 'Z', 'G', 'PET', 'PETROL', 'GASOLINE', 'GASOLINA', 'UNLEADED'].includes(c)) return 'Gasolina';
+  if (['L', 'S', 'LPG', 'GPL', 'GLP'].includes(c)) return 'GLP';
+  if (['U', 'X', 'ETHANOL', 'ETANOL', 'FLEX', 'F', 'M'].includes(c)) return 'Flex';
+  if (['A', 'HYDROGEN', 'H2'].includes(c)) return 'Hidrogênio';
+  return null;
+};
+
 // Helper: detecta se um item (seguro, taxa ou equipamento) representa correntes para neve (ex: Snow chains Italy)
 const isSnowChainsItem = (item: any): boolean => {
   if (!item) return false;
@@ -2456,9 +2472,9 @@ function VehiclesContent() {
                               )}
 
                               {/* Fuel type tag */}
-                              {car.specs?.carCategoryFuelType && (
+                              {getFuelLabel(car.specs?.carCategoryFuelType) && (
                                 <span className="group relative inline-flex items-center gap-1.5 bg-blue-50 rounded-full px-3 py-1 text-[10px] font-black text-blue-700 uppercase cursor-help">
-                                  {car.specs.carCategoryFuelType === 'D' ? 'Diesel' : car.specs.carCategoryFuelType === 'E' ? 'Elétrico' : car.specs.carCategoryFuelType === 'H' ? 'Híbrido' : 'Gasolina'}
+                                  {getFuelLabel(car.specs?.carCategoryFuelType)}
                                   <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 bg-gray-900 text-white text-[11px] font-normal normal-case rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl">
                                     Tipo de combustível do veículo
                                   </span>
