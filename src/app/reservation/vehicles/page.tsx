@@ -968,6 +968,14 @@ function VehiclesContent() {
       const totalMandatoryBRL = mandatoryEquipmentItems.reduce((sum, item) => sum + item.priceBRL, 0);
       const totalMandatoryLocal = mandatoryEquipmentItems.reduce((sum, item) => sum + item.priceLocal, 0);
 
+      // Itens mandatórios já embutidos na tarifa (valor 0 no equipmentList, ex: Brasil/Guarulhos):
+      // não alteram o total, mas precisam acompanhar o carro para aparecer como inclusos no Passo 3 e no checkout.
+      if (mandatoryEquipmentItems.length > 0 && !(totalMandatoryBRL > 0 || totalMandatoryLocal > 0)) {
+        for (const car of poaRates) {
+          car.mandatoryEquipmentList = mandatoryEquipmentItems;
+        }
+      }
+
       if (totalMandatoryBRL > 0 || totalMandatoryLocal > 0) {
         for (const car of poaRates) {
           const rawTotalLocal = parseFloat(car.totalRateEstimate || '0');
@@ -2525,7 +2533,7 @@ function VehiclesContent() {
                               )}
                               {(car.mandatoryEquipmentList || []).length > 0 && (
                               <div className="text-blue-700 flex items-center gap-2 text-sm font-bold">
-                                <span>❄️</span>
+                                <span>{(car.mandatoryEquipmentList || []).some((m: any) => isSnowChainsItem(m)) ? '❄️' : '✅'}</span>
                                 <span>Equipamento obrigatório incluso</span>
                               </div>
                               )}
@@ -3441,7 +3449,7 @@ function VehiclesContent() {
                       <div className="mb-8 bg-gradient-to-r from-blue-50/90 via-blue-50/50 to-indigo-50/40 border-2 border-blue-200 rounded-2xl p-5 shadow-xs">
                         <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                           <div className="flex items-center gap-2">
-                            <span className="text-xl">❄️</span>
+                            <span className="text-xl">{mandatoryItemsForDisplay.some((m: any) => isSnowChainsItem(m)) ? '❄️' : '✅'}</span>
                             <h4 className="font-black text-base text-gray-900">
                               Extras obrigatórios inclusos nesta estação
                             </h4>
@@ -3466,7 +3474,7 @@ function VehiclesContent() {
                               <div>
                                 <div className="flex items-start gap-3.5 mb-2.5">
                                   <div className="w-14 h-14 shrink-0 rounded-xl flex items-center justify-center bg-blue-50 border border-blue-100">
-                                    <EquipmentVisual code={m.code} icon={m.icon || '❄️'} />
+                                    <EquipmentVisual code={m.code} icon={m.icon || (isSnowChainsItem(m) ? '❄️' : '📦')} />
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <h4 className="text-sm font-bold leading-snug text-gray-900">
@@ -3475,7 +3483,7 @@ function VehiclesContent() {
                                   </div>
                                 </div>
                                 <p className="text-xs leading-relaxed text-gray-500 mb-4">
-                                  {m.description || m.descr || 'Item obrigatório por regulamentação de inverno nesta estação. Já incluso no valor total.'}
+                                  {m.description || m.descr || 'Item obrigatório nesta estação. Já incluso no valor total.'}
                                 </p>
                               </div>
                               <div className="mt-auto pt-2 border-t border-gray-100 flex items-center justify-between">

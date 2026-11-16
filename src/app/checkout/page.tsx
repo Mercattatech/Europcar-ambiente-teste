@@ -1558,7 +1558,9 @@ export default function CheckoutPage() {
                         <span className="font-bold">
                           {hasLocal && m.priceLocal > 0
                             ? fmtLocal(m.priceLocal)
-                            : `R$ ${(m.priceBRL || 0).toFixed(2).replace(".", ",")}`}
+                            : (parseFloat(m.priceBRL) || 0) > 0
+                              ? `R$ ${parseFloat(m.priceBRL).toFixed(2).replace(".", ",")}`
+                              : 'Incluso'}
                         </span>
                       </div>
                     ))}
@@ -2483,7 +2485,11 @@ export default function CheckoutPage() {
                                   </span>
                                 </div>
                                 <span className="font-semibold text-gray-900 shrink-0">
-                                  {hasLocal && m.priceLocal > 0 ? fmtLocal(m.priceLocal) : fmtBRL(m.priceBRL)}
+                                  {hasLocal && m.priceLocal > 0
+                                    ? fmtLocal(m.priceLocal)
+                                    : (parseFloat(m.priceBRL) || 0) > 0
+                                      ? fmtBRL(parseFloat(m.priceBRL))
+                                      : <span className="text-[#008d36] font-bold">Incluso</span>}
                                 </span>
                               </div>
                             ))}
