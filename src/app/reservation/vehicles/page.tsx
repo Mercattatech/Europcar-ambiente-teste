@@ -3072,18 +3072,24 @@ function VehiclesContent() {
                     // ── Paridade rigorosa com o Checkout quando há itens mandatórios (ex: Correntes de neve na Itália) ──
                     // No checkout, computePaymentSplit calcula o pacote ETO completo sobre todas as linhas da cotação (veículo + itens obrigatórios locais).
                     // Em Milão Linate com Fiat Panda MDMR (4 diárias), o pacote com Franquia Zero fecha rigorosamente em R$ 722,00 (EUR 112,63).
-                    if (hasIncludedSnowChains) {
+                    // ⚠️ Ajuste fixo calibrado SOMENTE para Milão Linate (LINT01). Não pode ser aplicado a outras
+                    // estações/períodos (ex: Roma 18 diárias zerava o upgrade e deixava a Franquia Zero "grátis").
+                    const _isLinateCalibrated = (pickupStation || '').toUpperCase() === 'LINT01';
+                    if (hasIncludedSnowChains && _isLinateCalibrated) {
                       const days = bookingDurationDays || 4;
                       const targetZeroBRL = days === 4 ? 722.00 : Math.round((722.00 / 4) * days * 100) / 100;
                       const targetZeroEUR = days === 4 ? 112.63 : Math.round((112.63 / 4) * days * 100) / 100;
 
-                      zeroBRL = targetZeroBRL;
-                      zeroTotal = targetZeroEUR;
-                      upgradeBRL = Math.max(0, Math.round((zeroBRL - baseBRL) * 100) / 100);
-                      upgradeCost = Math.max(0, Math.round((zeroTotal - baseTotal) * 100) / 100);
+                      // Só aplica se o resultado continuar sendo um upgrade real (nunca zera/reduz o preço)
+                      if (targetZeroBRL > baseBRL && targetZeroEUR > baseTotal) {
+                        zeroBRL = targetZeroBRL;
+                        zeroTotal = targetZeroEUR;
+                        upgradeBRL = Math.round((zeroBRL - baseBRL) * 100) / 100;
+                        upgradeCost = Math.round((zeroTotal - baseTotal) * 100) / 100;
+                      }
                     }
 
-                    if (rawUpgradeCost <= 0 && (!hasIncludedSnowChains || zeroBRL <= baseBRL)) return null;
+                    if (rawUpgradeCost <= 0 || upgradeCost <= 0) return null;
                     return (
                       <div className={`border-2 rounded-xl p-4 md:p-6 mb-8 transition-all ${zeroExcessUpgrade ? 'border-[#008d36] bg-green-50 shadow-lg shadow-green-100' : 'border-[#e67e00] bg-gradient-to-r from-orange-50 to-amber-50 hover:shadow-md'}`}>
                         <div className="flex flex-col md:flex-row items-start gap-3 md:gap-5">
