@@ -3069,23 +3069,34 @@ function VehiclesContent() {
                     let zeroTotal = baseTotal + upgradeCost;
                     let zeroBRL = baseBRL + upgradeBRL;
 
-                    // ── Paridade rigorosa com o Checkout quando há itens mandatórios (ex: Correntes de neve na Itália) ──
-                    // No checkout, computePaymentSplit calcula o pacote ETO completo sobre todas as linhas da cotação (veículo + itens obrigatórios locais).
-                    // Em Milão Linate com Fiat Panda MDMR (4 diárias), o pacote com Franquia Zero fecha rigorosamente em R$ 722,00 (EUR 112,63).
-                    // ⚠️ Ajuste fixo calibrado SOMENTE para Milão Linate (LINT01). Não pode ser aplicado a outras
-                    // estações/períodos (ex: Roma 18 diárias zerava o upgrade e deixava a Franquia Zero "grátis").
-                    const _isLinateCalibrated = (pickupStation || '').toUpperCase() === 'LINT01';
-                    if (hasIncludedSnowChains && _isLinateCalibrated) {
-                      const days = bookingDurationDays || 4;
-                      const targetZeroBRL = days === 4 ? 722.00 : Math.round((722.00 / 4) * days * 100) / 100;
-                      const targetZeroEUR = days === 4 ? 112.63 : Math.round((112.63 / 4) * days * 100) / 100;
-
-                      // Só aplica se o resultado continuar sendo um upgrade real (nunca zera/reduz o preço)
-                      if (targetZeroBRL > baseBRL && targetZeroEUR > baseTotal) {
-                        zeroBRL = targetZeroBRL;
-                        zeroTotal = targetZeroEUR;
-                        upgradeBRL = Math.round((zeroBRL - baseBRL) * 100) / 100;
-                        upgradeCost = Math.round((zeroTotal - baseTotal) * 100) / 100;
+                    // ── Paridade com o Checkout quando há itens mandatórios (ex: Correntes de neve na Itália) ──
+                    // No checkout, computePaymentSplit cobra o pacote ETO = total NET da cotação XRS (veículo +
+                    // Franquia Zero + itens obrigatórios locais) × (1 + margem). Ex.: Milão 577,60 × 1,25 = 722,00.
+                    // O getMultipleRates não traz os itens obrigatórios no total, então somamos aqui o valor real
+                    // deles (linha da cotação XRS quando existir; senão o preço do equipmentList) e aplicamos a
+                    // MESMA margem que o checkout usa para Franquia Zero.
+                    if (mandatoryItemsForDisplay.length > 0) {
+                      let mandBRL = 0;
+                      let mandLocal = 0;
+                      for (const m of mandatoryItemsForDisplay) {
+                        const q = (quoteInsurances || []).find((i: any) =>
+                          (isSnowChainsItem(m) && isSnowChainsItem(i)) || String(i.code || '').toUpperCase() === String(m.code || '').toUpperCase()
+                        );
+                        const qBRL = q ? (parseFloat(q.priceInBookingCurrency) || parseFloat(q.rentalPriceInBookingCurrencyAI) || 0) : 0;
+                        const qLocal = q ? (parseFloat(q.price) || parseFloat(q.rentalPriceAI) || 0) : 0;
+                        mandBRL += qBRL > 0 ? qBRL : (parseFloat(m.priceBRL) || 0);
+                        mandLocal += qLocal > 0 ? qLocal : (parseFloat(m.priceLocal) || 0);
+                      }
+                      if (mandBRL > 0 || mandLocal > 0) {
+                        const zeroMarkup = 1 + ((zeroExcessMargin > 0 ? zeroExcessMargin : (etoMargin || 0)) / 100);
+                        const pkgBRL = Math.round((zeroBRL_raw + mandBRL) * zeroMarkup * 100) / 100;
+                        const pkgLocal = Math.round((zeroTotal_raw + mandLocal) * zeroMarkup * 100) / 100;
+                        if (pkgBRL > baseBRL && pkgLocal > baseTotal) {
+                          zeroBRL = pkgBRL;
+                          zeroTotal = pkgLocal;
+                          upgradeBRL = Math.round((zeroBRL - baseBRL) * 100) / 100;
+                          upgradeCost = Math.round((zeroTotal - baseTotal) * 100) / 100;
+                        }
                       }
                     }
 
