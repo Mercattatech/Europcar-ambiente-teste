@@ -527,11 +527,15 @@ function VehiclesContent() {
     if (quoteInsurances.some(i => isSnowChainsItem(i))) return true;
     if ((selectedCar?.includedInsurances || []).some((i: any) => isSnowChainsItem(i))) return true;
     if ((selectedCar?.mandatoryEquipmentList || []).some((m: any) => isSnowChainsItem(m))) return true;
-    if (ratesEquipment.some((e: any) => isSnowChainsItem(e))) return true;
+    // Respeita a XRS: correntes só contam como inclusas se o equipmentList marcar como M (mandatório) ou I (incluso)
+    if (ratesEquipment.some((e: any) => isSnowChainsItem(e) && (e.type === 'I' || e.type === 'M'))) return true;
     try {
       const raw = sessionStorage.getItem("europcar_booking");
       if (raw) {
         const b = JSON.parse(raw);
+        // Só vale a sessão da MESMA pesquisa (estação + datas) — evita herdar correntes de uma busca anterior (ex: Milão → Barcelona)
+        const sameSearch = b?.pickupStation === pickupStation && b?.pickupDate === pickupDate && b?.returnDate === returnDate;
+        if (!sameSearch) return false;
         if ((b?.quoteInsurances || []).some((i: any) => isSnowChainsItem(i))) return true;
         if ((b?.car?.includedInsurances || []).some((i: any) => isSnowChainsItem(i))) return true;
         if ((b?.mandatoryEquipment || []).some((i: any) => isSnowChainsItem(i))) return true;
@@ -540,7 +544,7 @@ function VehiclesContent() {
       }
     } catch {}
     return false;
-  }, [quoteInsurances, selectedCar, ratesEquipment]);
+  }, [quoteInsurances, selectedCar, ratesEquipment, pickupStation, pickupDate, returnDate]);
 
   // Se correntes para neve já estão inclusas na tarifa, remove automaticamente qualquer seleção manual
   useEffect(() => {
@@ -964,7 +968,8 @@ function VehiclesContent() {
 
       // ── Incorpora itens mandatórios de equipamento (ex: Correntes de neve na Itália) na tarifa POA ──
       const mandatoryEquipmentItems = mergedEquipment
-        .filter((eq: any) => eq.type === 'M' || isSnowChainsItem(eq))
+        // Respeita a XRS: só entra o que vier marcado como mandatório (type="M"). Opcional ("O") nunca é somado.
+        .filter((eq: any) => eq.type === 'M')
         .map((eq: any) => {
           const cost = getEquipmentCost(eq, bookingDurationDays || 1);
           const meta = EQUIPMENT_CATALOG[eq.code];
@@ -1800,7 +1805,7 @@ function VehiclesContent() {
         const quoteHasSnowChains = allParsedInsurances.some(isSnowChainsItem) ||
           (selectedCar?.includedInsurances || []).some(isSnowChainsItem) ||
           (selectedCar?.mandatoryEquipmentList || []).some((m: any) => isSnowChainsItem(m)) ||
-          ratesEquipment.some((e: any) => isSnowChainsItem(e));
+          ratesEquipment.some((e: any) => isSnowChainsItem(e) && (e.type === 'I' || e.type === 'M'));
         if (quoteHasSnowChains) {
           finalEquipment = finalEquipment.filter((eq: any) => !isSnowChainsItem(eq));
           console.log('[Step3] ❄️ Snow chains already included in quote/rate — Correntes para neve removed from available extras');
@@ -3075,7 +3080,7 @@ function VehiclesContent() {
                     // O getMultipleRates não traz os itens obrigatórios no total, então somamos aqui o valor real
                     // deles (linha da cotação XRS quando existir; senão o preço do equipmentList) e aplicamos a
                     // MESMA margem que o checkout usa para Franquia Zero.
-                    if (mandatoryItemsForDisplay.length > 0) {
+                    {
                       let mandBRL = 0;
                       let mandLocal = 0;
                       for (const m of mandatoryItemsForDisplay) {
@@ -3087,7 +3092,8 @@ function VehiclesContent() {
                         mandBRL += qBRL > 0 ? qBRL : (parseFloat(m.priceBRL) || 0);
                         mandLocal += qLocal > 0 ? qLocal : (parseFloat(m.priceLocal) || 0);
                       }
-                      if (mandBRL > 0 || mandLocal > 0) {
+                      // Sempre igual ao checkout: pacote Franquia Zero (NET XRS + obrigatórios) × margem da Franquia Zero
+                      if (zeroBRL_raw > 0 || zeroTotal_raw > 0) {
                         const zeroMarkup = 1 + ((zeroExcessMargin > 0 ? zeroExcessMargin : (etoMargin || 0)) / 100);
                         const pkgBRL = Math.round((zeroBRL_raw + mandBRL) * zeroMarkup * 100) / 100;
                         const pkgLocal = Math.round((zeroTotal_raw + mandLocal) * zeroMarkup * 100) / 100;
