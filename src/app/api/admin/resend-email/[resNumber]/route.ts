@@ -5,6 +5,7 @@ import { getReceiptLocale, getCurrencyFromStation } from '@/lib/receiptLocales';
 import { calculateRentalDays } from '@/lib/europcar/rentalDuration';
 import { buildExtrasListVars } from '@/lib/email/reservationEmailVars';
 import { fetchXrsSnapshot } from '@/lib/email/xrsReservationSnapshot';
+import { isEtoContract } from '@/lib/commissions/pricingSnapshot';
 export const dynamic = 'force-dynamic';
 
 
@@ -132,17 +133,26 @@ export async function POST(
     const d = parseFloat(eq.priceBRL || 0);
     return s + (t > 0 ? t : d * _days) * (eq.qty || 1);
   }, 0) : 0;
-  // Total completo (fallback = amountInCents se booking não tiver dados suficientes)
-  // BALCÃO: o total da XRS (totalRateEstimate) JÁ inclui proteções/acessórios contratados —
-  // não somar de novo (evitava proteção em dobro no e-mail). Fonte da verdade = XRS.
+  // Total completo: em reservas pré-pagas (cartão/PIX), o valor cobrado (_baseAmountBRL)
+  // é a fonte da verdade e já inclui o markup comercial. A tarifa bruta da XRS (_vehicleBRL2)
+  // é o NET de custo confidencial da locadora e NUNCA pode sobrescrever o valor pago pelo cliente.
   const _xrsTotalBRL = Number(xrsSnap?.quote?.totalBooking) || 0;
   const _extrasBRL = _insBRL + _eqBRL;
   const _isBalcao = paymentMethod === 'BALCAO';
+  const _isEto = isEtoContract(booking?.contractID || car?.contractID);
+  const _etoMargin = Number(booking?.etoMarginPercent || cd?.etoMarginPercent || cd?.pricingSnapshot?.markupPercent || 0);
+
+  const _markedUpVehicleBRL = (_isEto && _etoMargin > 0 && _vehicleBRL2 > 0)
+    ? Math.round(_vehicleBRL2 * (1 + _etoMargin / 100) * 100) / 100
+    : _vehicleBRL2;
+
   const amountBRL = _isBalcao && _xrsTotalBRL > 0
     ? _xrsTotalBRL
     : _isBalcao && _extrasBRL > 0 && _vehicleBRL2 > _extrasBRL
       ? _vehicleBRL2
-      : ((_vehicleBRL2 + _insBRL + _eqBRL) || _baseAmountBRL);
+      : (!_isBalcao && _baseAmountBRL > 0)
+        ? _baseAmountBRL
+        : ((_markedUpVehicleBRL + _insBRL + _eqBRL) || _baseAmountBRL);
 
   // ── Moeda local da reserva ─────────────────────────────────────────────
   // Prioridade:

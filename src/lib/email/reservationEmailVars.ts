@@ -23,6 +23,7 @@ import { buildPaymentSplitEmailVars, getStoredPaymentSplit } from '@/lib/email/p
 import { buildCashSummaryFromSplit, buildCashSummaryFromVars } from '@/lib/email/cashSummaryHtml';
 import { computePaymentSplit } from '@/lib/europcar/paymentSplit';
 import { isZeroExcessBooking, ZERO_EXCESS_LABEL } from '@/lib/europcar/protectionSummary';
+import { isEtoContract } from '@/lib/commissions/pricingSnapshot';
 
 // Mesmos códigos de proteção usados em bookXRS.ts / reservas/route.ts
 export const INSURANCE_CODES = [
@@ -272,6 +273,9 @@ export function buildReservationEmailVars(params: {
 
   // Em reservas BALCAO, vehicleBRLNet é frequentemente a cotação consolidada do XRS (veículo + proteções + extras).
   // Se vehicleBRLNet > extrasTotalBRL, o veículo puro é (vehicleBRLNet - extrasTotalBRL).
+  const isEto = isEtoContract(booking.contractID || car.contractID);
+  const etoMargin = Number(booking.etoMarginPercent || cd.etoMarginPercent || cd.pricingSnapshot?.markupPercent || 0);
+
   let vehicleBRL = vehicleBRLNet;
   let totalBRL = 0;
 
@@ -290,10 +294,15 @@ export function buildReservationEmailVars(params: {
       totalBRL = (vehicleBRL + extrasTotalBRL) || paidBRL;
     }
   } else {
+    // Fallback sem paidBRL (ex.: On-Request antes de capturar, cotações, etc.)
+    // Se for contrato ETO (isPriceSecret="Y"), o veículo do XRS é NET B2B confidencial: aplica a margem comercial!
+    if (isEto && etoMargin > 0 && vehicleBRLNet > 0) {
+      vehicleBRL = Math.round(vehicleBRLNet * (1 + etoMargin / 100) * 100) / 100;
+    }
     totalBRL = (vehicleBRL + extrasTotalBRL) || paidBRL;
   }
 
-  const cv = buildDestinationCurrencyVars(totalBRL, booking, car, params.xrs);
+  let cv = buildDestinationCurrencyVars(totalBRL, booking, car, params.xrs);
 
   // Detalhamento pedido pelos clientes (diárias, km, incluídos, franquia, câmbio, online × balcão).
   // Nunca pode impedir o envio do e-mail: em caso de erro, as variáveis ficam vazias.
@@ -330,12 +339,31 @@ export function buildReservationEmailVars(params: {
         split = computePaymentSplit(params.xrs.raw, {
           resNumber: params.resNumber,
           isZeroExcess: isZeroExcessBooking(booking),
+          onlineMarkupPercent: isEto ? etoMargin : 0,
         });
       } catch (splitDeriveErr: any) {
         console.warn('[reservationEmailVars] Falha ao derivar split do nó raw XRS:', splitDeriveErr?.message);
       }
     }
     if (split) {
+      // ⚠️ Garante que o split on-line não exiba a tarifa NET confidencial da locadora (ex: 25k)
+      // para o cliente quando o valor cobrado / com margem é maior (ex: 31k)
+      const exRate = rateForCounter > 0 ? rateForCounter : 1;
+      if (paidBRL > 0 && split.online) {
+        if (Math.abs(split.online.subtotalBRL - paidBRL) > 0.05) {
+          split.online.subtotalBRL = paidBRL;
+          split.online.subtotalLocal = Math.round((paidBRL / exRate) * 100) / 100;
+          split.totalBRL = Math.round((paidBRL + (split.counter?.subtotalBRL ?? 0)) * 100) / 100;
+          split.totalLocal = Math.round(((split.online.subtotalLocal ?? 0) + (split.counter?.subtotalLocal ?? 0)) * 100) / 100;
+        }
+      } else if (isEto && etoMargin > 0 && (split.onlineMarkupPercent ?? 0) === 0 && split.online) {
+        const factor = 1 + etoMargin / 100;
+        split.online.subtotalBRL = Math.round(split.online.subtotalBRL * factor * 100) / 100;
+        split.online.subtotalLocal = Math.round(split.online.subtotalLocal * factor * 100) / 100;
+        split.totalBRL = Math.round((split.online.subtotalBRL + (split.counter?.subtotalBRL ?? 0)) * 100) / 100;
+        split.totalLocal = Math.round(((split.online.subtotalLocal ?? 0) + (split.counter?.subtotalLocal ?? 0)) * 100) / 100;
+      }
+
       splitVars = buildPaymentSplitEmailVars(split, { quilometragem: detail.QUILOMETRAGEM });
       cashSummaryFromSplit = buildCashSummaryFromSplit(split, {
         onlineTitle: paymentMethod === 'PIX' ? 'Pago on-line (PIX)' : 'Pago on-line',
@@ -346,6 +374,9 @@ export function buildReservationEmailVars(params: {
   } catch (err: any) {
     console.warn('[reservationEmailVars] Falha ao montar blocos on-line × balcão:', err?.message);
   }
+
+  // Atualiza cv com o totalBRL definitivo (com markup comercial)
+  cv = buildDestinationCurrencyVars(totalBRL, booking, car, params.xrs);
 
     const pickupStationCode = booking.pickupStation || '';
     const pickupStationName = booking.pickupStationName || pickupStationCode;

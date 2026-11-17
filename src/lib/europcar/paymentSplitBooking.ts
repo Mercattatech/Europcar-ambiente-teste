@@ -34,11 +34,17 @@ export function resolveBookedPaymentSplit(params: {
   if (!quoteSplit) {
     if (params.bookResNode) {
       try {
+        const fallbackMarkup = Number(params.bookingData?.etoMarginPercent) || 0;
         const directSplit = computePaymentSplit(params.bookResNode, {
           resNumber: params.resNumber,
           isZeroExcess: isZeroExcessBooking(params.bookingData),
+          onlineMarkupPercent: fallbackMarkup,
         });
         if (directSplit) {
+          if (params.chargedBRL > 0 && directSplit.online && Math.abs(directSplit.online.subtotalBRL - params.chargedBRL) > AMOUNT_TOLERANCE) {
+            directSplit.online.subtotalBRL = params.chargedBRL;
+            directSplit.totalBRL = round2(params.chargedBRL + (directSplit.counter?.subtotalBRL ?? 0));
+          }
           console.log(`${tag} ✅ split calculado diretamente do bookResNode: on-line ${formatBRL(directSplit.online?.subtotalBRL ?? 0)} · balcão ${formatBRL(directSplit.counter?.subtotalBRL ?? 0)}`);
           return directSplit;
         }
