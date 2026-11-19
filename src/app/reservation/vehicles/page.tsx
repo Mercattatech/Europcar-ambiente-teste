@@ -1746,7 +1746,9 @@ function VehiclesContent() {
         // de aeroporto do NP call (npAirportEntry) precisa ser injetada manualmente.
         // chrgTy 00024 = SEMPRE pago no balcão, nunca somar no ticket Cielo.
         if (npAirportEntry && npAirportEntry.priceBRL > 0) {
-          const currentInsurances = quoteInsurances.length > 0 ? [...quoteInsurances] : [];
+          // ⚠️ NÃO usar o state `quoteInsurances` aqui: dentro deste efeito ele é o valor ANTIGO (vazio) e
+          // sobrescreveria as proteções recém-lidas da XRS só com a sobretaxa. `allParsedInsurances` é o valor atual.
+          const currentInsurances = allParsedInsurances.length > 0 ? [...allParsedInsurances] : [];
           const hasAirport = currentInsurances.some((i: any) =>
             ['APF','APT','AIRPORTFEE','APS','ASF','APF2','APTF','STF'].includes((i.code || '').toUpperCase()) ||
             i.code === 'AIRPORTFEE' ||
@@ -3159,7 +3161,12 @@ function VehiclesContent() {
                     };
                     return {
                       upgradeCost, upgradeBRL, applyZero,
-                      items: zeroRows.map((i: any) => ({ code: String(i.code || '').toUpperCase(), label: String(i.descr || '').trim() || String(i.code || '').toUpperCase() })),
+                      items: zeroRows.map((i: any) => {
+                        const c = String(i.code || '').toUpperCase();
+                        // nome = descr do XML (tarifa) → descr do mesmo código na cotação (XML) → só o código
+                        const fromQuote = String((quoteInsurances.find((q: any) => String(q.code).toUpperCase() === c) as any)?.rawDescr || '').trim();
+                        return { code: c, label: String(i.descr || '').trim() || fromQuote || c };
+                      }),
                       excessBRL: zeroRows.length ? Math.max(0, ...zeroRows.map((i: any) => upNum(i.bkExcessWithPOM))) : null,
                       excessLocal: zeroRows.length ? Math.max(0, ...zeroRows.map((i: any) => upNum(i.excessWithPOM))) : null,
                     };

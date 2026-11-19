@@ -81,8 +81,8 @@ export default function ProtectionPackages({ cards, selected, currency, fmt, t, 
                   <li key={it.code} className="flex items-start gap-2 text-xs text-gray-700">
                     <span className="text-[#008d36] font-bold shrink-0">✓</span>
                     <span>
-                      {it.label}
-                      <span className="ml-1.5 text-[10px] font-black uppercase tracking-wider bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
+                      {it.label !== it.code && it.label}
+                      <span className={`${it.label !== it.code ? 'ml-1.5 ' : ''}text-[10px] font-black uppercase tracking-wider bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200`}>
                         {it.code}
                       </span>
                     </span>
