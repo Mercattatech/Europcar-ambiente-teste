@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "test:payment": "node --no-warnings --test tests/paymentSplit.test.mjs",
+    "test:packages": "node --no-warnings --test tests/protectionPackages.test.mjs",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",

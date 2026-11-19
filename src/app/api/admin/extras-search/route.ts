@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
+import { DEFAULT_PACKAGE_MATRIX, sanitizeMatrix } from '@/lib/europcar/protectionPackages';
 
 /**
  * Liga/desliga, para TODAS as buscas do site, a exibição de:
@@ -14,7 +15,9 @@ const PROTECTIONS_KEY = 'extras_search_protections_enabled';
 const EXTRAS_KEY = 'extras_search_extras_enabled';
 const DISABLED_PROTECTIONS_KEY = 'extras_search_disabled_protections';
 const DISABLED_EXTRAS_KEY = 'extras_search_disabled_extras';
-const ALL_KEYS = [PROTECTIONS_KEY, EXTRAS_KEY, DISABLED_PROTECTIONS_KEY, DISABLED_EXTRAS_KEY];
+// Matriz: quais códigos XRS formam cada pacote (Básica/Conforto/Premium). JSON; ausente = padrão.
+const PACKAGE_MATRIX_KEY = 'extras_search_package_matrix';
+const ALL_KEYS = [PROTECTIONS_KEY, EXTRAS_KEY, DISABLED_PROTECTIONS_KEY, DISABLED_EXTRAS_KEY, PACKAGE_MATRIX_KEY];
 const ADMIN_EMAILS = ["grupomercatta@gmail.com", "matheus@grupomercatta.com.br", "matheusconti@gmail.com", "matheus@grupomercatta.com", "admin@mercatta.com.br"];
 
 export const dynamic = 'force-dynamic';
@@ -43,6 +46,11 @@ const sanitizeList = (value: unknown): string[] =>
     ? Array.from(new Set(value.filter((x): x is string => typeof x === 'string').map((x) => x.trim().toUpperCase()).filter((x) => x && x.length <= 40))).slice(0, 300)
     : [];
 
+const parseMatrix = (value?: string | null) => {
+  if (!value) return DEFAULT_PACKAGE_MATRIX;
+  try { return sanitizeMatrix(JSON.parse(value)); } catch { return DEFAULT_PACKAGE_MATRIX; }
+};
+
 async function readConfig() {
   const rows = await prisma.contentBlock.findMany({ where: { key: { in: ALL_KEYS } } });
   const byKey = Object.fromEntries(rows.map((r) => [r.key, r.value_ptBR]));
@@ -51,6 +59,7 @@ async function readConfig() {
     extras: isEnabled(byKey[EXTRAS_KEY]),
     disabledProtections: parseList(byKey[DISABLED_PROTECTIONS_KEY]),
     disabledExtras: parseList(byKey[DISABLED_EXTRAS_KEY]),
+    packageMatrix: parseMatrix(byKey[PACKAGE_MATRIX_KEY]),
   };
 }
 
@@ -60,11 +69,11 @@ export async function GET() {
     return NextResponse.json(await readConfig(), { headers: NO_STORE });
   } catch (error: any) {
     console.error('[extras-search] DB error, mantendo padrão (ativo):', error.message);
-    return NextResponse.json({ protections: true, extras: true, disabledProtections: [], disabledExtras: [], fallback: true }, { headers: NO_STORE });
+    return NextResponse.json({ protections: true, extras: true, disabledProtections: [], disabledExtras: [], packageMatrix: DEFAULT_PACKAGE_MATRIX, fallback: true }, { headers: NO_STORE });
   }
 }
 
-// POST — somente admin. Aceita { protections?, extras?: boolean; disabledProtections?, disabledExtras?: string[] }
+// POST — somente admin. Aceita { protections?, extras?: boolean; disabledProtections?, disabledExtras?: string[]; packageMatrix?: {basicExclude,medium,premium} }
 export async function POST(request: Request) {
   if (!(await checkAdmin())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -77,6 +86,7 @@ export async function POST(request: Request) {
     if (typeof body.extras === 'boolean') updates.push([EXTRAS_KEY, String(body.extras)]);
     if (Array.isArray(body.disabledProtections)) updates.push([DISABLED_PROTECTIONS_KEY, JSON.stringify(sanitizeList(body.disabledProtections))]);
     if (Array.isArray(body.disabledExtras)) updates.push([DISABLED_EXTRAS_KEY, JSON.stringify(sanitizeList(body.disabledExtras))]);
+    if (body.packageMatrix && typeof body.packageMatrix === 'object') updates.push([PACKAGE_MATRIX_KEY, JSON.stringify(sanitizeMatrix(body.packageMatrix))]);
     if (updates.length === 0) {
       return NextResponse.json({ error: 'Nada para atualizar.' }, { status: 400 });
     }

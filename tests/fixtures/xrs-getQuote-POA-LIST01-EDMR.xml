@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<message>
+  <serviceResponse returnCode="OK">
+    <serviceContext>
+      <localisation active="true">
+        <language code="en_GB" />
+      </localisation>
+    </serviceContext>
+    <reservation carCategory="EDMR" carCategoryAirCond="Y" carCategoryAutomatic="N" carCategoryBaggageQuantity="1" carCategoryCO2Quantity="109" carCategoryDoors="5" carCategoryModelHeight="1.47" carCategoryModelLength="4.0" carCategoryModelMaxWeight="1550.0" carCategoryModelWeight="980.0" carCategoryModelWidth="1.75" carCategoryName="ECONOMY 4 DOORS,MANUAL,A/C" carCategoryPowerHP="82" carCategoryPowerKW="60" carCategorySample="CITROEN C3" carCategorySeats="5" carCategoryType="Eco-responsable" contractID="57269673" countryOfReservation="PT" duration="1" fuelTypeCode="UL" productCode="CRPLPT" productFamily="SPDR" productLevel="24137" productVersion="21" rateId="44a19bb87d8d9261414781ae34477595e6bd63f94e60e4481d36aea50af5b48c" resTimeStamp="202611191033" reservationDate="20261119" reservationTime="1033" statusCode="S" type="P" xrsPartnerCallerID="Europcar Brazil">
+      <links>
+        <link id="carvisual" value="https://static.europcar.com/carvisuals/partners/835x557/EDMR_PT.png" />
+      </links>
+      <checkin date="20261127" stationID="LIST01" time="1000" />
+      <checkout date="20261126" stationID="LIST01" time="1000" />
+      <quote IncludedKmUnit="K" areTaxesIncluded="Y" basePrice="17.53" baseType="D" bookingCurrencyOfTotalRateEstimate="BRL" currency="EUR" exchangeRate="6.447285" includedKm="99999" includedKmType="R" isAuthorizedForPublicUse="Y" isPrepaid="N" isPriceSecret="N" rentingCurrencyOfTotalRateEstimate="EUR" totalRateEstimate="17.53" totalRateEstimateInBookingCurrency="113.02" totalRateEstimateInRentingCurrency="17.53" xrsBasePrice="15.24" xrsBasePriceInBookingCurrency="98.26">
+        <insuranceList>
+          <insurance bkExcessWithPOM="0.00" code="WWI" descr="glass &amp; tyres protection" excessWithPOM="0.00" price="8.00" priceInBookingCurrency="51.58" rentalPriceAI="11.32" rentalPriceInBookingCurrencyAI="72.98" type="O" />
+          <insurance bkExcessWithPOM="0.00" code="SPAI" descr="super personal accident protection" excessWithPOM="0.00" price="9.50" priceInBookingCurrency="61.25" rentalPriceAI="13.44" rentalPriceInBookingCurrencyAI="86.65" type="O" />
+          <insurance bkExcessWithPOM="0.00" code="RSA" descr="Roadside assistance" excessWithPOM="0.00" price="6.50" priceInBookingCurrency="41.91" rentalPriceAI="9.20" rentalPriceInBookingCurrencyAI="59.32" type="O" />
+          <insurance bkExcessWithPOM="0.00" code="PREMPLUS" excessWithPOM="0.00" price="38.65" priceInBookingCurrency="249.19" rentalPriceAI="54.67" rentalPriceInBookingCurrencyAI="352.47" type="O" />
+          <insurance bkExcessWithPOM="0.00" code="PREMIUM" descr="Premium Protection package more 19 Years old" excessWithPOM="0.00" price="25.18" priceInBookingCurrency="162.34" rentalPriceAI="35.62" rentalPriceInBookingCurrencyAI="229.65" type="O" />
+          <insurance bkExcessWithPOM="0.00" code="PAI" descr="personal accident cover (pai)" excessWithPOM="0.00" price="7.00" priceInBookingCurrency="45.13" rentalPriceAI="9.90" rentalPriceInBookingCurrencyAI="63.83" type="O" />
+          <insurance bkExcessWithPOM="3868.37" code="MEDIUM" descr="Medium Protection Package" excessWithPOM="600.00" price="18.89" priceInBookingCurrency="121.79" rentalPriceAI="26.72" rentalPriceInBookingCurrencyAI="172.27" type="O" />
+          <insurance bkExcessWithPOM="0.00" code="INTERIOR" excessWithPOM="0.00" price="6.00" priceInBookingCurrency="38.68" rentalPriceAI="8.49" rentalPriceInBookingCurrencyAI="54.74" type="O" />
+          <insurance bkExcessWithPOM="14828.76" code="LDW" descr="BASIC(LDW)  Includes Theft And Collision Damage Waiver" excessWithPOM="2300.00" price="0.00" priceInBookingCurrency="0.00" rentalPriceAI="0.00" rentalPriceInBookingCurrencyAI="0.00" type="I" />
+          <insurance bkExcessWithPOM="0.00" code="LAF" descr="Road Tax &amp; License Fees (Laf)" excessWithPOM="0.00" price="0.00" priceInBookingCurrency="0.00" rentalPriceAI="0.00" rentalPriceInBookingCurrencyAI="0.00" type="I" />
+        </insuranceList>
+        <chargeList>
+          <chargeLine act="AS" chrgPct="23.00" chrgTy="00028" chrgTyDesc="VAT" price="3.28" priceInBookingCurrency="21.15" vatRefCd="A">
+            <payer dvrName="Driver" />
+          </chargeLine>
+          <chargeLine act="AS" auxK="5101" chrgPct="15.00" chrgTy="00024" chrgTyDesc="Airport Surcharge" price="1.86" priceInBookingCurrency="11.99" vatCd="A">
+            <payer dvrName="Driver" />
+          </chargeLine>
+          <chargeLine act="AS" auxK="LAF" chrgTy="00090" chrgTyDesc="LICENSES &amp; FEES" price="0.00" priceInBookingCurrency="0.00" vatCd="A">
+            <payer dvrName="Driver" />
+          </chargeLine>
+          <chargeLine act="AS" auxK="LDW" chrgTy="00079" chrgTyDesc="BASIC PROTECTION PACKAGE" price="0.00" priceInBookingCurrency="0.00" vatCd="A">
+            <payer dvrName="Driver" />
+          </chargeLine>
+          <chargeLine act="AS" chrgTy="00048" chrgTyDesc="Basic Rental-Free Miles" price="0.00" priceInBookingCurrency="0.00" vatCd="A">
+            <payer dvrName="Driver" />
+          </chargeLine>
+          <chargeLine act="AS" chrgTy="00001" chrgTyDesc="Basic Rental" price="12.39" priceInBookingCurrency="79.88" vatCd="A">
+            <payer dvrName="Driver" />
+          </chargeLine>
+        </chargeList>
+        <payerList>
+          <payer chargeAllocatedInBookingCurrency="113.02" chargeAllocatedInRentingCurrency="17.53" dueToPayInBookingCurrency="113.02" dueToPayInRentingCurrency="17.53" dvrName="Driver" />
+        </payerList>
+      </quote>
+      <ageLimit minAgeForCategory="19" minAgeForCountry="19" minLicencePeriod="12 months" youngDriverAge="23" />
+    </reservation>
+    <driver addressCountry="BR" countryOfResidence="BR" />
+  </serviceResponse>
+</message>
+

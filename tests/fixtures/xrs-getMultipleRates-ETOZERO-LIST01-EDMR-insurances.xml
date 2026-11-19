@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<message><serviceResponse><reservationRateList><reservationRate carCategoryCode="EDMR"><insuranceList>
+<insurance bkExcessWithPOM="0.00" code="SPAI" excessWithPOM="0.00" price="9.50" priceInBookingCurrency="61.25" rentalPriceAI="13.44" rentalPriceInBookingCurrencyAI="86.65" type="O" />
+<insurance bkExcessWithPOM="0.00" code="RSA" excessWithPOM="0.00" price="6.50" priceInBookingCurrency="41.91" rentalPriceAI="9.20" rentalPriceInBookingCurrencyAI="59.32" type="O" />
+<insurance bkExcessWithPOM="0.00" code="PREMUP" excessWithPOM="0.00" price="2.85" priceInBookingCurrency="18.37" rentalPriceAI="4.03" rentalPriceInBookingCurrencyAI="25.98" type="O" />
+<insurance bkExcessWithPOM="0.00" code="PREMPLUS" excessWithPOM="0.00" price="38.65" priceInBookingCurrency="249.19" rentalPriceAI="54.67" rentalPriceInBookingCurrencyAI="352.47" type="O" />
+<insurance bkExcessWithPOM="0.00" code="PREMIUM" excessWithPOM="0.00" price="25.18" priceInBookingCurrency="162.34" rentalPriceAI="35.62" rentalPriceInBookingCurrencyAI="229.65" type="O" />
+<insurance bkExcessWithPOM="0.00" code="PAI" excessWithPOM="0.00" price="7.00" priceInBookingCurrency="45.13" rentalPriceAI="9.90" rentalPriceInBookingCurrencyAI="63.83" type="O" />
+<insurance bkExcessWithPOM="3868.37" code="MEDIUM" excessWithPOM="600.00" price="18.89" priceInBookingCurrency="121.79" rentalPriceAI="26.72" rentalPriceInBookingCurrencyAI="172.27" type="O" />
+<insurance bkExcessWithPOM="0.00" code="INTERIOR" excessWithPOM="0.00" price="6.00" priceInBookingCurrency="38.68" rentalPriceAI="8.49" rentalPriceInBookingCurrencyAI="54.74" type="O" />
+<insurance bkExcessWithPOM="0.00" code="APP" excessWithPOM="0.00" price="14.60" priceInBookingCurrency="94.13" rentalPriceAI="20.65" rentalPriceInBookingCurrencyAI="133.14" type="O" />
+<insurance bkExcessWithPOM="14828.76" code="LDW" excessWithPOM="2300.00" price="0.00" priceInBookingCurrency="0.00" rentalPriceAI="0.00" rentalPriceInBookingCurrencyAI="0.00" type="I" />
+<insurance bkExcessWithPOM="0.00" code="LAF" excessWithPOM="0.00" price="0.00" priceInBookingCurrency="0.00" rentalPriceAI="0.00" rentalPriceInBookingCurrencyAI="0.00" type="I" />
+<insurance bkExcessWithPOM="0.00" code="WWI" excessWithPOM="0.00" price="0.00" priceInBookingCurrency="0.00" rentalPriceAI="0.00" rentalPriceInBookingCurrencyAI="0.00" type="M" />
+<insurance bkExcessWithPOM="0.00" code="SPTHW" excessWithPOM="0.00" price="0.00" priceInBookingCurrency="0.00" rentalPriceAI="0.00" rentalPriceInBookingCurrencyAI="0.00" type="M" />
+<insurance bkExcessWithPOM="0.00" code="SPCDW" excessWithPOM="0.00" price="0.00" priceInBookingCurrency="0.00" rentalPriceAI="0.00" rentalPriceInBookingCurrencyAI="0.00" type="M" />
+</insuranceList></reservationRate></reservationRateList></serviceResponse></message>

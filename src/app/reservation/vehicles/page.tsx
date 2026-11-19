@@ -1,5 +1,7 @@
 "use client";
 
+import ProtectionPackages, { type ProtectionCardData } from '@/components/checkout/ProtectionPackages';
+import { buildProtectionPackages, packageMemberCodes, sanitizeMatrix, DEFAULT_PACKAGE_MATRIX, type PackageMatrix } from '@/lib/europcar/protectionPackages';
 import Link from "next/link";
 import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
 import { useSession, signOut } from "next-auth/react";
@@ -499,7 +501,7 @@ function VehiclesContent() {
   // Extras
   const [dbExtras, setDbExtras] = useState<any[]>([]);
   // Chave global do painel (/painel/extras): quando false, a seção correspondente some de TODAS as buscas
-  const [extrasSearchCfg, setExtrasSearchCfg] = useState<{ protections: boolean; extras: boolean; disabledProtections: string[]; disabledExtras: string[] }>({ protections: true, extras: true, disabledProtections: [], disabledExtras: [] });
+  const [extrasSearchCfg, setExtrasSearchCfg] = useState<{ protections: boolean; extras: boolean; disabledProtections: string[]; disabledExtras: string[]; packageMatrix: PackageMatrix }>({ protections: true, extras: true, disabledProtections: [], disabledExtras: [], packageMatrix: DEFAULT_PACKAGE_MATRIX });
   const [selectedExtrasMap, setSelectedExtrasMap] = useState<Record<string, number>>({});
   const [selectedProtectionPackage, setSelectedProtectionPackage] = useState<'none' | 'basic' | 'medium' | 'premium'>('none');
   const [expandedPackages, setExpandedPackages] = useState<Set<string>>(new Set());
@@ -1116,6 +1118,7 @@ function VehiclesContent() {
         extras: d?.extras !== false,
         disabledProtections: Array.isArray(d?.disabledProtections) ? d.disabledProtections.map((c: string) => String(c).toUpperCase()) : [],
         disabledExtras: Array.isArray(d?.disabledExtras) ? d.disabledExtras.map((c: string) => String(c).toUpperCase()) : [],
+        packageMatrix: sanitizeMatrix(d?.packageMatrix),
       }))
       .catch(() => {});
   }, [currentStep]);
@@ -1429,6 +1432,8 @@ function VehiclesContent() {
                 bkExcessWithPOM:               parseFloat(a.bkExcessWithPOM    || '0'),
                 prepaid:                       a.prepaid                       || '',
                 paidBy:                        undefined as string | undefined,
+                rawDescr:                      String(a.descr || ''),   // descr EXATA do XML (sem tradução) — usada nos pacotes
+                fromInsuranceList:             true,                    // veio do <insuranceList> (não do chargeList/taxList)
               };
             }).filter((ins: any) => ins.code);
 
@@ -1462,6 +1467,8 @@ function VehiclesContent() {
                 bkExcessWithPOM:               parseFloat(a.bkExcessWithPOM    || '0'),
                 prepaid:                       a.prepaid                       || '',
                 paidBy:                        undefined as string | undefined,
+                rawDescr:                      String(a.descr || ''),   // descr EXATA do XML (sem tradução) — usada nos pacotes
+                fromInsuranceList:             true,                    // veio do <insuranceList> (não do chargeList/taxList)
               };
             }).filter((ins: any) => ins.code);
           }
@@ -3035,11 +3042,23 @@ function VehiclesContent() {
                 </div>
               ) : (
                 <>
-                  {/* Proteções (franquia zero + seguros da XRS): controladas pela chave do painel /painel/extras */}
+                  {/* Proteções agrupadas em 3 pacotes (Básica · Conforto · Premium).
+                      TUDO vem do XML da XRS desta estação; a matriz (painel /painel/extras) só diz quais códigos formam cada nível. */}
                   {extrasSearchCfg.protections && (
                   <>
-                  {/* 🛡️ Zero Excess Upsell — only for ETO tariff */}
-                  {selectedTariffType === 'ETO' && (() => {
+                  {loadingEquipment ? (
+                    <div className="flex items-center gap-2 text-gray-500 text-sm py-4">
+                      <div className="w-4 h-4 border-2 border-[#008d36] border-t-transparent rounded-full animate-spin" />
+                      <p>{t('extras.loadingProtections')}</p>
+                    </div>
+                  ) : (() => {
+                    const cur = selectedCar?.currency || 'EUR';
+                    const isOff = (code: string) => extrasSearchCfg.disabledProtections.includes(String(code).toUpperCase());
+                    const enabledRows = quoteInsurances.filter((i: any) => !isOff(i.code));
+                    const pk = buildProtectionPackages(enabledRows, extrasSearchCfg.packageMatrix);
+
+                    // ── Premium na tarifa ETO = contrato Franquia Zero (preço = diferença entre as tarifas XRS) ──
+                    const zero = selectedTariffType === 'ETO' ? (() => {
                     const code = selectedCar?.carCategoryCode;
                     const etoZeroCar = etoZeroCars.find(e => e.carCategoryCode === code);
                     if (!etoZeroCar) return null;
@@ -3107,74 +3126,73 @@ function VehiclesContent() {
                     }
 
                     if (rawUpgradeCost <= 0 || upgradeCost <= 0) return null;
-                    return (
-                      <div className={`border-2 rounded-xl p-4 md:p-6 mb-8 transition-all ${zeroExcessUpgrade ? 'border-[#008d36] bg-green-50 shadow-lg shadow-green-100' : 'border-[#e67e00] bg-gradient-to-r from-orange-50 to-amber-50 hover:shadow-md'}`}>
-                        <div className="flex flex-col md:flex-row items-start gap-3 md:gap-5">
-                          <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-[#e67e00] to-[#ff9800] flex items-center justify-center text-white text-xl md:text-2xl shrink-0 shadow-lg">🛡️</div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <h3 className="font-black text-gray-900 text-base md:text-lg">Proteção Premium — Franquia Zero</h3>
-                              <span className="text-[9px] bg-[#e67e00] text-white px-2 py-0.5 rounded-full font-black uppercase">Recomendado</span>
-                            </div>
-                            <p className="text-xs md:text-sm text-gray-600 mb-3">{t('extras.zeroExcessDesc')}</p>
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 md:gap-6">
-                              <div>
-                                <span className="text-[10px] text-gray-400 uppercase font-bold block">{t('extras.upgradeFor')}</span>
-                                <span className="text-xl md:text-2xl font-black text-[#e67e00]">+ {currency} {fmtPrice(upgradeCost)}</span>
-                                {upgradeBRL > 0 && <span className="text-xs text-gray-500 ml-2">(+ R$ {fmtPrice(upgradeBRL)})</span>}
-                              </div>
-                              <button
-                                onClick={() => {
-                                  if (zeroExcessUpgrade) {
-                                    setZeroExcessUpgrade(false);
-                                    setSelectedCar((prev: any) => ({
-                                      ...prev,
-                                      ...(originalCar || {}),
-                                      ...(originalEtoCar || {}),
-                                      totalRateEstimate: baseTotal.toFixed(2),
-                                      totalRateEstimateInBookingCurrency: baseBRL.toFixed(2),
-                                      optionalInsurances: originalCar?.optionalInsurances || prev?.optionalInsurances,
-                                      imageUrl: prev?.imageUrl,
-                                      _etoCID: '56935466'
-                                    }));
-                                  } else {
-                                    setZeroExcessUpgrade(true);
-                                    setSelectedCar((prev: any) => ({
-                                      ...prev,
-                                      ...etoZeroCar,
-                                      totalRateEstimate: zeroTotal.toFixed(2),
-                                      totalRateEstimateInBookingCurrency: zeroBRL.toFixed(2),
-                                      optionalInsurances: prev?.optionalInsurances,
-                                      imageUrl: prev?.imageUrl,
-                                      _etoCID: '56935495'
-                                    }));
-                                  }
-                                }}
-                                className={`font-bold py-3 px-6 md:px-8 rounded-lg text-sm transition-all w-full sm:w-auto text-center ${zeroExcessUpgrade ? 'bg-[#008d36] text-white shadow-lg' : 'bg-[#e67e00] hover:bg-[#cc6f00] text-white shadow-lg shadow-[#e67e00]/25'}`}
-                              >
-                                {zeroExcessUpgrade ? '✓ Adicionado' : 'Adicionar Proteção'}
-                              </button>
-                            </div>
-                            {zeroExcessUpgrade && (
-                              <div className="mt-3 text-xs md:text-sm text-[#008d36] font-bold flex flex-wrap items-center gap-2">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-                                Franquia zero ativada! Novo total: {currency} {fmtPrice(zeroTotal)}
-                                {zeroBRL > 0 && <span className="text-gray-500 font-normal">(R$ {fmtPrice(zeroBRL)})</span>}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
 
-                  {/* 🛡️ Proteções da API getQuote — Real data for selected vehicle */}
-                  {loadingEquipment ? (
-                    <div className="flex items-center gap-2 text-gray-500 text-sm py-4">
-                      <div className="w-4 h-4 border-2 border-[#008d36] border-t-transparent rounded-full animate-spin" />
-                      <p>{t('extras.loadingProtections')}</p>
-                    </div>
-                  ) : quoteInsurances.filter((ins: any) => ins.type !== 'M' && ins.code !== 'SL' && !extrasSearchCfg.disabledProtections.includes(String(ins.code).toUpperCase())).length > 0 ? (() => {
+                    const upNum = (v: any) => { const n = parseFloat(String(v ?? '')); return Number.isFinite(n) ? n : 0; };
+                    // Itens embutidos no contrato = type="M" do insuranceList da tarifa Franquia Zero (XML)
+                    const zeroRows = (etoZeroCar.includedInsurances || []).filter((i: any) => i && i.type === 'M');
+                    const applyZero = (on: boolean) => {
+                      if (on === zeroExcessUpgrade) return;
+                      if (!on) {
+                        setZeroExcessUpgrade(false);
+                        setSelectedCar((prev: any) => ({
+                          ...prev,
+                          ...(originalCar || {}),
+                          ...(originalEtoCar || {}),
+                          totalRateEstimate: baseTotal.toFixed(2),
+                          totalRateEstimateInBookingCurrency: baseBRL.toFixed(2),
+                          optionalInsurances: originalCar?.optionalInsurances || prev?.optionalInsurances,
+                          imageUrl: prev?.imageUrl,
+                          _etoCID: '56935466'
+                        }));
+                      } else {
+                        setZeroExcessUpgrade(true);
+                        setSelectedCar((prev: any) => ({
+                          ...prev,
+                          ...etoZeroCar,
+                          totalRateEstimate: zeroTotal.toFixed(2),
+                          totalRateEstimateInBookingCurrency: zeroBRL.toFixed(2),
+                          optionalInsurances: prev?.optionalInsurances,
+                          imageUrl: prev?.imageUrl,
+                          _etoCID: '56935495'
+                        }));
+                      }
+                    };
+                    return {
+                      upgradeCost, upgradeBRL, applyZero,
+                      items: zeroRows.map((i: any) => ({ code: String(i.code || '').toUpperCase(), label: String(i.descr || '').trim() || String(i.code || '').toUpperCase() })),
+                      excessBRL: zeroRows.length ? Math.max(0, ...zeroRows.map((i: any) => upNum(i.bkExcessWithPOM))) : null,
+                      excessLocal: zeroRows.length ? Math.max(0, ...zeroRows.map((i: any) => upNum(i.excessWithPOM))) : null,
+                    };
+                    })() : null;
+
+                    // ── Cartões: Básica · Conforto · Premium ──
+                    const cards: ProtectionCardData[] = [];
+                    if (pk.basic) cards.push({ id: 'basic', items: pk.basic.items, excessBRL: pk.basic.excessBRL, excessLocal: pk.basic.excessLocal, extraBRL: 0, extraLocal: 0 });
+                    if (pk.medium) cards.push({ id: 'medium', items: pk.medium.items, excessBRL: pk.medium.excessBRL, excessLocal: pk.medium.excessLocal, extraBRL: pk.medium.priceBRL, extraLocal: pk.medium.priceLocal });
+                    if (zero) cards.push({ id: 'premium', items: zero.items, excessBRL: zero.excessBRL, excessLocal: zero.excessLocal, extraBRL: zero.upgradeBRL, extraLocal: zero.upgradeCost });
+                    else if (pk.premium) cards.push({ id: 'premium', items: pk.premium.items, excessBRL: pk.premium.excessBRL, excessLocal: pk.premium.excessLocal, extraBRL: pk.premium.priceBRL, extraLocal: pk.premium.priceLocal });
+
+                    // Pacote selecionado é DERIVADO do estado (sempre coerente com o que vai para a reserva)
+                    const hasAll = (pkg: any) => !!pkg && pkg.members.length > 0 && pkg.members.every((m: any) => (selectedExtrasMap[m.code] || 0) > 0);
+                    const premiumSel = zero ? zeroExcessUpgrade : hasAll(pk.premium);
+                    const mediumSel = !premiumSel && hasAll(pk.medium);
+                    const selPkg: 'basic' | 'medium' | 'premium' = premiumSel ? 'premium' : mediumSel ? 'medium' : 'basic';
+
+                    // Exclusão mútua: ao escolher um pacote, remove os códigos dos outros e liga/desliga a Franquia Zero
+                    const onSelectPackage = (id: 'basic' | 'medium' | 'premium') => {
+                      const newMap: Record<string, number> = { ...selectedExtrasMap };
+                      for (const m of [...(pk.medium?.members || []), ...(pk.premium?.members || [])]) delete newMap[m.code];
+                      if (id === 'medium') for (const m of pk.medium?.members || []) newMap[m.code] = 1;
+                      if (id === 'premium' && !zero) for (const m of pk.premium?.members || []) newMap[m.code] = 1;
+                      setSelectedExtrasMap(newMap);
+                      setSelectedProtectionPackage(id);
+                      if (zero) zero.applyZero(id === 'premium');
+                    };
+
+                    // Coberturas avulsas = opcionais da XRS que não pertencem a nenhum pacote
+                    const memberCodes = packageMemberCodes(pk);
+                    const avulsas = enabledRows.filter((i: any) => i.fromInsuranceList && i.type === 'O' && i.code !== 'SL' && !memberCodes.has(String(i.code).toUpperCase()));
+
                     // Insurance name and description maps (Portuguese)
                     const insNamesPT: Record<string, string> = {
                       WWI: 'Proteção de para-brisas, vidros, faróis e pneus',
@@ -3250,39 +3268,15 @@ function VehiclesContent() {
                       CDW: '🚗', LDW: '📋', TPL: '📄', ECOLOGIC: '🌿',
                       PEP: '🧳', APP: '🎨',
                     };
-                    // ── Tier classification of insurance codes ────────────────────────────
-                    const MEDIUM_CODES = new Set(['RSA', 'WWI', 'APP', 'INTERIOR', 'AWC', 'PEP', 'THW', 'STHW', 'MEDIUM', 'PAI']);
-                    const PREMIUM_CODES = new Set(['SCDW', 'SPCDW', 'SPTHW', 'PREMIUM', 'PREMPLUS', 'PREMPRE', 'ECOLOGIC']);
 
-                    const includedIns  = quoteInsurances.filter((ins: any) => ins.type === 'I');
-                    const optionalIns  = quoteInsurances.filter((ins: any) => ins.type === 'O' && ins.code !== 'SL');
-                    const mediumMembers  = optionalIns.filter((ins: any) => MEDIUM_CODES.has(ins.code));
-                    const premiumMembers = optionalIns.filter((ins: any) => PREMIUM_CODES.has(ins.code));
-                    const premiumAll    = [...mediumMembers, ...premiumMembers];
-                    const sumBRL = (list: any[]) => list.reduce((acc: number, ins: any) => acc + (ins.rentalPriceInBookingCurrencyAI || 0), 0);
-
-                    const packages = [
-                      { id: 'basic' as const, label: 'Básico', sublabel: 'Já incluído no veículo', badge: '', color: 'border-gray-300', headerBg: 'bg-gray-800', icon: '🛡️', members: [] as any[], extraMembers: includedIns, total: 0, isFree: true, description: 'Proteção mínima obrigatória incluída na tarifa do veículo.' },
-                      { id: 'medium' as const, label: 'Médio', sublabel: 'Cobertura ampliada', badge: 'POPULAR', color: 'border-[#008d36]', headerBg: 'bg-[#008d36]', icon: '🛡️🛡️', members: mediumMembers, extraMembers: includedIns, total: sumBRL(mediumMembers), isFree: false, description: 'Amplia a proteção com coberturas adicionais como vidros, assistência e mais.' },
-                      { id: 'premium' as const, label: 'Premium', sublabel: 'Cobertura máxima', badge: 'COMPLETO', color: 'border-yellow-400', headerBg: 'bg-yellow-500', icon: '🏆', members: premiumAll, extraMembers: includedIns, total: sumBRL(premiumAll), isFree: false, description: 'Máxima cobertura: sem franquia, proteção total contra danos e roubo.' },
-                    ].filter(pkg => pkg.id === 'basic' || pkg.members.length > 0);
-
-                    const handleSelectPackage = (pkgId: 'none' | 'basic' | 'medium' | 'premium', members: any[]) => {
-                      setSelectedProtectionPackage(pkgId);
-                      const newMap: Record<string, number> = { ...selectedExtrasMap };
-                      for (const ins of quoteInsurances) { delete newMap[ins.code]; }
-                      for (const ins of members) { if (ins.type === 'O') newMap[ins.code] = 1; }
-                      setSelectedExtrasMap(newMap);
-                    };
-
-                     return (
+                    return (
                       <>
-                        <h3 className="font-extrabold text-2xl text-gray-900 mb-2">Proteções</h3>
-                        <p className="text-sm text-gray-500 mb-6">{t('extras.selectProtection')}</p>
-
+                        <ProtectionPackages cards={cards} selected={selPkg} currency={cur} fmt={fmtPrice} t={t} onSelect={onSelectPackage} />
+                        {avulsas.length > 0 && (
+                          <details className="mb-8">
+                            <summary className="cursor-pointer font-bold text-lg text-gray-900 mb-3">{t('pkg.others')}</summary>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                          {quoteInsurances
-                            .filter((ins: any) => ins.type !== 'M' && ins.code !== 'SL' && !extrasSearchCfg.disabledProtections.includes(String(ins.code).toUpperCase()))
+                          {avulsas
                             .map((ins: any) => {
                               const insId = ins.code;
                               const sel = selectedExtrasMap[insId] > 0;
@@ -3369,82 +3363,9 @@ function VehiclesContent() {
                               );
                             })}
                         </div>
+                          </details>
+                        )}
                       </>
-                    );
-                  })() : (() => {
-                    const basicWithExcess = (quoteInsurances || []).find(
-                      (ins: any) => (ins.type === 'I' || ins.type === 'M') && (ins.bkExcessWithPOM > 0 || ins.excessWithPOM > 0)
-                    );
-                    const excessBRL = basicWithExcess?.bkExcessWithPOM || 0;
-                    const excessOrig = basicWithExcess?.excessWithPOM || 0;
-                    const currency = selectedCar?.currency || 'EUR';
-
-                    return (
-                      <div className="border border-green-200 bg-gradient-to-r from-green-50/70 to-emerald-50/40 rounded-2xl p-5 md:p-6 mb-8 shadow-xs">
-                        <div className="flex items-start gap-3.5 mb-4">
-                          <div className="w-10 h-10 rounded-xl bg-[#008d36] text-white flex items-center justify-center text-xl shrink-0 shadow-sm">
-                            🛡️
-                          </div>
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="font-extrabold text-gray-900 text-base md:text-lg">
-                                Proteção Básica Inclusa
-                              </h3>
-                              <span className="text-[11px] bg-green-100 text-[#008d36] font-bold px-2.5 py-0.5 rounded-full border border-green-200">
-                                Já inclusa no valor
-                              </span>
-                            </div>
-                            <p className="text-xs md:text-sm text-gray-600 mt-0.5">
-                              Sua tarifa já contempla as coberturas obrigatórias da Europcar para você viajar com segurança e tranquilidade.
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Coberturas detalhadas da proteção básica */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 pt-3 border-t border-green-100">
-                          <div className="bg-white/80 rounded-xl p-3.5 border border-green-100/80 shadow-2xs">
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <span className="text-base">🚗</span>
-                              <h4 className="font-bold text-gray-900 text-xs md:text-sm">Danos e Colisão (CDW/LDW)</h4>
-                            </div>
-                            <p className="text-[11px] md:text-xs text-gray-600 leading-relaxed">
-                              Limita sua responsabilidade financeira em caso de avarias ou danos por colisão acidental ao veículo alugado.
-                            </p>
-                          </div>
-
-                          <div className="bg-white/80 rounded-xl p-3.5 border border-green-100/80 shadow-2xs">
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <span className="text-base">🔒</span>
-                              <h4 className="font-bold text-gray-900 text-xs md:text-sm">Roubo e Furto (THW/TP)</h4>
-                            </div>
-                            <p className="text-[11px] md:text-xs text-gray-600 leading-relaxed">
-                              Cobertura contra roubo ou furto total do veículo durante todo o período da locação.
-                            </p>
-                          </div>
-
-                          <div className="bg-white/80 rounded-xl p-3.5 border border-green-100/80 shadow-2xs">
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <span className="text-base">📄</span>
-                              <h4 className="font-bold text-gray-900 text-xs md:text-sm">Responsabilidade Civil (TPL)</h4>
-                            </div>
-                            <p className="text-[11px] md:text-xs text-gray-600 leading-relaxed">
-                              Proteção contra terceiros para danos materiais e corporais, conforme as leis do país de destino.
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Informação sobre franquia */}
-                        <div className="mt-3.5 pt-3 border-t border-green-100/70 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
-                          <span className="flex items-center gap-1.5">
-                            <span className="text-green-700 font-bold">ℹ️</span>
-                            {excessBRL > 0 ? (
-                              <span>Franquia padrão desta categoria: <strong className="text-gray-800">R$ {fmtPrice(excessBRL)}</strong> {excessOrig > 0 && `(${currency} ${fmtPrice(excessOrig)})`} (aplicada somente em caso de sinistro ou avaria).</span>
-                            ) : (
-                              <span>Proteção sujeita à coparticipação (franquia) padrão da locadora, acionada somente em caso de sinistro.</span>
-                            )}
-                          </span>
-                        </div>
-                      </div>
                     );
                   })()}
                   </>

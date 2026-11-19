@@ -1,5 +1,6 @@
 "use client";
 
+import { sanitizeMatrix, DEFAULT_PACKAGE_MATRIX, type PackageMatrix } from "@/lib/europcar/protectionPackages";
 import { useState, useEffect } from "react";
 import { PROTECTION_CATALOG, EXTRA_CATALOG } from "@/lib/extrasSearchCatalog";
 
@@ -25,6 +26,32 @@ export default function PainelExtras() {
   const [searchCfg, setSearchCfg] = useState<SearchCfg | null>(null);
   const [savingCfg, setSavingCfg] = useState<string | null>(null);
 
+  // Matriz dos pacotes (Básica/Conforto/Premium): quais códigos XRS formam cada nível
+  const matrixToText = (m: PackageMatrix) => ({
+    exclude: m.basicExclude.join(", "),
+    medium: m.medium.map((alt) => alt.join(" + ")).join("\n"),
+    premium: m.premium.map((alt) => alt.join(" + ")).join("\n"),
+  });
+  const [matrixText, setMatrixText] = useState(matrixToText(DEFAULT_PACKAGE_MATRIX));
+  const [savingMatrix, setSavingMatrix] = useState(false);
+  const parseAlternatives = (txt: string) => txt.split("\n").map((l) => l.split(/[+,]/).map((c) => c.trim()).filter(Boolean)).filter((a) => a.length > 0);
+  const saveMatrix = async () => {
+    setSavingMatrix(true);
+    try {
+      const packageMatrix = {
+        basicExclude: matrixText.exclude.split(/[,\s]+/).map((c) => c.trim()).filter(Boolean),
+        medium: parseAlternatives(matrixText.medium),
+        premium: parseAlternatives(matrixText.premium),
+      };
+      const r = await fetch("/api/admin/extras-search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ packageMatrix }) });
+      if (!r.ok) throw new Error("save failed");
+      const d = await r.json();
+      setMatrixText(matrixToText(sanitizeMatrix(d?.packageMatrix)));
+      showToast("Matriz dos pacotes salva!");
+    } catch { showToast("Erro ao salvar a matriz.", "error"); }
+    finally { setSavingMatrix(false); }
+  };
+
   const normalizeCfg = (d: any): SearchCfg => ({
     protections: d?.protections !== false,
     extras: d?.extras !== false,
@@ -33,7 +60,7 @@ export default function PainelExtras() {
   });
 
   const fetchSearchCfg = async () => {
-    try { const r = await fetch("/api/admin/extras-search", { cache: "no-store" }); if (r.ok) setSearchCfg(normalizeCfg(await r.json())); }
+    try { const r = await fetch("/api/admin/extras-search", { cache: "no-store" }); if (r.ok) { const d = await r.json(); setSearchCfg(normalizeCfg(d)); setMatrixText(matrixToText(sanitizeMatrix(d?.packageMatrix))); } }
     catch (e) { console.error(e); }
   };
 
@@ -199,6 +226,36 @@ export default function PainelExtras() {
           </div>
         )}
         {searchCfg && <p className="text-[11px] text-gray-500 mt-3">Itens que a XRS devolver e que não estiverem nas listas acima continuam aparecendo normalmente.</p>}
+      </div>
+
+      {/* ═══ MATRIZ DOS PACOTES DE PROTEÇÃO (Básica · Conforto · Premium) ═══ */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+        <h2 className="text-sm font-black text-white uppercase tracking-wider">Pacotes de proteção (Básica · Conforto · Premium)</h2>
+        <p className="text-xs text-gray-400 mt-1 mb-4">
+          Em cada busca, a tela monta os 3 pacotes <strong className="text-white">com o que a XRS devolver para aquela estação</strong> (nomes, franquia e preços vêm do XML).
+          Aqui você só define <strong className="text-white">quais códigos XRS formam cada nível</strong>. Se a estação não devolver os códigos, o pacote não aparece.
+        </p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <label className="block">
+            <span className="text-xs font-black text-white uppercase tracking-wider">Básica</span>
+            <span className="block text-[11px] text-gray-500 mb-1.5">Tudo que a XRS marca como incluso (type I/M). Códigos abaixo ficam de fora (não são proteção):</span>
+            <input id="matrix-basic-exclude" value={matrixText.exclude} onChange={(e) => setMatrixText({ ...matrixText, exclude: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono" placeholder="LAF" />
+          </label>
+          <label className="block">
+            <span className="text-xs font-black text-white uppercase tracking-wider">Conforto</span>
+            <span className="block text-[11px] text-gray-500 mb-1.5">Uma alternativa por linha, em ordem de preferência. Use + para combinar códigos.</span>
+            <textarea id="matrix-medium" rows={3} value={matrixText.medium} onChange={(e) => setMatrixText({ ...matrixText, medium: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono" placeholder={"MEDIUM\nSCDW + WWI + PAI"} />
+          </label>
+          <label className="block">
+            <span className="text-xs font-black text-white uppercase tracking-wider">Premium</span>
+            <span className="block text-[11px] text-gray-500 mb-1.5">Na tarifa ETO o Premium é o contrato Franquia Zero (não depende desta lista).</span>
+            <textarea id="matrix-premium" rows={3} value={matrixText.premium} onChange={(e) => setMatrixText({ ...matrixText, premium: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono" placeholder={"PREMIUM\nSLDW + SPAI"} />
+          </label>
+        </div>
+        <div className="flex items-center gap-3 mt-4">
+          <button type="button" id="matrix-save" disabled={savingMatrix} onClick={saveMatrix} className="bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg font-bold text-sm">{savingMatrix ? "Salvando..." : "Salvar matriz"}</button>
+          <button type="button" onClick={() => setMatrixText(matrixToText(DEFAULT_PACKAGE_MATRIX))} className="text-xs text-gray-400 hover:text-white underline">Restaurar padrão</button>
+        </div>
       </div>
 
       {loading ? (
