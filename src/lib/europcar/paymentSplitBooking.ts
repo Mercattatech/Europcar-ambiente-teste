@@ -15,6 +15,8 @@
 import { computePaymentSplit, formatBRL, AMOUNT_TOLERANCE, type PaymentSplit } from '@/lib/europcar/paymentSplit';
 import { isZeroExcessBooking } from '@/lib/europcar/protectionSummary';
 
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
 export function resolveBookedPaymentSplit(params: {
   bookResNode: any;
   bookingData: any;
