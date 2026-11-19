@@ -29,6 +29,11 @@ export interface XrsInsuranceRow {
 export interface PackageMatrix {
   /** códigos type=I/M do insuranceList que NÃO são proteção (ex.: taxas) → não listar na Básica */
   basicExclude: string[];
+  /**
+   * Quando a estação NÃO devolve nenhuma proteção inclusa (type I/M), a Básica vem de um opcional da XRS
+   * (ex.: Brasil devolve LDW como opcional com preço). Alternativas em ordem de preferência.
+   */
+  basicOptional: string[][];
   /** alternativas em ordem de preferência; vale a 1ª em que TODOS os códigos existem como opcionais */
   medium: string[][];
   premium: string[][];
@@ -36,6 +41,7 @@ export interface PackageMatrix {
 
 export const DEFAULT_PACKAGE_MATRIX: PackageMatrix = {
   basicExclude: ['LAF'],
+  basicOptional: [['LDW']],
   medium: [['MEDIUM'], ['SCDW', 'WWI', 'PAI']],
   premium: [['PREMIUM'], ['SLDW', 'SPAI'], ['SER-PACK'], ['SER-PP']],
 };
@@ -48,7 +54,12 @@ export interface PackageItem {
 
 export interface ProtectionPackage {
   id: 'basic' | 'medium' | 'premium';
+  /** itens PRÓPRIOS deste nível (code + descr do XML) */
   items: PackageItem[];
+  /** itens dos níveis inferiores (cada nível contém tudo o que o anterior tem) — só para exibição */
+  inherited: PackageItem[];
+  /** níveis inferiores que este contém */
+  inheritsFrom: Array<'basic' | 'medium'>;
   /** linhas opcionais (type=O) que entram na reserva ao escolher o pacote */
   members: XrsInsuranceRow[];
   /** adicional do pacote (BRL, total do período). Básica = 0 */
@@ -78,6 +89,7 @@ export function sanitizeMatrix(input: any): PackageMatrix {
     basicExclude: Array.isArray(input?.basicExclude)
       ? input.basicExclude.map(up).filter(Boolean)
       : DEFAULT_PACKAGE_MATRIX.basicExclude,
+    basicOptional: lists(input?.basicOptional, DEFAULT_PACKAGE_MATRIX.basicOptional),
     medium: lists(input?.medium, DEFAULT_PACKAGE_MATRIX.medium),
     premium: lists(input?.premium, DEFAULT_PACKAGE_MATRIX.premium),
   };
@@ -107,10 +119,12 @@ function firstAlternative(rows: XrsInsuranceRow[], alts: string[][]): XrsInsuran
   return null;
 }
 
-function build(id: 'medium' | 'premium', members: XrsInsuranceRow[]): ProtectionPackage {
+function build(id: 'basic' | 'medium' | 'premium', members: XrsInsuranceRow[]): ProtectionPackage {
   return {
     id,
     items: members.map(toItem),
+    inherited: [],
+    inheritsFrom: [],
     members,
     priceBRL: members.reduce((s, r) => s + num(r.rentalPriceInBookingCurrencyAI), 0),
     priceLocal: members.reduce((s, r) => s + num(r.rentalPriceAI), 0),
@@ -118,6 +132,11 @@ function build(id: 'medium' | 'premium', members: XrsInsuranceRow[]): Protection
     excessLocal: maxOrNull(members.map((r) => num(r.excessWithPOM)), members.length > 0),
   };
 }
+
+const dedupe = (list: PackageItem[]) => {
+  const seen = new Set<string>();
+  return list.filter((i) => (seen.has(i.code) ? false : (seen.add(i.code), true)));
+};
 
 export interface BuiltPackages {
   basic: ProtectionPackage | null;
@@ -130,29 +149,43 @@ export interface BuiltPackages {
  * @param matrix matriz de códigos por nível (padrão ou a configurada no painel)
  */
 export function buildProtectionPackages(rows: XrsInsuranceRow[], matrix: PackageMatrix = DEFAULT_PACKAGE_MATRIX): BuiltPackages {
-  const basic = basicRows(rows, matrix);
+  // Básica: 1) itens inclusos da XRS (type I/M)  2) senão, um opcional da XRS (ex.: LDW no Brasil)
+  const included = basicRows(rows, matrix);
+  let basic: ProtectionPackage | null = null;
+  if (included.length) {
+    basic = {
+      ...build('basic', []),
+      items: included.map(toItem),
+      excessBRL: maxOrNull(included.map((r) => num(r.bkExcessWithPOM)), true),
+      excessLocal: maxOrNull(included.map((r) => num(r.excessWithPOM)), true),
+    };
+  } else {
+    const opt = firstAlternative(rows, matrix.basicOptional);
+    if (opt) basic = build('basic', opt);
+  }
+
   const mediumM = firstAlternative(rows, matrix.medium);
   const premiumM = firstAlternative(rows, matrix.premium);
-  return {
-    basic: basic.length
-      ? {
-          id: 'basic',
-          items: basic.map(toItem),
-          members: [],
-          priceBRL: 0,
-          priceLocal: 0,
-          excessBRL: maxOrNull(basic.map((r) => num(r.bkExcessWithPOM)), true),
-          excessLocal: maxOrNull(basic.map((r) => num(r.excessWithPOM)), true),
-        }
-      : null,
-    medium: mediumM ? build('medium', mediumM) : null,
-    premium: premiumM ? build('premium', premiumM) : null,
-  };
+  const medium = mediumM ? build('medium', mediumM) : null;
+  const premium = premiumM ? build('premium', premiumM) : null;
+
+  // Cada nível contém tudo o que os inferiores têm (regra de exibição pedida pelo negócio):
+  //   Conforto = Básica + itens do Conforto · Premium = Básica + Conforto + itens do Premium
+  const basicItems = basic?.items ?? [];
+  if (medium) {
+    medium.inheritsFrom = basic ? ['basic'] : [];
+    medium.inherited = dedupe(basicItems).filter((i) => !medium.items.some((m) => m.code === i.code));
+  }
+  if (premium) {
+    premium.inheritsFrom = [...(basic ? (['basic'] as const) : []), ...(medium ? (['medium'] as const) : [])];
+    premium.inherited = dedupe([...basicItems, ...(medium?.items ?? [])]).filter((i) => !premium.items.some((m) => m.code === i.code));
+  }
+  return { basic, medium, premium };
 }
 
 /** Códigos que algum pacote usa (para a lista de coberturas avulsas não repeti-los). */
 export function packageMemberCodes(p: BuiltPackages): Set<string> {
   const s = new Set<string>();
-  for (const pkg of [p.medium, p.premium]) for (const m of pkg?.members || []) s.add(up(m.code));
+  for (const pkg of [p.basic, p.medium, p.premium]) for (const m of pkg?.members || []) s.add(up(m.code));
   return s;
 }

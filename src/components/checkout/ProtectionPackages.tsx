@@ -5,8 +5,13 @@ import type { PackageItem } from '@/lib/europcar/protectionPackages';
 
 export interface ProtectionCardData {
   id: 'basic' | 'medium' | 'premium';
-  /** itens informados pela XRS (code + descr do XML) */
+  /** itens PRÓPRIOS do nível, informados pela XRS (code + descr do XML) */
   items: PackageItem[];
+  /** itens dos níveis inferiores (cada nível contém tudo o que o anterior tem) */
+  inherited: PackageItem[];
+  inheritsFrom: Array<'basic' | 'medium'>;
+  /** Básica incluída na tarifa (true) ou opcional com preço (false) */
+  includedInRate?: boolean;
   /** franquia em BRL / moeda local (null = XML não informou) */
   excessBRL: number | null;
   excessLocal: number | null;
@@ -19,7 +24,7 @@ export interface ProtectionCardData {
 
 interface Props {
   cards: ProtectionCardData[];
-  selected: 'basic' | 'medium' | 'premium';
+  selected: 'basic' | 'medium' | 'premium' | 'none';
   currency: string;
   fmt: (n: number) => string;
   t: (key: any) => string;
@@ -27,6 +32,21 @@ interface Props {
 }
 
 const TITLE_KEY = { basic: 'pkg.basic', medium: 'pkg.medium', premium: 'pkg.premium' } as const;
+
+function ItemRow({ it, muted }: { it: PackageItem; muted?: boolean }) {
+  const showLabel = it.label !== it.code;
+  return (
+    <li className={`flex items-start gap-2 text-xs ${muted ? 'text-gray-500' : 'text-gray-800 font-medium'}`}>
+      <span className="text-[#008d36] font-bold shrink-0">✓</span>
+      <span>
+        {showLabel && it.label}
+        <span className={`${showLabel ? 'ml-1.5 ' : ''}text-[10px] font-black uppercase tracking-wider bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200`}>
+          {it.code}
+        </span>
+      </span>
+    </li>
+  );
+}
 
 export default function ProtectionPackages({ cards, selected, currency, fmt, t, onSelect }: Props) {
   if (!cards.length) return null;
@@ -56,39 +76,46 @@ export default function ProtectionPackages({ cards, selected, currency, fmt, t, 
               {c.excessBRL !== null && (
                 <p className={`text-xs font-bold mt-1 ${zeroExcess ? 'text-red-600' : 'text-gray-800'}`}>
                   {t('pkg.excess')}: R$ {fmt(c.excessBRL)}
-                  {!zeroExcess && c.excessLocal ? <span className="font-normal text-gray-500"> ({currency} {fmt(c.excessLocal)})</span> : null}
+                  {!zeroExcess && c.excessLocal && currency !== 'BRL' ? <span className="font-normal text-gray-500"> ({currency} {fmt(c.excessLocal)})</span> : null}
                 </p>
               )}
 
               {/* Adicional */}
               <div className="mt-3 mb-3">
-                {c.id === 'basic' ? (
+                {c.id === 'basic' && c.includedInRate !== false ? (
                   <span className="text-base font-extrabold text-[#008d36]">{t('pkg.included')}</span>
                 ) : (
                   <>
                     <span className="text-[10px] text-gray-400 uppercase font-bold block">{t('pkg.extra')}</span>
                     <span className="text-2xl font-black text-gray-900">+ R$ {fmt(c.extraBRL)}</span>
-                    {c.extraLocal > 0 && (
+                    {c.extraLocal > 0 && currency !== 'BRL' && (
                       <span className="text-xs text-gray-500 ml-2">({currency} {fmt(c.extraLocal)})</span>
                     )}
                   </>
                 )}
               </div>
 
-              {/* Itens que compõem o pacote — todos vindos da XRS */}
-              <ul className="space-y-2 border-t border-gray-100 pt-3 mb-4 flex-1">
-                {c.items.map((it) => (
-                  <li key={it.code} className="flex items-start gap-2 text-xs text-gray-700">
-                    <span className="text-[#008d36] font-bold shrink-0">✓</span>
-                    <span>
-                      {it.label !== it.code && it.label}
-                      <span className={`${it.label !== it.code ? 'ml-1.5 ' : ''}text-[10px] font-black uppercase tracking-wider bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200`}>
-                        {it.code}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              {/* Itens do pacote — todos vindos da XRS. Cada nível mostra primeiro o que herda dos inferiores */}
+              <div className="border-t border-gray-100 pt-3 mb-4 flex-1">
+                {c.inherited.length > 0 && (
+                  <>
+                    <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400 mb-1.5">
+                      {t('pkg.includes')} {c.inheritsFrom.map((i) => t(TITLE_KEY[i])).join(' + ')}
+                    </p>
+                    <ul className="space-y-1.5 mb-3">
+                      {c.inherited.map((it) => (
+                        <ItemRow key={`inh-${it.code}`} it={it} muted />
+                      ))}
+                    </ul>
+                    <p className="text-[10px] uppercase font-bold tracking-wider text-[#008d36] mb-1.5">+ {t(TITLE_KEY[c.id])}</p>
+                  </>
+                )}
+                <ul className="space-y-1.5">
+                  {c.items.map((it) => (
+                    <ItemRow key={it.code} it={it} />
+                  ))}
+                </ul>
+              </div>
 
               <button
                 type="button"

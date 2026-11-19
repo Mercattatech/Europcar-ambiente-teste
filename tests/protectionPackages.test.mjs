@@ -124,3 +124,37 @@ test('Contrato Franquia Zero ETO (XML real): itens embutidos type=M vêm do XML'
   assert.deepEqual(embedded, ['SPCDW', 'SPTHW', 'WWI']);
   assert.ok(rows.filter((r) => r.type === 'M').every((r) => r.excessWithPOM === 0));
 });
+
+// ───────── Cada nível contém tudo dos inferiores ─────────
+test('Lisboa: Conforto herda a Básica e Premium herda Básica + Conforto (itens do XML)', async () => {
+  const pk = buildProtectionPackages(await quoteRows());
+  assert.deepEqual(pk.basic.items.map((i) => i.code), ['LDW']);
+  assert.deepEqual(pk.medium.inherited.map((i) => i.code), ['LDW']);
+  assert.deepEqual(pk.medium.items.map((i) => i.code), ['MEDIUM']);
+  assert.deepEqual(pk.medium.inheritsFrom, ['basic']);
+  assert.deepEqual(pk.premium.inherited.map((i) => i.code), ['LDW', 'MEDIUM']);
+  assert.deepEqual(pk.premium.items.map((i) => i.code), ['PREMIUM']);
+  assert.deepEqual(pk.premium.inheritsFrom, ['basic', 'medium']);
+  // o preço do pacote é só o do próprio código (os pacotes são alternativas, não somam)
+  assert.equal(pk.premium.priceBRL, 229.65);
+});
+
+test('Guarulhos (XML real QCVC01): sem item incluso → Básica = LDW opcional; Conforto herda LDW; sem Premium', async () => {
+  const xml = fs.readFileSync(new URL('./fixtures/xrs-getQuote-POA-QCVC01-CDMR.xml', import.meta.url), 'utf8');
+  const p = await parseStringPromise(xml, { explicitArray: false });
+  const rows = rowsFromInsuranceNodes(arr(p.message.serviceResponse.reservation.quote.insuranceList.insurance));
+  assert.deepEqual(rows.map((r) => r.code).sort(), ['LDW', 'MEDIUM', 'TPL']);
+  assert.ok(rows.every((r) => r.type === 'O')); // a XRS não marca nada como incluso no Brasil
+  const pk = buildProtectionPackages(rows);
+  assert.deepEqual(pk.basic.items.map((i) => i.code), ['LDW']);
+  assert.deepEqual(pk.basic.members.map((m) => m.code), ['LDW']); // entra na reserva ao escolher
+  assert.equal(pk.basic.excessBRL, 5000);
+  assert.deepEqual(pk.medium.items.map((i) => i.code), ['MEDIUM']);
+  assert.deepEqual(pk.medium.inherited.map((i) => i.code), ['LDW']);
+  assert.equal(pk.medium.excessBRL, 2500);
+  assert.equal(pk.medium.priceBRL, 196.48);
+  assert.equal(pk.premium, null);
+  // TPL e LDW/MEDIUM: LDW e MEDIUM são pacotes; TPL fica como cobertura avulsa
+  const used = packageMemberCodes(pk);
+  assert.ok(used.has('LDW') && used.has('MEDIUM') && !used.has('TPL'));
+});

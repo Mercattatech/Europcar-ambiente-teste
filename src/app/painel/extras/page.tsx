@@ -29,6 +29,7 @@ export default function PainelExtras() {
   // Matriz dos pacotes (Básica/Conforto/Premium): quais códigos XRS formam cada nível
   const matrixToText = (m: PackageMatrix) => ({
     exclude: m.basicExclude.join(", "),
+    basicOptional: m.basicOptional.map((alt) => alt.join(" + ")).join("\n"),
     medium: m.medium.map((alt) => alt.join(" + ")).join("\n"),
     premium: m.premium.map((alt) => alt.join(" + ")).join("\n"),
   });
@@ -40,6 +41,7 @@ export default function PainelExtras() {
     try {
       const packageMatrix = {
         basicExclude: matrixText.exclude.split(/[,\s]+/).map((c) => c.trim()).filter(Boolean),
+        basicOptional: parseAlternatives(matrixText.basicOptional),
         medium: parseAlternatives(matrixText.medium),
         premium: parseAlternatives(matrixText.premium),
       };
@@ -235,11 +237,16 @@ export default function PainelExtras() {
           Em cada busca, a tela monta os 3 pacotes <strong className="text-white">com o que a XRS devolver para aquela estação</strong> (nomes, franquia e preços vêm do XML).
           Aqui você só define <strong className="text-white">quais códigos XRS formam cada nível</strong>. Se a estação não devolver os códigos, o pacote não aparece.
         </p>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
           <label className="block">
             <span className="text-xs font-black text-white uppercase tracking-wider">Básica</span>
             <span className="block text-[11px] text-gray-500 mb-1.5">Tudo que a XRS marca como incluso (type I/M). Códigos abaixo ficam de fora (não são proteção):</span>
             <input id="matrix-basic-exclude" value={matrixText.exclude} onChange={(e) => setMatrixText({ ...matrixText, exclude: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono" placeholder="LAF" />
+          </label>
+          <label className="block">
+            <span className="text-xs font-black text-white uppercase tracking-wider">Básica (quando não houver inclusa)</span>
+            <span className="block text-[11px] text-gray-500 mb-1.5">Se a estação não devolver nenhuma proteção inclusa (ex.: Brasil), a Básica vem deste opcional da XRS.</span>
+            <textarea id="matrix-basic-optional" rows={3} value={matrixText.basicOptional} onChange={(e) => setMatrixText({ ...matrixText, basicOptional: e.target.value })} className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono" placeholder="LDW" />
           </label>
           <label className="block">
             <span className="text-xs font-black text-white uppercase tracking-wider">Conforto</span>

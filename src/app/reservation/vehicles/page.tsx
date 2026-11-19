@@ -3172,28 +3172,38 @@ function VehiclesContent() {
                     };
                     })() : null;
 
-                    // ── Cartões: Básica · Conforto · Premium ──
+                    // ── Cartões: Básica · Conforto · Premium (cada nível contém tudo dos inferiores) ──
+                    const basicIncluded = !!pk.basic && pk.basic.members.length === 0;
                     const cards: ProtectionCardData[] = [];
-                    if (pk.basic) cards.push({ id: 'basic', items: pk.basic.items, excessBRL: pk.basic.excessBRL, excessLocal: pk.basic.excessLocal, extraBRL: 0, extraLocal: 0 });
-                    if (pk.medium) cards.push({ id: 'medium', items: pk.medium.items, excessBRL: pk.medium.excessBRL, excessLocal: pk.medium.excessLocal, extraBRL: pk.medium.priceBRL, extraLocal: pk.medium.priceLocal });
-                    if (zero) cards.push({ id: 'premium', items: zero.items, excessBRL: zero.excessBRL, excessLocal: zero.excessLocal, extraBRL: zero.upgradeBRL, extraLocal: zero.upgradeCost });
-                    else if (pk.premium) cards.push({ id: 'premium', items: pk.premium.items, excessBRL: pk.premium.excessBRL, excessLocal: pk.premium.excessLocal, extraBRL: pk.premium.priceBRL, extraLocal: pk.premium.priceLocal });
+                    if (pk.basic) cards.push({ id: 'basic', items: pk.basic.items, inherited: [], inheritsFrom: [], includedInRate: basicIncluded, excessBRL: pk.basic.excessBRL, excessLocal: pk.basic.excessLocal, extraBRL: pk.basic.priceBRL, extraLocal: pk.basic.priceLocal });
+                    if (pk.medium) cards.push({ id: 'medium', items: pk.medium.items, inherited: pk.medium.inherited, inheritsFrom: pk.medium.inheritsFrom, excessBRL: pk.medium.excessBRL, excessLocal: pk.medium.excessLocal, extraBRL: pk.medium.priceBRL, extraLocal: pk.medium.priceLocal });
+                    if (zero) {
+                      // Premium ETO = contrato Franquia Zero: herda Básica + Conforto e acrescenta o que o contrato embute (XML)
+                      const inh = [...(pk.basic?.items || []), ...(pk.medium?.items || [])].filter((i, n, arr) => arr.findIndex((x) => x.code === i.code) === n && !zero.items.some((z: any) => z.code === i.code));
+                      cards.push({ id: 'premium', items: zero.items, inherited: inh, inheritsFrom: [...(pk.basic ? ['basic' as const] : []), ...(pk.medium ? ['medium' as const] : [])], excessBRL: zero.excessBRL, excessLocal: zero.excessLocal, extraBRL: zero.upgradeBRL, extraLocal: zero.upgradeCost });
+                    } else if (pk.premium) {
+                      cards.push({ id: 'premium', items: pk.premium.items, inherited: pk.premium.inherited, inheritsFrom: pk.premium.inheritsFrom, excessBRL: pk.premium.excessBRL, excessLocal: pk.premium.excessLocal, extraBRL: pk.premium.priceBRL, extraLocal: pk.premium.priceLocal });
+                    }
 
                     // Pacote selecionado é DERIVADO do estado (sempre coerente com o que vai para a reserva)
                     const hasAll = (pkg: any) => !!pkg && pkg.members.length > 0 && pkg.members.every((m: any) => (selectedExtrasMap[m.code] || 0) > 0);
                     const premiumSel = zero ? zeroExcessUpgrade : hasAll(pk.premium);
                     const mediumSel = !premiumSel && hasAll(pk.medium);
-                    const selPkg: 'basic' | 'medium' | 'premium' = premiumSel ? 'premium' : mediumSel ? 'medium' : 'basic';
+                    const basicOptSel = !premiumSel && !mediumSel && hasAll(pk.basic);
+                    const selPkg: 'basic' | 'medium' | 'premium' | 'none' = premiumSel ? 'premium' : mediumSel ? 'medium' : (basicOptSel || basicIncluded) ? 'basic' : 'none';
 
-                    // Exclusão mútua: ao escolher um pacote, remove os códigos dos outros e liga/desliga a Franquia Zero
+                    // Exclusão mútua: ao escolher um pacote, remove os códigos dos outros e liga/desliga a Franquia Zero.
+                    // Clicar de novo no pacote já escolhido (e opcional) desfaz a escolha.
                     const onSelectPackage = (id: 'basic' | 'medium' | 'premium') => {
+                      const target: 'basic' | 'medium' | 'premium' | 'none' = id === selPkg && !(id === 'basic' && basicIncluded) ? 'none' : id;
                       const newMap: Record<string, number> = { ...selectedExtrasMap };
-                      for (const m of [...(pk.medium?.members || []), ...(pk.premium?.members || [])]) delete newMap[m.code];
-                      if (id === 'medium') for (const m of pk.medium?.members || []) newMap[m.code] = 1;
-                      if (id === 'premium' && !zero) for (const m of pk.premium?.members || []) newMap[m.code] = 1;
+                      for (const m of [...(pk.basic?.members || []), ...(pk.medium?.members || []), ...(pk.premium?.members || [])]) delete newMap[m.code];
+                      if (target === 'basic') for (const m of pk.basic?.members || []) newMap[m.code] = 1;
+                      if (target === 'medium') for (const m of pk.medium?.members || []) newMap[m.code] = 1;
+                      if (target === 'premium' && !zero) for (const m of pk.premium?.members || []) newMap[m.code] = 1;
                       setSelectedExtrasMap(newMap);
-                      setSelectedProtectionPackage(id);
-                      if (zero) zero.applyZero(id === 'premium');
+                      setSelectedProtectionPackage(target);
+                      if (zero) zero.applyZero(target === 'premium');
                     };
 
                     // Coberturas avulsas = opcionais da XRS que não pertencem a nenhum pacote
